@@ -3,8 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { listStepsForAssemblyQuery } from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
+import { buildQueryString } from "../../utils/odata-helpers.js";
+import { fetchPluginSteps } from "./plugin-inventory.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -32,11 +33,27 @@ export function registerListPluginSteps(
     async ({ environment, pluginName }) => {
       try {
         const env = getEnvironment(config, environment);
-        const steps = await client.query<Record<string, unknown>>(
+        const assemblies = await client.query<Record<string, unknown>>(
           env,
-          "sdkmessageprocessingsteps",
-          listStepsForAssemblyQuery(pluginName),
+          "pluginassemblies",
+          buildQueryString({
+            select: ["pluginassemblyid", "name"],
+            filter: `name eq '${pluginName}'`,
+          }),
         );
+
+        if (assemblies.length === 0) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Plugin assembly '${pluginName}' not found in '${env.name}'.`,
+              },
+            ],
+          };
+        }
+
+        const steps = await fetchPluginSteps(env, client, assemblies);
 
         if (steps.length === 0) {
           return {
@@ -51,13 +68,10 @@ export function registerListPluginSteps(
 
         const headers = ["Step Name", "Message", "Entity", "Stage", "Mode", "Status", "Rank"];
         const rows = steps.map((s) => {
-          const message = (s.sdkmessageid as Record<string, unknown>)?.name || "";
-          const entity =
-            (s.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none";
           return [
             String(s.name || ""),
-            String(message),
-            String(entity),
+            String(s.messageName || ""),
+            String(s.primaryEntity || "none"),
             STAGE_LABELS[s.stage as number] || String(s.stage),
             MODE_LABELS[s.mode as number] || String(s.mode),
             s.statecode === 0 ? "Enabled" : "Disabled",

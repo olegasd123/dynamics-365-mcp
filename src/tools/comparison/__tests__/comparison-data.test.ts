@@ -40,11 +40,13 @@ describe("comparePluginsData", () => {
             plugintypeid: "type-1",
             name: "AccountPlugin",
             typename: "Core.Plugins.AccountPlugin",
+            _pluginassemblyid_value: "asm-1",
           },
         ],
         sdkmessageprocessingsteps: [
           {
             sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
             name: "Account Create",
             stage: 20,
             mode: 0,
@@ -60,6 +62,7 @@ describe("comparePluginsData", () => {
         sdkmessageprocessingstepimages: [
           {
             sdkmessageprocessingstepimageid: "img-1",
+            _sdkmessageprocessingstepid_value: "step-1",
             name: "PreImage",
             entityalias: "pre",
             imagetype: 0,
@@ -83,11 +86,13 @@ describe("comparePluginsData", () => {
             plugintypeid: "type-1",
             name: "AccountPlugin",
             typename: "Core.Plugins.AccountPlugin",
+            _pluginassemblyid_value: "asm-1",
           },
         ],
         sdkmessageprocessingsteps: [
           {
             sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
             name: "Account Create",
             stage: 20,
             mode: 0,
@@ -103,6 +108,7 @@ describe("comparePluginsData", () => {
         sdkmessageprocessingstepimages: [
           {
             sdkmessageprocessingstepimageid: "img-1",
+            _sdkmessageprocessingstepid_value: "step-1",
             name: "PreImage",
             entityalias: "pre",
             imagetype: 0,

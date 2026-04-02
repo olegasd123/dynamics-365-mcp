@@ -3,13 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import {
-  listPluginStepsQuery,
-  listPluginImagesQuery,
-  listPluginTypesQuery,
-} from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
+import { fetchPluginInventory } from "./plugin-inventory.js";
 
 const IMAGE_TYPE_LABELS: Record<number, string> = {
   0: "PreImage",
@@ -56,50 +52,16 @@ export function registerListPluginImages(
           };
         }
 
-        const assemblyId = assemblies[0].pluginassemblyid as string;
-
-        // Get plugin types for the assembly
-        const types = await client.query<Record<string, unknown>>(
-          env,
-          "plugintypes",
-          listPluginTypesQuery(assemblyId),
-        );
-
-        // Get steps for all types, then images for each step
-        const allImages: {
-          stepName: string;
-          messageName: string;
-          image: Record<string, unknown>;
-        }[] = [];
-
-        for (const type of types) {
-          const steps = await client.query<Record<string, unknown>>(
-            env,
-            "sdkmessageprocessingsteps",
-            listPluginStepsQuery(type.plugintypeid as string),
-          );
-
-          for (const step of steps) {
-            const msgName = ((step.sdkmessageid as Record<string, unknown>)?.name as string) || "";
-
-            if (message && msgName.toLowerCase() !== message.toLowerCase()) continue;
-            if (stepName && step.name !== stepName) continue;
-
-            const images = await client.query<Record<string, unknown>>(
-              env,
-              "sdkmessageprocessingstepimages",
-              listPluginImagesQuery(step.sdkmessageprocessingstepid as string),
-            );
-
-            for (const img of images) {
-              allImages.push({
-                stepName: String(step.name || ""),
-                messageName: msgName,
-                image: img,
-              });
-            }
+        const inventory = await fetchPluginInventory(env, client, assemblies);
+        const allImages = inventory.images.filter((image) => {
+          if (message && String(image.messageName || "").toLowerCase() !== message.toLowerCase()) {
+            return false;
           }
-        }
+          if (stepName && String(image.stepName || "") !== stepName) {
+            return false;
+          }
+          return true;
+        });
 
         if (allImages.length === 0) {
           let filterDesc = `plugin '${pluginName}'`;
@@ -116,13 +78,13 @@ export function registerListPluginImages(
         }
 
         const headers = ["Step", "Message", "Image Name", "Alias", "Type", "Attributes"];
-        const rows = allImages.map((entry) => [
-          entry.stepName,
-          entry.messageName,
-          String(entry.image.name || ""),
-          String(entry.image.entityalias || ""),
-          IMAGE_TYPE_LABELS[entry.image.imagetype as number] || String(entry.image.imagetype),
-          String(entry.image.attributes || "(all)"),
+        const rows = allImages.map((image) => [
+          String(image.stepName || ""),
+          String(image.messageName || ""),
+          String(image.name || ""),
+          String(image.entityalias || ""),
+          IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
+          String(image.attributes || "(all)"),
         ]);
 
         const text = `## Plugin Images for '${pluginName}' in '${env.name}'\n\nFound ${allImages.length} image(s).\n\n${formatTable(headers, rows)}`;

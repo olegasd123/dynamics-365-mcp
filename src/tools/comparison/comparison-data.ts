@@ -1,19 +1,15 @@
 import { createHash } from "node:crypto";
-import type { AppConfig, EnvironmentConfig } from "../../config/types.js";
+import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import {
-  listPluginAssembliesQuery,
-  listPluginImagesQuery,
-  listPluginStepsQuery,
-  listPluginTypesQuery,
-} from "../../queries/plugin-queries.js";
+import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { diffCollections, type DiffResult } from "../../utils/diff.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
+import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
 
 export interface CollectionComparisonData<T extends Record<string, unknown>> {
   sourceItems: T[];
@@ -234,139 +230,4 @@ export async function compareWebResourcesData(
   );
 
   return { sourceItems, targetItems, result };
-}
-
-async function fetchPluginInventory(
-  env: EnvironmentConfig,
-  client: DynamicsClient,
-  assemblies: Record<string, unknown>[],
-): Promise<{
-  steps: Record<string, unknown>[];
-  images: Record<string, unknown>[];
-}> {
-  if (assemblies.length === 0) {
-    return { steps: [], images: [] };
-  }
-
-  const typeRecords = (
-    await Promise.all(
-      assemblies.map(async (assembly) => {
-        const types = await client.query<Record<string, unknown>>(
-          env,
-          "plugintypes",
-          listPluginTypesQuery(String(assembly.pluginassemblyid)),
-        );
-
-        return types.map((type) => ({
-          assemblyName: String(assembly.name || ""),
-          pluginTypeName: String(type.name || ""),
-          pluginTypeFullName: String(type.typename || ""),
-          pluginTypeId: String(type.plugintypeid || ""),
-        }));
-      }),
-    )
-  ).flat();
-
-  const stepRecords = (
-    await Promise.all(
-      typeRecords.map(async (typeRecord) => {
-        const steps = await client.query<Record<string, unknown>>(
-          env,
-          "sdkmessageprocessingsteps",
-          listPluginStepsQuery(typeRecord.pluginTypeId),
-        );
-
-        return steps.map((step) => normalizePluginStep(typeRecord, step));
-      }),
-    )
-  ).flat();
-
-  const imageRecords = (
-    await Promise.all(
-      stepRecords.map(async (stepRecord) => {
-        const images = await client.query<Record<string, unknown>>(
-          env,
-          "sdkmessageprocessingstepimages",
-          listPluginImagesQuery(String(stepRecord.sdkmessageprocessingstepid)),
-        );
-
-        return images.map((image) => normalizePluginImage(stepRecord, image));
-      }),
-    )
-  ).flat();
-
-  return { steps: stepRecords, images: imageRecords };
-}
-
-function normalizePluginStep(
-  typeRecord: {
-    assemblyName: string;
-    pluginTypeName: string;
-    pluginTypeFullName: string;
-  },
-  step: Record<string, unknown>,
-): Record<string, unknown> {
-  const messageName = String((step.sdkmessageid as Record<string, unknown>)?.name || "");
-  const primaryEntity = String(
-    (step.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none",
-  );
-  const stage = String(step.stage ?? "");
-  const mode = String(step.mode ?? "");
-  const rank = String(step.rank ?? "");
-  const name = String(step.name || "");
-  const key = [
-    typeRecord.assemblyName,
-    typeRecord.pluginTypeFullName,
-    messageName,
-    primaryEntity,
-    stage,
-    mode,
-    rank,
-    name,
-  ].join(" | ");
-
-  return {
-    key,
-    displayName: `${typeRecord.assemblyName} :: ${name} [${messageName}/${primaryEntity}]`,
-    assemblyName: typeRecord.assemblyName,
-    pluginTypeName: typeRecord.pluginTypeName,
-    pluginTypeFullName: typeRecord.pluginTypeFullName,
-    name,
-    messageName,
-    primaryEntity,
-    stage: step.stage,
-    mode: step.mode,
-    rank: step.rank,
-    statecode: step.statecode,
-    filteringattributes: step.filteringattributes || "",
-    supporteddeployment: step.supporteddeployment,
-    asyncautodelete: step.asyncautodelete,
-    sdkmessageprocessingstepid: step.sdkmessageprocessingstepid,
-  };
-}
-
-function normalizePluginImage(
-  stepRecord: Record<string, unknown>,
-  image: Record<string, unknown>,
-): Record<string, unknown> {
-  const name = String(image.name || "");
-  const imageType = String(image.imagetype ?? "");
-  const alias = String(image.entityalias || "");
-  const key = [String(stepRecord.key || ""), name, imageType, alias].join(" | ");
-
-  return {
-    key,
-    displayName: `${stepRecord.displayName} :: ${name}`,
-    assemblyName: stepRecord.assemblyName,
-    pluginTypeName: stepRecord.pluginTypeName,
-    stepName: stepRecord.name,
-    messageName: stepRecord.messageName,
-    primaryEntity: stepRecord.primaryEntity,
-    stepKey: stepRecord.key,
-    name,
-    entityalias: image.entityalias || "",
-    imagetype: image.imagetype,
-    attributes: image.attributes || "",
-    messagepropertyname: image.messagepropertyname || "",
-  };
 }

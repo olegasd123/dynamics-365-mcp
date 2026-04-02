@@ -3,12 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import {
-  listPluginTypesQuery,
-  listPluginStepsQuery,
-  listPluginImagesQuery,
-} from "../../queries/plugin-queries.js";
+import { listPluginTypesForAssembliesQuery } from "../../queries/plugin-queries.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
+import { fetchPluginInventory } from "./plugin-inventory.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -78,8 +75,25 @@ export function registerGetPluginDetails(
         const types = await client.query<Record<string, unknown>>(
           env,
           "plugintypes",
-          listPluginTypesQuery(assembly.pluginassemblyid as string),
+          listPluginTypesForAssembliesQuery([String(assembly.pluginassemblyid)]),
         );
+        const inventory = await fetchPluginInventory(env, client, [assembly]);
+        const stepsByPluginTypeId = new Map<string, Record<string, unknown>[]>();
+        const imagesByStepId = new Map<string, Record<string, unknown>[]>();
+
+        for (const step of inventory.steps) {
+          const pluginTypeId = String(step.pluginTypeId || "");
+          const steps = stepsByPluginTypeId.get(pluginTypeId) || [];
+          steps.push(step);
+          stepsByPluginTypeId.set(pluginTypeId, steps);
+        }
+
+        for (const image of inventory.images) {
+          const stepId = String(image.sdkmessageprocessingstepid || "");
+          const images = imagesByStepId.get(stepId) || [];
+          images.push(image);
+          imagesByStepId.set(stepId, images);
+        }
 
         lines.push(`### Plugin Types (${types.length})`);
 
@@ -87,11 +101,7 @@ export function registerGetPluginDetails(
           lines.push(`\n#### ${type.name} (\`${type.typename}\`)`);
           if (type.isworkflowactivity) lines.push("  - *Workflow Activity*");
 
-          const steps = await client.query<Record<string, unknown>>(
-            env,
-            "sdkmessageprocessingsteps",
-            listPluginStepsQuery(type.plugintypeid as string),
-          );
+          const steps = stepsByPluginTypeId.get(String(type.plugintypeid || "")) || [];
 
           if (steps.length === 0) {
             lines.push("  - No registered steps");
@@ -100,27 +110,20 @@ export function registerGetPluginDetails(
 
           lines.push(`  **Steps (${steps.length}):**`);
           for (const step of steps) {
-            const msg = (step.sdkmessageid as Record<string, unknown>)?.name || "";
-            const entity =
-              (step.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none";
             const stage = STAGE_LABELS[step.stage as number] || String(step.stage);
             const mode = MODE_LABELS[step.mode as number] || String(step.mode);
             const status = step.statecode === 0 ? "Enabled" : "Disabled";
 
             lines.push(`  - **${step.name}**`);
             lines.push(
-              `    Message: ${msg} | Entity: ${entity} | Stage: ${stage} | Mode: ${mode} | Status: ${status}`,
+              `    Message: ${step.messageName || ""} | Entity: ${step.primaryEntity || "none"} | Stage: ${stage} | Mode: ${mode} | Status: ${status}`,
             );
 
             if (step.filteringattributes) {
               lines.push(`    Filtering: ${step.filteringattributes}`);
             }
 
-            const images = await client.query<Record<string, unknown>>(
-              env,
-              "sdkmessageprocessingstepimages",
-              listPluginImagesQuery(step.sdkmessageprocessingstepid as string),
-            );
+            const images = imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || [];
 
             if (images.length > 0) {
               lines.push(`    **Images (${images.length}):**`);

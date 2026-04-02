@@ -5,10 +5,9 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
   listPluginAssembliesQuery,
-  listPluginTypesQuery,
-  listPluginStepsQuery,
 } from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
+import { fetchPluginSteps } from "./plugin-inventory.js";
 
 export function registerListPlugins(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
@@ -33,34 +32,11 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         let results = assemblies;
 
         if (filter === "no_steps") {
-          const orphaned: Record<string, unknown>[] = [];
-
-          for (const assembly of assemblies) {
-            const types = await client.query<Record<string, unknown>>(
-              env,
-              "plugintypes",
-              listPluginTypesQuery(assembly.pluginassemblyid as string),
-            );
-
-            let hasSteps = false;
-            for (const type of types) {
-              const steps = await client.query<Record<string, unknown>>(
-                env,
-                "sdkmessageprocessingsteps",
-                listPluginStepsQuery(type.plugintypeid as string),
-              );
-              if (steps.length > 0) {
-                hasSteps = true;
-                break;
-              }
-            }
-
-            if (!hasSteps) {
-              orphaned.push(assembly);
-            }
-          }
-
-          results = orphaned;
+          const steps = await fetchPluginSteps(env, client, assemblies);
+          const assemblyIdsWithSteps = new Set(steps.map((step) => String(step.assemblyId || "")));
+          results = assemblies.filter(
+            (assembly) => !assemblyIdsWithSteps.has(String(assembly.pluginassemblyid || "")),
+          );
         }
 
         if (results.length === 0) {
