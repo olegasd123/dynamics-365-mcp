@@ -174,4 +174,25 @@ describe("compare_environment_matrix tool", () => {
     expect(text).toContain("test");
     expect(text).toContain("Aligned");
   });
+
+  it("returns an error when no target environments remain after filtering", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["prod"]);
+    const { client } = createRecordingClient({
+      prod: {
+        pluginassemblies: [],
+      },
+    });
+
+    registerCompareEnvironmentMatrix(server as never, config, client);
+
+    const response = await server.getHandler("compare_environment_matrix")({
+      baselineEnvironment: "prod",
+      targetEnvironments: ["prod"],
+      componentType: "plugins",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("No target environments found for baseline 'prod'.");
+  });
 });

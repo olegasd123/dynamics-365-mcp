@@ -71,4 +71,39 @@ describe("list_plugin_steps tool", () => {
       "sdkmessageprocessingsteps",
     ]);
   });
+
+  it("returns an error when the environment does not exist", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({ dev: {} });
+
+    registerListPluginSteps(server as never, config, client);
+
+    const response = await server.getHandler("list_plugin_steps")({
+      environment: "prod",
+      pluginName: "Core.Plugins",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("Environment 'prod' not found");
+  });
+
+  it("returns a not found message when the plugin assembly does not exist", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        pluginassemblies: [],
+      },
+    });
+
+    registerListPluginSteps(server as never, config, client);
+
+    const response = await server.getHandler("list_plugin_steps")({
+      pluginName: "Missing.Plugin",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
+  });
 });
