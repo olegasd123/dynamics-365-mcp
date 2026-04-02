@@ -8,7 +8,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
 - **Transport**: stdio
-- **Auth**: Azure AD OAuth2 — client credentials flow (app registration + client secret)
+- **Auth**: Azure AD OAuth2 — client secret or interactive device code
 - **Package manager**: npm
 
 ## Architecture
@@ -20,7 +20,7 @@ src/
     types.ts                        # Environment config interfaces
     environments.ts                 # Config loader (JSON file, connection string envs)
   auth/
-    token-manager.ts                # OAuth2 client credentials + per-env token cache
+    token-manager.ts                # OAuth2 token flows + per-env token cache
   client/
     dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
   tools/
@@ -84,6 +84,7 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json
       "name": "dev",
       "url": "https://dev-org.crm.dynamics.com",
       "tenantId": "...",
+      "authType": "clientSecret",
       "clientId": "...",
       "clientSecret": "..."
     },
@@ -91,6 +92,7 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json
       "name": "prod",
       "url": "https://prod-org.crm.dynamics.com",
       "tenantId": "...",
+      "authType": "clientSecret",
       "clientId": "...",
       "clientSecret": "..."
     }
@@ -99,12 +101,39 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json
 }
 ```
 
+### JSON Config File With Interactive Auth
+
+Use this when the user can sign in in a browser and does not have a client secret.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://dev-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "deviceCode",
+      "clientId": "..."
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+`clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
+
 ### Connection String (single env)
 
 Via `D365_CONNECTION_STRING` env var:
 
 ```
 AuthType=ClientSecret;Url=https://org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=...
+```
+
+Interactive auth:
+
+```
+AuthType=DeviceCode;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...
 ```
 
 ### Connection Strings JSON (multiple envs)
@@ -258,12 +287,13 @@ Use `uniqueName` when possible. It is safer than display name.
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
 3. If token is valid (not within 5 min of expiry), return cached token
-4. Otherwise, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
+4. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
    - `grant_type=client_credentials`
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-5. Cache new token with `expiresAt = now + expires_in - 300s`
+5. For `deviceCode` auth, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+6. Cache new token with `expiresAt = now + expires_in - 300s`
 
 ## Cross-Environment Comparison Design
 

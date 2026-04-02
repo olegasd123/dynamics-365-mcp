@@ -7,6 +7,7 @@ const environment = {
   name: "dev",
   url: "https://dev.crm.dynamics.com",
   tenantId: "tenant-id",
+  authType: "clientSecret" as const,
   clientId: "client-id",
   clientSecret: "client-secret",
 };
@@ -14,6 +15,13 @@ const environment = {
 function createTokenResponse(token: string): Response {
   return new Response(JSON.stringify({ access_token: token, expires_in: 3600 }), {
     status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function createJsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
     headers: { "Content-Type": "application/json" },
   });
 }
@@ -74,5 +82,51 @@ describe("TokenManager", () => {
 
     await expect(manager.getToken(environment)).rejects.toBeInstanceOf(AuthenticationError);
     await expect(manager.getToken(environment)).rejects.toThrow("Network error: network down");
+  });
+
+  it("supports device code auth without a client secret", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((callback: TimerHandler) => {
+      if (typeof callback === "function") {
+        callback();
+      }
+      return 0 as NodeJS.Timeout;
+    }) as typeof setTimeout);
+
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          device_code: "device-code",
+          expires_in: 900,
+          interval: 0,
+          message: "Open https://microsoft.com/devicelogin and enter ABC-123",
+        }),
+      )
+      .mockResolvedValueOnce(createTokenResponse("interactive-token"));
+
+    global.fetch = fetchMock;
+
+    const manager = new TokenManager();
+
+    await expect(
+      manager.getToken({
+        name: "interactive",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "deviceCode",
+      }),
+    ).resolves.toBe("interactive-token");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain("client_id=04b07795-8ddb-461a-bbee-02f9e1bf7b46");
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain(
+      "scope=https%3A%2F%2Forg.crm.dynamics.com%2Fuser_impersonation",
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      "\n[interactive] Open https://microsoft.com/devicelogin and enter ABC-123\n\n",
+    );
+
+    timeoutSpy.mockRestore();
   });
 });

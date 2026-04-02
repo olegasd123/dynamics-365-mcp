@@ -23,19 +23,35 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
     parts.set(key, value);
   }
 
+  const authTypeValue = parts.get("authtype")?.toLowerCase();
   const url = parts.get("url");
   const clientId = parts.get("clientid");
   const clientSecret = parts.get("clientsecret");
   const tenantId = parts.get("tenantid");
 
-  if (!url || !clientId || !clientSecret || !tenantId) {
-    throw new Error("Connection string must contain Url, ClientId, ClientSecret, and TenantId");
+  if (!url || !tenantId) {
+    throw new Error("Connection string must contain Url and TenantId");
+  }
+
+  if (authTypeValue === "devicecode") {
+    return {
+      name: "default",
+      url: url.replace(/\/$/, ""),
+      tenantId,
+      authType: "deviceCode",
+      clientId,
+    };
+  }
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Client secret auth requires ClientId, ClientSecret, Url, and TenantId");
   }
 
   return {
     name: "default",
     url: url.replace(/\/$/, ""),
     tenantId,
+    authType: "clientSecret",
     clientId,
     clientSecret,
   };
@@ -82,15 +98,22 @@ function loadFromJsonFile(filePath: string): AppConfig {
   }
 
   const environments: EnvironmentConfig[] = json.environments.map((env: Record<string, string>) => {
-    if (!env.name || !env.url || !env.tenantId || !env.clientId || !env.clientSecret) {
+    if (!env.name || !env.url || !env.tenantId) {
+      throw new Error(`Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId)`);
+    }
+
+    const authType = env.authType === "deviceCode" ? "deviceCode" : "clientSecret";
+    if (authType === "clientSecret" && (!env.clientId || !env.clientSecret)) {
       throw new Error(
-        `Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId, clientId, clientSecret)`,
+        `Environment '${env.name}' uses clientSecret auth and must include clientId and clientSecret`,
       );
     }
+
     return {
       name: env.name,
       url: env.url.replace(/\/$/, ""),
       tenantId: env.tenantId,
+      authType,
       clientId: env.clientId,
       clientSecret: env.clientSecret,
     };
