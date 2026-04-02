@@ -42,8 +42,7 @@ export function listPluginStepsQuery(pluginTypeId: string): string {
       "supporteddeployment",
     ],
     filter: `_eventhandler_value eq '${pluginTypeId}'`,
-    expand:
-      "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
+    expand: "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
     orderby: "name asc",
   });
 }

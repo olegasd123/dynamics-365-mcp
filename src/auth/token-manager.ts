@@ -8,7 +8,7 @@ interface CachedToken {
 export class AuthenticationError extends Error {
   constructor(
     public readonly environment: string,
-    message: string
+    message: string,
   ) {
     super(`Authentication failed for '${environment}': ${message}`);
     this.name = "AuthenticationError";
@@ -64,16 +64,13 @@ export class TokenManager {
     } catch (error) {
       throw new AuthenticationError(
         env.name,
-        `Network error: ${error instanceof Error ? error.message : String(error)}`
+        `Network error: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
     if (!response.ok) {
       const text = await response.text();
-      throw new AuthenticationError(
-        env.name,
-        `HTTP ${response.status}: ${text}`
-      );
+      throw new AuthenticationError(env.name, `HTTP ${response.status}: ${text}`);
     }
 
     const data = (await response.json()) as {

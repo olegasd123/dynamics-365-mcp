@@ -3,14 +3,26 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { listPluginTypesQuery, listPluginStepsQuery, listPluginImagesQuery } from "../../queries/plugin-queries.js";
+import {
+  listPluginTypesQuery,
+  listPluginStepsQuery,
+  listPluginImagesQuery,
+} from "../../queries/plugin-queries.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
 
-const STAGE_LABELS: Record<number, string> = { 10: "Pre-Validation", 20: "Pre-Operation", 40: "Post-Operation" };
+const STAGE_LABELS: Record<number, string> = {
+  10: "Pre-Validation",
+  20: "Pre-Operation",
+  40: "Post-Operation",
+};
 const MODE_LABELS: Record<number, string> = { 0: "Synchronous", 1: "Asynchronous" };
 const IMAGE_TYPE_LABELS: Record<number, string> = { 0: "PreImage", 1: "PostImage", 2: "Both" };
 
-export function registerGetPluginDetails(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerGetPluginDetails(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "get_plugin_details",
     "Get detailed information about a plugin assembly including all types, steps, and images.",
@@ -26,14 +38,28 @@ export function registerGetPluginDetails(server: McpServer, config: AppConfig, c
           env,
           "pluginassemblies",
           buildQueryString({
-            select: ["pluginassemblyid", "name", "version", "publickeytoken", "isolationmode", "ismanaged", "createdon", "modifiedon"],
+            select: [
+              "pluginassemblyid",
+              "name",
+              "version",
+              "publickeytoken",
+              "isolationmode",
+              "ismanaged",
+              "createdon",
+              "modifiedon",
+            ],
             filter: `name eq '${pluginName}'`,
-          })
+          }),
         );
 
         if (assemblies.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `Plugin assembly '${pluginName}' not found in '${env.name}'.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `Plugin assembly '${pluginName}' not found in '${env.name}'.`,
+              },
+            ],
           };
         }
 
@@ -52,7 +78,7 @@ export function registerGetPluginDetails(server: McpServer, config: AppConfig, c
         const types = await client.query<Record<string, unknown>>(
           env,
           "plugintypes",
-          listPluginTypesQuery(assembly.pluginassemblyid as string)
+          listPluginTypesQuery(assembly.pluginassemblyid as string),
         );
 
         lines.push(`### Plugin Types (${types.length})`);
@@ -64,7 +90,7 @@ export function registerGetPluginDetails(server: McpServer, config: AppConfig, c
           const steps = await client.query<Record<string, unknown>>(
             env,
             "sdkmessageprocessingsteps",
-            listPluginStepsQuery(type.plugintypeid as string)
+            listPluginStepsQuery(type.plugintypeid as string),
           );
 
           if (steps.length === 0) {
@@ -75,13 +101,16 @@ export function registerGetPluginDetails(server: McpServer, config: AppConfig, c
           lines.push(`  **Steps (${steps.length}):**`);
           for (const step of steps) {
             const msg = (step.sdkmessageid as Record<string, unknown>)?.name || "";
-            const entity = (step.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none";
+            const entity =
+              (step.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none";
             const stage = STAGE_LABELS[step.stage as number] || String(step.stage);
             const mode = MODE_LABELS[step.mode as number] || String(step.mode);
             const status = step.statecode === 0 ? "Enabled" : "Disabled";
 
             lines.push(`  - **${step.name}**`);
-            lines.push(`    Message: ${msg} | Entity: ${entity} | Stage: ${stage} | Mode: ${mode} | Status: ${status}`);
+            lines.push(
+              `    Message: ${msg} | Entity: ${entity} | Stage: ${stage} | Mode: ${mode} | Status: ${status}`,
+            );
 
             if (step.filteringattributes) {
               lines.push(`    Filtering: ${step.filteringattributes}`);
@@ -90,14 +119,16 @@ export function registerGetPluginDetails(server: McpServer, config: AppConfig, c
             const images = await client.query<Record<string, unknown>>(
               env,
               "sdkmessageprocessingstepimages",
-              listPluginImagesQuery(step.sdkmessageprocessingstepid as string)
+              listPluginImagesQuery(step.sdkmessageprocessingstepid as string),
             );
 
             if (images.length > 0) {
               lines.push(`    **Images (${images.length}):**`);
               for (const img of images) {
                 const imgType = IMAGE_TYPE_LABELS[img.imagetype as number] || String(img.imagetype);
-                lines.push(`    - ${img.name} (${imgType}, alias: ${img.entityalias || "none"}, attributes: ${img.attributes || "all"})`);
+                lines.push(
+                  `    - ${img.name} (${imgType}, alias: ${img.entityalias || "none"}, attributes: ${img.attributes || "all"})`,
+                );
               }
             }
           }
@@ -106,10 +137,15 @@ export function registerGetPluginDetails(server: McpServer, config: AppConfig, c
         return { content: [{ type: "text" as const, text: lines.join("\n") }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

@@ -3,7 +3,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { listPluginAssembliesQuery, listPluginTypesQuery, listPluginStepsQuery } from "../../queries/plugin-queries.js";
+import {
+  listPluginAssembliesQuery,
+  listPluginTypesQuery,
+  listPluginStepsQuery,
+} from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
 
 export function registerListPlugins(server: McpServer, config: AppConfig, client: DynamicsClient) {
@@ -12,7 +16,10 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
     "List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugins with no registered steps.",
     {
       environment: z.string().optional().describe("Environment name (e.g. 'dev', 'prod')"),
-      filter: z.enum(["all", "no_steps"]).optional().describe("Filter: 'all' (default) or 'no_steps' for orphaned plugins"),
+      filter: z
+        .enum(["all", "no_steps"])
+        .optional()
+        .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugins"),
     },
     async ({ environment, filter }) => {
       try {
@@ -20,7 +27,7 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         const assemblies = await client.query<Record<string, unknown>>(
           env,
           "pluginassemblies",
-          listPluginAssembliesQuery()
+          listPluginAssembliesQuery(),
         );
 
         let results = assemblies;
@@ -32,7 +39,7 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
             const types = await client.query<Record<string, unknown>>(
               env,
               "plugintypes",
-              listPluginTypesQuery(assembly.pluginassemblyid as string)
+              listPluginTypesQuery(assembly.pluginassemblyid as string),
             );
 
             let hasSteps = false;
@@ -40,7 +47,7 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
               const steps = await client.query<Record<string, unknown>>(
                 env,
                 "sdkmessageprocessingsteps",
-                listPluginStepsQuery(type.plugintypeid as string)
+                listPluginStepsQuery(type.plugintypeid as string),
               );
               if (steps.length > 0) {
                 hasSteps = true;
@@ -58,12 +65,15 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
 
         if (results.length === 0) {
           return {
-            content: [{
-              type: "text" as const,
-              text: filter === "no_steps"
-                ? `No orphaned plugins found in '${env.name}'.`
-                : `No plugins found in '${env.name}'.`,
-            }],
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  filter === "no_steps"
+                    ? `No orphaned plugins found in '${env.name}'.`
+                    : `No plugins found in '${env.name}'.`,
+              },
+            ],
           };
         }
 
@@ -81,10 +91,15 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

@@ -22,7 +22,11 @@ import { registerComparePlugins } from "./comparison/compare-plugins.js";
 import { registerCompareWorkflows } from "./comparison/compare-workflows.js";
 import { registerCompareWebResources } from "./comparison/compare-web-resources.js";
 
-export function registerAllTools(server: McpServer, config: AppConfig, client: DynamicsClient): void {
+export function registerAllTools(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+): void {
   // Plugin tools
   registerListPlugins(server, config, client);
   registerListPluginSteps(server, config, client);

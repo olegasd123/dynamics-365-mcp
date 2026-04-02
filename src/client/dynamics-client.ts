@@ -1,12 +1,12 @@
 import type { EnvironmentConfig } from "../config/types.js";
-import { TokenManager } from "../auth/token-manager.js";
+import type { TokenManager } from "../auth/token-manager.js";
 
 export class DynamicsApiError extends Error {
   constructor(
     public readonly environment: string,
     public readonly statusCode: number,
     public readonly odataErrorCode: string | undefined,
-    message: string
+    message: string,
   ) {
     super(`Dynamics API error [${environment}] (${statusCode}): ${message}`);
     this.name = "DynamicsApiError";
@@ -38,7 +38,7 @@ export class DynamicsClient {
   private async makeRequest(
     env: EnvironmentConfig,
     url: string,
-    timeout: number
+    timeout: number,
   ): Promise<Response> {
     const token = await this.tokenManager.getToken(env);
 
@@ -66,7 +66,7 @@ export class DynamicsClient {
   private async requestWithRetry(
     env: EnvironmentConfig,
     url: string,
-    timeout: number
+    timeout: number,
   ): Promise<Response> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const response = await this.makeRequest(env, url, timeout);
@@ -88,7 +88,7 @@ export class DynamicsClient {
     env: EnvironmentConfig,
     entitySet: string,
     queryParams?: string,
-    options?: RequestOptions
+    options?: RequestOptions,
   ): Promise<T[]> {
     const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
     const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
@@ -134,7 +134,7 @@ export class DynamicsClient {
     env: EnvironmentConfig,
     entitySet: string,
     id: string,
-    queryParams?: string
+    queryParams?: string,
   ): Promise<T | null> {
     const timeout = DEFAULT_TIMEOUT;
     const baseUrl = `${env.url}/api/data/v9.2/${entitySet}(${id})`;

@@ -17,7 +17,11 @@ const MODE_LABELS: Record<number, string> = {
   1: "Asynchronous",
 };
 
-export function registerListPluginSteps(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerListPluginSteps(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "list_plugin_steps",
     "List registered steps (message processing steps) for a plugin assembly in Dynamics 365.",
@@ -31,19 +35,25 @@ export function registerListPluginSteps(server: McpServer, config: AppConfig, cl
         const steps = await client.query<Record<string, unknown>>(
           env,
           "sdkmessageprocessingsteps",
-          listStepsForAssemblyQuery(pluginName)
+          listStepsForAssemblyQuery(pluginName),
         );
 
         if (steps.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `No steps found for plugin '${pluginName}' in '${env.name}'.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `No steps found for plugin '${pluginName}' in '${env.name}'.`,
+              },
+            ],
           };
         }
 
         const headers = ["Step Name", "Message", "Entity", "Stage", "Mode", "Status", "Rank"];
         const rows = steps.map((s) => {
           const message = (s.sdkmessageid as Record<string, unknown>)?.name || "";
-          const entity = (s.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none";
+          const entity =
+            (s.sdkmessagefilterid as Record<string, unknown>)?.primaryobjecttypecode || "none";
           return [
             String(s.name || ""),
             String(message),
@@ -59,10 +69,15 @@ export function registerListPluginSteps(server: McpServer, config: AppConfig, cl
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

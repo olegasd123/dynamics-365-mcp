@@ -10,16 +10,26 @@ import { diffCollections } from "../../utils/diff.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
 
-export function registerCompareWebResources(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerCompareWebResources(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "compare_web_resources",
     "Compare web resources between two Dynamics 365 environments.",
     {
       sourceEnvironment: z.string().describe("Source environment name"),
       targetEnvironment: z.string().describe("Target environment name"),
-      type: z.enum(["html", "css", "js", "xml", "png", "jpg", "gif", "xap", "xsl", "ico", "svg", "resx"]).optional().describe("Filter by type"),
+      type: z
+        .enum(["html", "css", "js", "xml", "png", "jpg", "gif", "xap", "xsl", "ico", "svg", "resx"])
+        .optional()
+        .describe("Filter by type"),
       nameFilter: z.string().optional().describe("Filter by name (contains match)"),
-      compareContent: z.boolean().optional().describe("Compare content hashes (slower, requires fetching content). Default: false"),
+      compareContent: z
+        .boolean()
+        .optional()
+        .describe("Compare content hashes (slower, requires fetching content). Default: false"),
     },
     async ({ sourceEnvironment, targetEnvironment, type, nameFilter, compareContent }) => {
       try {
@@ -28,11 +38,24 @@ export function registerCompareWebResources(server: McpServer, config: AppConfig
 
         const queryParams = compareContent
           ? buildQueryString({
-              select: ["webresourceid", "name", "displayname", "webresourcetype", "ismanaged", "modifiedon", "content"],
-              filter: [
-                type ? `webresourcetype eq ${({ html: 1, css: 2, js: 3, xml: 4, png: 5, jpg: 6, gif: 7, xap: 8, xsl: 9, ico: 10, svg: 11, resx: 12 } as Record<string, number>)[type]}` : "",
-                nameFilter ? `contains(name,'${nameFilter}')` : "",
-              ].filter(Boolean).join(" and ") || undefined,
+              select: [
+                "webresourceid",
+                "name",
+                "displayname",
+                "webresourcetype",
+                "ismanaged",
+                "modifiedon",
+                "content",
+              ],
+              filter:
+                [
+                  type
+                    ? `webresourcetype eq ${({ html: 1, css: 2, js: 3, xml: 4, png: 5, jpg: 6, gif: 7, xap: 8, xsl: 9, ico: 10, svg: 11, resx: 12 } as Record<string, number>)[type]}`
+                    : "",
+                  nameFilter ? `contains(name,'${nameFilter}')` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" and ") || undefined,
               orderby: "name asc",
             })
           : listWebResourcesQuery({ type: type as WebResourceType | undefined, nameFilter });
@@ -46,7 +69,10 @@ export function registerCompareWebResources(server: McpServer, config: AppConfig
         if (compareContent) {
           for (const r of [...sourceResources, ...targetResources]) {
             if (r.content) {
-              r.contentHash = createHash("sha256").update(String(r.content)).digest("hex").slice(0, 12);
+              r.contentHash = createHash("sha256")
+                .update(String(r.content))
+                .digest("hex")
+                .slice(0, 12);
             } else {
               r.contentHash = "(empty)";
             }
@@ -61,17 +87,22 @@ export function registerCompareWebResources(server: McpServer, config: AppConfig
           sourceResources,
           targetResources,
           (r) => String(r.name),
-          compareFields
+          compareFields,
         );
 
         const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

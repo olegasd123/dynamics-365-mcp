@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { listWorkflowsQuery, WORKFLOW_CATEGORY, WORKFLOW_STATE } from "../../queries/workflow-queries.js";
+import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory, WorkflowState } from "../../queries/workflow-queries.js";
 import { formatTable } from "../../utils/formatters.js";
 
@@ -22,13 +22,20 @@ const STATE_LABELS: Record<number, string> = {
   2: "Suspended",
 };
 
-export function registerListWorkflows(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerListWorkflows(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "list_workflows",
     "List workflows and processes in Dynamics 365 with their status.",
     {
       environment: z.string().optional().describe("Environment name"),
-      category: z.enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"]).optional().describe("Filter by category"),
+      category: z
+        .enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"])
+        .optional()
+        .describe("Filter by category"),
       status: z.enum(["draft", "activated", "suspended"]).optional().describe("Filter by status"),
     },
     async ({ environment, category, status }) => {
@@ -40,12 +47,17 @@ export function registerListWorkflows(server: McpServer, config: AppConfig, clie
           listWorkflowsQuery({
             category: category as WorkflowCategory | undefined,
             status: status as WorkflowState | undefined,
-          })
+          }),
         );
 
         if (workflows.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `No workflows found in '${env.name}' with the specified filters.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `No workflows found in '${env.name}' with the specified filters.`,
+              },
+            ],
           };
         }
 
@@ -62,16 +74,23 @@ export function registerListWorkflows(server: McpServer, config: AppConfig, clie
         const filterDesc = [
           category ? `category=${category}` : "",
           status ? `status=${status}` : "",
-        ].filter(Boolean).join(", ");
+        ]
+          .filter(Boolean)
+          .join(", ");
 
         const text = `## Workflows in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\nFound ${workflows.length} workflow(s).\n\n${formatTable(headers, rows)}`;
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

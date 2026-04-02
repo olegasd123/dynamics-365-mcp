@@ -14,7 +14,7 @@ export function diffCollections<T extends Record<string, unknown>>(
   source: T[],
   target: T[],
   keyFn: (item: T) => string,
-  compareFields: string[]
+  compareFields: string[],
 ): DiffResult<T> {
   const sourceMap = new Map<string, T>();
   const targetMap = new Map<string, T>();

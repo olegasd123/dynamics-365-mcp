@@ -7,7 +7,11 @@ import { buildQueryString } from "../../utils/odata-helpers.js";
 
 const TEXT_TYPES = new Set([1, 2, 3, 4, 9, 12]); // HTML, CSS, JS, XML, XSL, RESX
 
-export function registerGetWebResourceContent(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerGetWebResourceContent(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "get_web_resource_content",
     "Fetch the content of a specific web resource from Dynamics 365.",
@@ -25,12 +29,17 @@ export function registerGetWebResourceContent(server: McpServer, config: AppConf
           buildQueryString({
             select: ["webresourceid", "name", "displayname", "webresourcetype", "content"],
             filter: `name eq '${resourceName}'`,
-          })
+          }),
         );
 
         if (resources.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `Web resource '${resourceName}' not found in '${env.name}'.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `Web resource '${resourceName}' not found in '${env.name}'.`,
+              },
+            ],
           };
         }
 
@@ -40,31 +49,42 @@ export function registerGetWebResourceContent(server: McpServer, config: AppConf
 
         if (!base64Content) {
           return {
-            content: [{ type: "text" as const, text: `Web resource '${resourceName}' has no content.` }],
+            content: [
+              { type: "text" as const, text: `Web resource '${resourceName}' has no content.` },
+            ],
           };
         }
 
         if (TEXT_TYPES.has(resourceType)) {
           const decoded = Buffer.from(base64Content, "base64").toString("utf-8");
           return {
-            content: [{ type: "text" as const, text: `## ${resource.name}\n\n\`\`\`\n${decoded}\n\`\`\`` }],
+            content: [
+              { type: "text" as const, text: `## ${resource.name}\n\n\`\`\`\n${decoded}\n\`\`\`` },
+            ],
           };
         }
 
         // Binary content — return metadata and base64 size
         const sizeKb = Math.round((base64Content.length * 3) / 4 / 1024);
         return {
-          content: [{
-            type: "text" as const,
-            text: `## ${resource.name}\n\nBinary web resource (type: ${resourceType}), size: ~${sizeKb} KB.\nBase64 content available but not decoded (binary format).`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `## ${resource.name}\n\nBinary web resource (type: ${resourceType}), size: ~${sizeKb} KB.\nBase64 content available but not decoded (binary format).`,
+            },
+          ],
         };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

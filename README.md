@@ -119,25 +119,25 @@ D365_CLIENT_SECRET=...
 
 ### Metadata Query Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `list_plugins` | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter` |
-| `list_plugin_steps` | List registered steps for a plugin | `environment`, `pluginName` |
-| `list_plugin_images` | List pre/post images on plugin steps | `environment`, `pluginName`, `stepName` |
-| `get_plugin_details` | Deep info: assembly → types → steps → images | `environment`, `pluginName` |
-| `list_workflows` | List workflows/processes with status | `environment`, `category`, `status` |
-| `list_actions` | List custom actions and custom APIs | `environment` |
-| `get_workflow_details` | Full workflow definition | `environment`, `workflowName` / `uniqueName` |
-| `list_web_resources` | List web resources by type | `environment`, `type`, `nameFilter` |
-| `get_web_resource_content` | Fetch decoded web resource content | `environment`, `name` |
+| Tool                       | Description                                                   | Key Parameters                               |
+| -------------------------- | ------------------------------------------------------------- | -------------------------------------------- |
+| `list_plugins`             | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                      |
+| `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
+| `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
+| `get_plugin_details`       | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                  |
+| `list_workflows`           | List workflows/processes with status                          | `environment`, `category`, `status`          |
+| `list_actions`             | List custom actions and custom APIs                           | `environment`                                |
+| `get_workflow_details`     | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName` |
+| `list_web_resources`       | List web resources by type                                    | `environment`, `type`, `nameFilter`          |
+| `get_web_resource_content` | Fetch decoded web resource content                            | `environment`, `name`                        |
 
 ### Cross-Environment Comparison Tools
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `compare_plugins` | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName` |
-| `compare_workflows` | Compare workflow state/definitions | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
-| `compare_web_resources` | Compare web resource content | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter` |
+| Tool                    | Description                              | Key Parameters                                                       |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
+| `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
+| `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
+| `compare_web_resources` | Compare web resource content             | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`       |
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 

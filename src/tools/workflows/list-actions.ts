@@ -25,7 +25,7 @@ export function registerListActions(server: McpServer, config: AppConfig, client
         const actions = await client.query<Record<string, unknown>>(
           env,
           "workflows",
-          listActionsQuery()
+          listActionsQuery(),
         );
 
         if (actions.length === 0) {
@@ -48,10 +48,15 @@ export function registerListActions(server: McpServer, config: AppConfig, client
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

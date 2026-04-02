@@ -1,19 +1,14 @@
 import type { DiffResult } from "./diff.js";
 
-export function formatTable(
-  headers: string[],
-  rows: string[][]
-): string {
+export function formatTable(headers: string[], rows: string[][]): string {
   const colWidths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => (r[i] || "").length))
+    Math.max(h.length, ...rows.map((r) => (r[i] || "").length)),
   );
 
-  const headerLine = headers
-    .map((h, i) => h.padEnd(colWidths[i]))
-    .join(" | ");
+  const headerLine = headers.map((h, i) => h.padEnd(colWidths[i])).join(" | ");
   const separator = colWidths.map((w) => "-".repeat(w)).join("-|-");
   const dataLines = rows.map((row) =>
-    row.map((cell, i) => (cell || "").padEnd(colWidths[i])).join(" | ")
+    row.map((cell, i) => (cell || "").padEnd(colWidths[i])).join(" | "),
   );
 
   return [headerLine, separator, ...dataLines].join("\n");
@@ -23,12 +18,14 @@ export function formatDiffResult<T extends Record<string, unknown>>(
   result: DiffResult<T>,
   sourceEnv: string,
   targetEnv: string,
-  nameField: string
+  nameField: string,
 ): string {
   const lines: string[] = [];
 
   lines.push(`## Comparison: ${sourceEnv} vs ${targetEnv}`);
-  lines.push(`Matching: ${result.matching} | Differences: ${result.differences.length} | Only in ${sourceEnv}: ${result.onlyInSource.length} | Only in ${targetEnv}: ${result.onlyInTarget.length}`);
+  lines.push(
+    `Matching: ${result.matching} | Differences: ${result.differences.length} | Only in ${sourceEnv}: ${result.onlyInSource.length} | Only in ${targetEnv}: ${result.onlyInTarget.length}`,
+  );
   lines.push("");
 
   if (result.onlyInSource.length > 0) {
@@ -52,7 +49,9 @@ export function formatDiffResult<T extends Record<string, unknown>>(
     for (const diff of result.differences) {
       lines.push(`\n**${diff.key}**`);
       for (const change of diff.changedFields) {
-        lines.push(`  - ${change.field}: \`${formatValue(change.sourceValue)}\` → \`${formatValue(change.targetValue)}\``);
+        lines.push(
+          `  - ${change.field}: \`${formatValue(change.sourceValue)}\` → \`${formatValue(change.targetValue)}\``,
+        );
       }
     }
     lines.push("");

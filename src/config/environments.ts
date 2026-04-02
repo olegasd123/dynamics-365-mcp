@@ -19,9 +19,7 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
   const tenantId = parts.get("tenantid");
 
   if (!url || !clientId || !clientSecret || !tenantId) {
-    throw new Error(
-      "Connection string must contain Url, ClientId, ClientSecret, and TenantId"
-    );
+    throw new Error("Connection string must contain Url, ClientId, ClientSecret, and TenantId");
   }
 
   return {
@@ -41,22 +39,20 @@ function loadFromJsonFile(filePath: string): AppConfig {
     throw new Error("Config file must contain an 'environments' array");
   }
 
-  const environments: EnvironmentConfig[] = json.environments.map(
-    (env: Record<string, string>) => {
-      if (!env.name || !env.url || !env.tenantId || !env.clientId || !env.clientSecret) {
-        throw new Error(
-          `Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId, clientId, clientSecret)`
-        );
-      }
-      return {
-        name: env.name,
-        url: env.url.replace(/\/$/, ""),
-        tenantId: env.tenantId,
-        clientId: env.clientId,
-        clientSecret: env.clientSecret,
-      };
+  const environments: EnvironmentConfig[] = json.environments.map((env: Record<string, string>) => {
+    if (!env.name || !env.url || !env.tenantId || !env.clientId || !env.clientSecret) {
+      throw new Error(
+        `Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId, clientId, clientSecret)`,
+      );
     }
-  );
+    return {
+      name: env.name,
+      url: env.url.replace(/\/$/, ""),
+      tenantId: env.tenantId,
+      clientId: env.clientId,
+      clientSecret: env.clientSecret,
+    };
+  });
 
   return {
     environments,
@@ -115,21 +111,16 @@ export function loadConfig(): AppConfig {
   }
 
   throw new Error(
-    "No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRING, or individual D365_* env vars. See .env.example for details."
+    "No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRING, or individual D365_* env vars. See .env.example for details.",
   );
 }
 
-export function getEnvironment(
-  config: AppConfig,
-  name?: string
-): EnvironmentConfig {
+export function getEnvironment(config: AppConfig, name?: string): EnvironmentConfig {
   const envName = name || config.defaultEnvironment;
   const env = config.environments.find((e) => e.name === envName);
   if (!env) {
     const available = config.environments.map((e) => e.name).join(", ");
-    throw new Error(
-      `Environment '${envName}' not found. Available: ${available}`
-    );
+    throw new Error(`Environment '${envName}' not found. Available: ${available}`);
   }
   return env;
 }

@@ -3,7 +3,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { listPluginStepsQuery, listPluginImagesQuery, listPluginTypesQuery } from "../../queries/plugin-queries.js";
+import {
+  listPluginStepsQuery,
+  listPluginImagesQuery,
+  listPluginTypesQuery,
+} from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
 
@@ -13,7 +17,11 @@ const IMAGE_TYPE_LABELS: Record<number, string> = {
   2: "Both",
 };
 
-export function registerListPluginImages(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerListPluginImages(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "list_plugin_images",
     "List pre/post entity images registered on plugin steps in Dynamics 365.",
@@ -34,12 +42,17 @@ export function registerListPluginImages(server: McpServer, config: AppConfig, c
           buildQueryString({
             select: ["pluginassemblyid", "name"],
             filter: `name eq '${pluginName}'`,
-          })
+          }),
         );
 
         if (assemblies.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `Plugin assembly '${pluginName}' not found in '${env.name}'.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `Plugin assembly '${pluginName}' not found in '${env.name}'.`,
+              },
+            ],
           };
         }
 
@@ -49,21 +62,25 @@ export function registerListPluginImages(server: McpServer, config: AppConfig, c
         const types = await client.query<Record<string, unknown>>(
           env,
           "plugintypes",
-          listPluginTypesQuery(assemblyId)
+          listPluginTypesQuery(assemblyId),
         );
 
         // Get steps for all types, then images for each step
-        const allImages: { stepName: string; messageName: string; image: Record<string, unknown> }[] = [];
+        const allImages: {
+          stepName: string;
+          messageName: string;
+          image: Record<string, unknown>;
+        }[] = [];
 
         for (const type of types) {
           const steps = await client.query<Record<string, unknown>>(
             env,
             "sdkmessageprocessingsteps",
-            listPluginStepsQuery(type.plugintypeid as string)
+            listPluginStepsQuery(type.plugintypeid as string),
           );
 
           for (const step of steps) {
-            const msgName = (step.sdkmessageid as Record<string, unknown>)?.name as string || "";
+            const msgName = ((step.sdkmessageid as Record<string, unknown>)?.name as string) || "";
 
             if (message && msgName.toLowerCase() !== message.toLowerCase()) continue;
             if (stepName && step.name !== stepName) continue;
@@ -71,7 +88,7 @@ export function registerListPluginImages(server: McpServer, config: AppConfig, c
             const images = await client.query<Record<string, unknown>>(
               env,
               "sdkmessageprocessingstepimages",
-              listPluginImagesQuery(step.sdkmessageprocessingstepid as string)
+              listPluginImagesQuery(step.sdkmessageprocessingstepid as string),
             );
 
             for (const img of images) {
@@ -89,7 +106,12 @@ export function registerListPluginImages(server: McpServer, config: AppConfig, c
           if (message) filterDesc += ` (message: ${message})`;
           if (stepName) filterDesc += ` (step: ${stepName})`;
           return {
-            content: [{ type: "text" as const, text: `No images found for ${filterDesc} in '${env.name}'.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `No images found for ${filterDesc} in '${env.name}'.`,
+              },
+            ],
           };
         }
 
@@ -107,10 +129,15 @@ export function registerListPluginImages(server: McpServer, config: AppConfig, c
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }

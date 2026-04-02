@@ -3,17 +3,30 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { getWorkflowDetailsQuery } from "../../queries/workflow-queries.js";
 import { buildQueryString } from "../../utils/odata-helpers.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
-  0: "Workflow", 1: "Dialog", 2: "Business Rule", 3: "Action", 4: "BPF", 5: "Modern Flow",
+  0: "Workflow",
+  1: "Dialog",
+  2: "Business Rule",
+  3: "Action",
+  4: "BPF",
+  5: "Modern Flow",
 };
 const STATE_LABELS: Record<number, string> = { 0: "Draft", 1: "Activated", 2: "Suspended" };
 const MODE_LABELS: Record<number, string> = { 0: "Background", 1: "Real-time" };
-const SCOPE_LABELS: Record<number, string> = { 1: "User", 2: "Business Unit", 3: "Parent-Child BU", 4: "Organization" };
+const SCOPE_LABELS: Record<number, string> = {
+  1: "User",
+  2: "Business Unit",
+  3: "Parent-Child BU",
+  4: "Organization",
+};
 
-export function registerGetWorkflowDetails(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerGetWorkflowDetails(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
     "get_workflow_details",
     "Get detailed information about a specific workflow including triggers, scope, and definition.",
@@ -26,7 +39,9 @@ export function registerGetWorkflowDetails(server: McpServer, config: AppConfig,
       try {
         if (!workflowName && !uniqueName) {
           return {
-            content: [{ type: "text" as const, text: "Please provide either workflowName or uniqueName." }],
+            content: [
+              { type: "text" as const, text: "Please provide either workflowName or uniqueName." },
+            ],
             isError: true,
           };
         }
@@ -42,18 +57,38 @@ export function registerGetWorkflowDetails(server: McpServer, config: AppConfig,
           "workflows",
           buildQueryString({
             select: [
-              "workflowid", "name", "uniquename", "category", "statecode", "statuscode",
-              "mode", "scope", "primaryentity", "ismanaged", "description",
-              "xaml", "clientdata", "triggeroncreate", "triggerondelete",
-              "triggeronupdateattributelist", "inputparameters", "createdon", "modifiedon",
+              "workflowid",
+              "name",
+              "uniquename",
+              "category",
+              "statecode",
+              "statuscode",
+              "mode",
+              "scope",
+              "primaryentity",
+              "ismanaged",
+              "description",
+              "xaml",
+              "clientdata",
+              "triggeroncreate",
+              "triggerondelete",
+              "triggeronupdateattributelist",
+              "inputparameters",
+              "createdon",
+              "modifiedon",
             ],
             filter,
-          })
+          }),
         );
 
         if (workflows.length === 0) {
           return {
-            content: [{ type: "text" as const, text: `Workflow '${workflowName || uniqueName}' not found in '${env.name}'.` }],
+            content: [
+              {
+                type: "text" as const,
+                text: `Workflow '${workflowName || uniqueName}' not found in '${env.name}'.`,
+              },
+            ],
           };
         }
 
@@ -80,7 +115,8 @@ export function registerGetWorkflowDetails(server: McpServer, config: AppConfig,
         const triggers: string[] = [];
         if (w.triggeroncreate) triggers.push("Create");
         if (w.triggerondelete) triggers.push("Delete");
-        if (w.triggeronupdateattributelist) triggers.push(`Update (${w.triggeronupdateattributelist})`);
+        if (w.triggeronupdateattributelist)
+          triggers.push(`Update (${w.triggeronupdateattributelist})`);
         lines.push(triggers.length > 0 ? triggers.join(", ") : "None / Manual");
 
         if (w.inputparameters) {
@@ -103,10 +139,15 @@ export function registerGetWorkflowDetails(server: McpServer, config: AppConfig,
         return { content: [{ type: "text" as const, text: lines.join("\n") }] };
       } catch (error) {
         return {
-          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 }
