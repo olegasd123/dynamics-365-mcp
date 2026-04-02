@@ -106,4 +106,25 @@ describe("list_plugin_steps tool", () => {
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
   });
+
+  it("returns an error when the client query fails", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const client = {
+      async query(): Promise<never[]> {
+        throw new Error("Dynamics API error [dev] (500): Plugin query failed");
+      },
+    } as never;
+
+    registerListPluginSteps(server as never, config, client);
+
+    const response = await server.getHandler("list_plugin_steps")({
+      pluginName: "Core.Plugins",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain(
+      "Dynamics API error [dev] (500): Plugin query failed",
+    );
+  });
 });
