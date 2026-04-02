@@ -41,6 +41,7 @@ src/
       compare-plugins.ts
       compare-workflows.ts
       compare-web-resources.ts
+      compare-environment-matrix.ts
   queries/
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
@@ -138,8 +139,11 @@ D365_CLIENT_SECRET=...
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
 | `compare_web_resources` | Compare web resource content             | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`       |
+| `compare_environment_matrix` | Compare one baseline against many environments | `baselineEnvironment`, `targetEnvironments`, `componentType` |
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
+
+`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugins it now shows drift on three levels: assemblies, steps, and step images.
 
 ## Authentication Flow
 

@@ -21,6 +21,7 @@ import { registerGetWebResourceContent } from "./web-resources/get-web-resource-
 import { registerComparePlugins } from "./comparison/compare-plugins.js";
 import { registerCompareWorkflows } from "./comparison/compare-workflows.js";
 import { registerCompareWebResources } from "./comparison/compare-web-resources.js";
+import { registerCompareEnvironmentMatrix } from "./comparison/compare-environment-matrix.js";
 
 export function registerAllTools(
   server: McpServer,
@@ -46,4 +47,5 @@ export function registerAllTools(
   registerComparePlugins(server, config, client);
   registerCompareWorkflows(server, config, client);
   registerCompareWebResources(server, config, client);
+  registerCompareEnvironmentMatrix(server, config, client);
 }

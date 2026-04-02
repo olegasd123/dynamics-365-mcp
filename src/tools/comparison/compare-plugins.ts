@@ -1,14 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
-import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import {
-  listPluginAssembliesQuery,
-  listStepsForAssemblyQuery,
-} from "../../queries/plugin-queries.js";
-import { diffCollections } from "../../utils/diff.js";
 import { formatDiffResult } from "../../utils/formatters.js";
+import { comparePluginsData } from "./comparison-data.js";
 
 export function registerComparePlugins(
   server: McpServer,
@@ -25,64 +20,38 @@ export function registerComparePlugins(
     },
     async ({ sourceEnvironment, targetEnvironment, pluginName }) => {
       try {
-        const sourceEnv = getEnvironment(config, sourceEnvironment);
-        const targetEnv = getEnvironment(config, targetEnvironment);
-
-        // Parallel fetch from both environments
-        const [sourcePlugins, targetPlugins] = await Promise.all([
-          client.query<Record<string, unknown>>(
-            sourceEnv,
-            "pluginassemblies",
-            listPluginAssembliesQuery(),
-          ),
-          client.query<Record<string, unknown>>(
-            targetEnv,
-            "pluginassemblies",
-            listPluginAssembliesQuery(),
-          ),
-        ]);
-
-        let source = sourcePlugins;
-        let target = targetPlugins;
-
-        if (pluginName) {
-          source = source.filter((p) => p.name === pluginName);
-          target = target.filter((p) => p.name === pluginName);
-        }
-
-        const result = diffCollections(source, target, (p) => String(p.name), [
-          "version",
-          "isolationmode",
-          "ismanaged",
-        ]);
-
+        const {
+          sourceItems,
+          targetItems,
+          result,
+          stepResult,
+          imageResult,
+        } = await comparePluginsData(
+          config,
+          client,
+          sourceEnvironment,
+          targetEnvironment,
+          {
+            pluginName,
+            includeChildComponents: Boolean(pluginName),
+          },
+        );
         let text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
 
         // For plugins that exist in both, compare steps
-        if (pluginName && source.length > 0 && target.length > 0) {
-          const [sourceSteps, targetSteps] = await Promise.all([
-            client.query<Record<string, unknown>>(
-              sourceEnv,
-              "sdkmessageprocessingsteps",
-              listStepsForAssemblyQuery(pluginName),
-            ),
-            client.query<Record<string, unknown>>(
-              targetEnv,
-              "sdkmessageprocessingsteps",
-              listStepsForAssemblyQuery(pluginName),
-            ),
-          ]);
-
-          const stepDiff = diffCollections(sourceSteps, targetSteps, (s) => String(s.name), [
-            "stage",
-            "mode",
-            "statecode",
-            "rank",
-            "filteringattributes",
-          ]);
-
+        if (pluginName && sourceItems.length > 0 && targetItems.length > 0 && stepResult) {
           text += `\n\n### Step Comparison for '${pluginName}'\n`;
-          text += formatDiffResult(stepDiff, sourceEnvironment, targetEnvironment, "name");
+          text += formatDiffResult(stepResult, sourceEnvironment, targetEnvironment, "displayName");
+        }
+
+        if (pluginName && sourceItems.length > 0 && targetItems.length > 0 && imageResult) {
+          text += `\n\n### Image Comparison for '${pluginName}'\n`;
+          text += formatDiffResult(
+            imageResult,
+            sourceEnvironment,
+            targetEnvironment,
+            "displayName",
+          );
         }
 
         return { content: [{ type: "text" as const, text }] };

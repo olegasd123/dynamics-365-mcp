@@ -1,12 +1,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
-import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
-import { diffCollections } from "../../utils/diff.js";
 import { formatDiffResult } from "../../utils/formatters.js";
+import { compareWorkflowsData } from "./comparison-data.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
   0: "Workflow",
@@ -37,34 +35,10 @@ export function registerCompareWorkflows(
     },
     async ({ sourceEnvironment, targetEnvironment, category, workflowName }) => {
       try {
-        const sourceEnv = getEnvironment(config, sourceEnvironment);
-        const targetEnv = getEnvironment(config, targetEnvironment);
-
-        const queryParams = listWorkflowsQuery({
+        const { result } = await compareWorkflowsData(config, client, sourceEnvironment, targetEnvironment, {
           category: category as WorkflowCategory | undefined,
+          workflowName,
         });
-
-        const [sourceWorkflows, targetWorkflows] = await Promise.all([
-          client.query<Record<string, unknown>>(sourceEnv, "workflows", queryParams),
-          client.query<Record<string, unknown>>(targetEnv, "workflows", queryParams),
-        ]);
-
-        let source = sourceWorkflows;
-        let target = targetWorkflows;
-
-        if (workflowName) {
-          const nameLower = workflowName.toLowerCase();
-          source = source.filter((w) => String(w.name).toLowerCase().includes(nameLower));
-          target = target.filter((w) => String(w.name).toLowerCase().includes(nameLower));
-        }
-
-        const result = diffCollections(source, target, (w) => String(w.uniquename || w.name), [
-          "statecode",
-          "statuscode",
-          "category",
-          "mode",
-          "ismanaged",
-        ]);
 
         // Enhance diff output with human-readable labels
         for (const diff of result.differences) {
