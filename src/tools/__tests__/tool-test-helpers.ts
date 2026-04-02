@@ -26,6 +26,10 @@ export class FakeServer {
     }
     return handler;
   }
+
+  getToolNames(): string[] {
+    return [...this.handlers.keys()].sort((left, right) => left.localeCompare(right));
+  }
 }
 
 export function createTestConfig(environmentNames: string[]): AppConfig {
