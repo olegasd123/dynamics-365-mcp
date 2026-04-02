@@ -3,6 +3,16 @@ import { resolve } from "node:path";
 import { homedir } from "node:os";
 import type { AppConfig, EnvironmentConfig } from "./types.js";
 
+interface ConnectionStringEnvironmentEntry {
+  name?: string;
+  connectionString?: string;
+}
+
+interface ConnectionStringsEnvPayload {
+  environments?: ConnectionStringEnvironmentEntry[];
+  defaultEnvironment?: string;
+}
+
 function parseConnectionString(connStr: string): EnvironmentConfig {
   const parts = new Map<string, string>();
   for (const segment of connStr.split(";")) {
@@ -28,6 +38,38 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
     tenantId,
     clientId,
     clientSecret,
+  };
+}
+
+function loadFromConnectionStringsEnv(): AppConfig | null {
+  const raw = process.env.D365_CONNECTION_STRINGS;
+  if (!raw) {
+    return null;
+  }
+
+  let payload: ConnectionStringsEnvPayload;
+  try {
+    payload = JSON.parse(raw) as ConnectionStringsEnvPayload;
+  } catch {
+    throw new Error("D365_CONNECTION_STRINGS must be valid JSON");
+  }
+
+  if (!payload.environments || !Array.isArray(payload.environments) || payload.environments.length === 0) {
+    throw new Error("D365_CONNECTION_STRINGS must contain a non-empty 'environments' array");
+  }
+
+  const environments = payload.environments.map((env) => {
+    if (!env.name || !env.connectionString) {
+      throw new Error("Each D365_CONNECTION_STRINGS environment must contain 'name' and 'connectionString'");
+    }
+
+    const parsed = parseConnectionString(env.connectionString);
+    return { ...parsed, name: env.name };
+  });
+
+  return {
+    environments,
+    defaultEnvironment: payload.defaultEnvironment || environments[0].name,
   };
 }
 
@@ -60,27 +102,6 @@ function loadFromJsonFile(filePath: string): AppConfig {
   };
 }
 
-function loadFromEnvVars(): AppConfig | null {
-  const url = process.env.D365_URL;
-  const tenantId = process.env.D365_TENANT_ID;
-  const clientId = process.env.D365_CLIENT_ID;
-  const clientSecret = process.env.D365_CLIENT_SECRET;
-
-  if (!url || !tenantId || !clientId || !clientSecret) {
-    return null;
-  }
-
-  const env: EnvironmentConfig = {
-    name: "default",
-    url: url.replace(/\/$/, ""),
-    tenantId,
-    clientId,
-    clientSecret,
-  };
-
-  return { environments: [env], defaultEnvironment: "default" };
-}
-
 export function loadConfig(): AppConfig {
   // Priority 1: JSON config file
   const configPath = process.env.D365_MCP_CONFIG;
@@ -97,21 +118,21 @@ export function loadConfig(): AppConfig {
     // File doesn't exist or is invalid — continue to other sources
   }
 
-  // Priority 3: Connection string
+  // Priority 3: Multiple connection strings
+  const fromConnectionStringsEnv = loadFromConnectionStringsEnv();
+  if (fromConnectionStringsEnv) {
+    return fromConnectionStringsEnv;
+  }
+
+  // Priority 4: Connection string
   const connStr = process.env.D365_CONNECTION_STRING;
   if (connStr) {
     const env = parseConnectionString(connStr);
     return { environments: [env], defaultEnvironment: "default" };
   }
 
-  // Priority 4: Individual env vars
-  const fromEnv = loadFromEnvVars();
-  if (fromEnv) {
-    return fromEnv;
-  }
-
   throw new Error(
-    "No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRING, or individual D365_* env vars. See .env.example for details.",
+    "No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRINGS, or D365_CONNECTION_STRING. See .env.example for details.",
   );
 }
 

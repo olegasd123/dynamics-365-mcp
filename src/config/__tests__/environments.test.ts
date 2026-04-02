@@ -90,26 +90,44 @@ describe("environments config", () => {
     });
   });
 
-  it("loads config from individual environment variables", async () => {
+  it("loads config from multiple connection strings", async () => {
     const dir = createTempDir();
-    process.env.D365_URL = "https://org.crm.dynamics.com/";
-    process.env.D365_TENANT_ID = "tenant";
-    process.env.D365_CLIENT_ID = "client";
-    process.env.D365_CLIENT_SECRET = "secret";
+    process.env.D365_CONNECTION_STRINGS = JSON.stringify({
+      environments: [
+        {
+          name: "dev",
+          connectionString:
+            "AuthType=ClientSecret;Url=https://dev.crm.dynamics.com/;ClientId=dev-client;ClientSecret=dev-secret;TenantId=dev-tenant",
+        },
+        {
+          name: "prod",
+          connectionString:
+            "AuthType=ClientSecret;Url=https://prod.crm.dynamics.com/;ClientId=prod-client;ClientSecret=prod-secret;TenantId=prod-tenant",
+        },
+      ],
+      defaultEnvironment: "prod",
+    });
 
     const { loadConfig } = await importEnvironmentsModule(dir);
 
     expect(loadConfig()).toEqual({
       environments: [
         {
-          name: "default",
-          url: "https://org.crm.dynamics.com",
-          tenantId: "tenant",
-          clientId: "client",
-          clientSecret: "secret",
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          tenantId: "dev-tenant",
+          clientId: "dev-client",
+          clientSecret: "dev-secret",
+        },
+        {
+          name: "prod",
+          url: "https://prod.crm.dynamics.com",
+          tenantId: "prod-tenant",
+          clientId: "prod-client",
+          clientSecret: "prod-secret",
         },
       ],
-      defaultEnvironment: "default",
+      defaultEnvironment: "prod",
     });
   });
 

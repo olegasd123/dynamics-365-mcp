@@ -18,7 +18,7 @@ src/
   index.ts                          # Entry point: McpServer + StdioServerTransport
   config/
     types.ts                        # Environment config interfaces
-    environments.ts                 # Config loader (JSON file, env vars, connection string)
+    environments.ts                 # Config loader (JSON file, connection string envs)
   auth/
     token-manager.ts                # OAuth2 client credentials + per-env token cache
   client/
@@ -107,13 +107,24 @@ Via `D365_CONNECTION_STRING` env var:
 AuthType=ClientSecret;Url=https://org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=...
 ```
 
-### Individual Env Vars (single env)
+### Connection Strings JSON (multiple envs)
 
-```
-D365_URL=https://org.crm.dynamics.com
-D365_TENANT_ID=...
-D365_CLIENT_ID=...
-D365_CLIENT_SECRET=...
+Set `D365_CONNECTION_STRINGS` to JSON:
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "connectionString": "AuthType=ClientSecret;Url=https://dev-org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=..."
+    },
+    {
+      "name": "prod",
+      "connectionString": "AuthType=ClientSecret;Url=https://prod-org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=..."
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
 ```
 
 ## Tools
