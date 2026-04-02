@@ -3,12 +3,14 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
-import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
+import {
+  listWebResourcesQuery,
+  listWebResourcesWithContentQuery,
+} from "../../queries/web-resource-queries.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { diffCollections, type DiffResult } from "../../utils/diff.js";
-import { buildQueryString, odataContains } from "../../utils/odata-helpers.js";
 import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
 
 export interface CollectionComparisonData<T extends Record<string, unknown>> {
@@ -174,26 +176,9 @@ export async function compareWebResourcesData(
   const resourceNameFilter = options?.nameFilter;
 
   const queryParams = options?.compareContent
-    ? buildQueryString({
-        select: [
-          "webresourceid",
-          "name",
-          "displayname",
-          "webresourcetype",
-          "ismanaged",
-          "modifiedon",
-          "content",
-        ],
-        filter:
-          [
-            resourceType
-              ? `webresourcetype eq ${({ html: 1, css: 2, js: 3, xml: 4, png: 5, jpg: 6, gif: 7, xap: 8, xsl: 9, ico: 10, svg: 11, resx: 12 } as Record<string, number>)[resourceType]}`
-              : "",
-            resourceNameFilter ? odataContains("name", resourceNameFilter) : "",
-          ]
-            .filter(Boolean)
-            .join(" and ") || undefined,
-        orderby: "name asc",
+    ? listWebResourcesWithContentQuery({
+        type: resourceType,
+        nameFilter: resourceNameFilter,
       })
     : listWebResourcesQuery({
         type: resourceType,

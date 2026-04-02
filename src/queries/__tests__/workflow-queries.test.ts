@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getWorkflowDetailsQuery,
+  getWorkflowDetailsByIdentityQuery,
   listActionsQuery,
   listWorkflowsQuery,
 } from "../workflow-queries.js";
@@ -29,5 +30,12 @@ describe("workflow queries", () => {
     expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
     expect(query).toContain("triggeronupdateattributelist");
     expect(query).toContain("inputparameters");
+  });
+
+  it("builds the workflow details query by unique name", () => {
+    const query = getWorkflowDetailsByIdentityQuery({ uniqueName: "contoso_O'Hara" });
+
+    expect(query).toContain("$filter=uniquename eq 'contoso_O''Hara' and type eq 1");
+    expect(query).toContain("triggeronupdateattributelist");
   });
 });

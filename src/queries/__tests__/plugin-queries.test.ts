@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPluginAssemblyByNameQuery,
   listPluginAssembliesQuery,
   listPluginImagesForStepsQuery,
   listPluginImagesQuery,
@@ -19,6 +20,13 @@ describe("plugin queries", () => {
     );
     expect(query).toContain("$filter=ishidden/Value eq false");
     expect(query).toContain("$orderby=name asc");
+  });
+
+  it("builds the plugin assembly by name query", () => {
+    const query = getPluginAssemblyByNameQuery("O'Hara.Plugin", ["pluginassemblyid", "name"]);
+
+    expect(query).toContain("$select=pluginassemblyid,name");
+    expect(query).toContain("$filter=name eq 'O''Hara.Plugin'");
   });
 
   it("builds the plugin types query", () => {

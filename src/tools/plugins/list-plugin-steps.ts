@@ -3,8 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { getPluginAssemblyByNameQuery } from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
-import { buildQueryString, odataEq } from "../../utils/odata-helpers.js";
 import { fetchPluginSteps } from "./plugin-inventory.js";
 
 const STAGE_LABELS: Record<number, string> = {
@@ -36,10 +36,7 @@ export function registerListPluginSteps(
         const assemblies = await client.query<Record<string, unknown>>(
           env,
           "pluginassemblies",
-          buildQueryString({
-            select: ["pluginassemblyid", "name"],
-            filter: odataEq("name", pluginName),
-          }),
+          getPluginAssemblyByNameQuery(pluginName, ["pluginassemblyid", "name"]),
         );
 
         if (assemblies.length === 0) {

@@ -1,4 +1,4 @@
-import { buildQueryString } from "../utils/odata-helpers.js";
+import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
 
 const WORKFLOW_CATEGORY = {
   workflow: 0,
@@ -95,6 +95,40 @@ export function getWorkflowDetailsQuery(): string {
       "createdon",
       "modifiedon",
     ],
+  });
+}
+
+export function getWorkflowDetailsByIdentityQuery(options: {
+  workflowName?: string;
+  uniqueName?: string;
+}): string {
+  const filter = options.uniqueName
+    ? `${odataEq("uniquename", options.uniqueName)} and type eq 1`
+    : `${odataEq("name", options.workflowName as string)} and type eq 1`;
+
+  return buildQueryString({
+    select: [
+      "workflowid",
+      "name",
+      "uniquename",
+      "category",
+      "statecode",
+      "statuscode",
+      "mode",
+      "scope",
+      "primaryentity",
+      "ismanaged",
+      "description",
+      "xaml",
+      "clientdata",
+      "triggeroncreate",
+      "triggerondelete",
+      "triggeronupdateattributelist",
+      "inputparameters",
+      "createdon",
+      "modifiedon",
+    ],
+    filter,
   });
 }
 

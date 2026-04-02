@@ -1,23 +1,35 @@
 import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
 
+const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
+  "pluginassemblyid",
+  "name",
+  "version",
+  "publickeytoken",
+  "isolationmode",
+  "ismanaged",
+  "createdon",
+  "modifiedon",
+];
+
 function buildOrFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");
 }
 
 export function listPluginAssembliesQuery(): string {
   return buildQueryString({
-    select: [
-      "pluginassemblyid",
-      "name",
-      "version",
-      "publickeytoken",
-      "isolationmode",
-      "ismanaged",
-      "createdon",
-      "modifiedon",
-    ],
+    select: DEFAULT_PLUGIN_ASSEMBLY_SELECT,
     filter: "ishidden/Value eq false",
     orderby: "name asc",
+  });
+}
+
+export function getPluginAssemblyByNameQuery(
+  assemblyName: string,
+  select = DEFAULT_PLUGIN_ASSEMBLY_SELECT,
+): string {
+  return buildQueryString({
+    select,
+    filter: odataEq("name", assemblyName),
   });
 }
 
