@@ -177,6 +177,29 @@ If you want a long-running process on a fixed port, use HTTP mode:
 - Default host: `127.0.0.1`
 - Default port: `3003`
 
+The scripts auto-load the repo `.env` file if it exists. This is useful for:
+
+- `D365_MCP_CONFIG`
+- `MCP_PORT`
+- `MCP_HOST`
+- `MCP_PATH`
+- `NODE_BIN`
+
+Priority order:
+
+- CLI arguments
+- `.env`
+- script defaults
+
+Example `.env`:
+
+```bash
+D365_MCP_CONFIG=~/.dynamics365-mcp/config.json
+MCP_PORT=3003
+MCP_HOST=127.0.0.1
+MCP_PATH=/mcp
+```
+
 macOS / Linux:
 
 ```bash

@@ -205,6 +205,14 @@ scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
 
 The scripts store PID files in `run/` and logs in `logs/`.
 
+The scripts also auto-load the repo `.env` file if it exists. This is useful for values like `D365_MCP_CONFIG`, `MCP_PORT`, `MCP_HOST`, `MCP_PATH`, and `NODE_BIN`.
+
+Priority order:
+
+- CLI arguments
+- `.env`
+- script defaults
+
 ## Tools
 
 ### Metadata Query Tools

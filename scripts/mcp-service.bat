@@ -1,12 +1,32 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
+for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
+set "ENV_FILE=%ROOT_DIR%\.env"
+
+if exist "%ENV_FILE%" (
+  for /f "usebackq eol=# tokens=1* delims==" %%A in ("%ENV_FILE%") do (
+    set "ENV_KEY=%%A"
+    set "ENV_VALUE=%%B"
+    if defined ENV_KEY (
+      if "!ENV_KEY:~0,7!"=="export " set "ENV_KEY=!ENV_KEY:~7!"
+      if defined ENV_KEY set "!ENV_KEY!=!ENV_VALUE!"
+    )
+  )
+)
+
 set "ACTION=%~1"
 set "PORT=%~2"
 set "CONFIG_PATH=%~3"
 
 if "%ACTION%"=="" goto :usage
-if "%PORT%"=="" set "PORT=3003"
+if "%PORT%"=="" (
+  if "%MCP_PORT%"=="" (
+    set "PORT=3003"
+  ) else (
+    set "PORT=%MCP_PORT%"
+  )
+)
 
 if "%MCP_HOST%"=="" (
   set "HOST=127.0.0.1"
@@ -26,7 +46,6 @@ if "%NODE_BIN%"=="" (
   set "NODE_BIN=%NODE_BIN%"
 )
 
-for %%I in ("%~dp0..") do set "ROOT_DIR=%%~fI"
 set "RUN_DIR=%ROOT_DIR%\run"
 set "LOG_DIR=%ROOT_DIR%\logs"
 set "PID_FILE=%RUN_DIR%\dynamics-365-mcp-%PORT%.pid"

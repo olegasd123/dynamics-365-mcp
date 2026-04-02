@@ -4,9 +4,17 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+ENV_FILE="$ROOT_DIR/.env"
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
 
 ACTION=${1:-}
-PORT=${2:-3003}
+PORT=${2:-${MCP_PORT:-3003}}
 CONFIG_PATH=${3:-${D365_MCP_CONFIG:-}}
 
 HOST=${MCP_HOST:-127.0.0.1}
