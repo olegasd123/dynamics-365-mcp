@@ -4,7 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { formatTable } from "../../utils/formatters.js";
-import { buildQueryString } from "../../utils/odata-helpers.js";
+import { buildQueryString, odataEq } from "../../utils/odata-helpers.js";
 import { fetchPluginInventory } from "./plugin-inventory.js";
 
 const IMAGE_TYPE_LABELS: Record<number, string> = {
@@ -37,7 +37,7 @@ export function registerListPluginImages(
           "pluginassemblies",
           buildQueryString({
             select: ["pluginassemblyid", "name"],
-            filter: `name eq '${pluginName}'`,
+            filter: odataEq("name", pluginName),
           }),
         );
 

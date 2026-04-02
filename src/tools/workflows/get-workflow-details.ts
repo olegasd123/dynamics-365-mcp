@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { buildQueryString } from "../../utils/odata-helpers.js";
+import { buildQueryString, odataEq } from "../../utils/odata-helpers.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
   0: "Workflow",
@@ -49,8 +49,8 @@ export function registerGetWorkflowDetails(
         const env = getEnvironment(config, environment);
 
         const filter = uniqueName
-          ? `uniquename eq '${uniqueName}' and type eq 1`
-          : `name eq '${workflowName}' and type eq 1`;
+          ? `${odataEq("uniquename", uniqueName)} and type eq 1`
+          : `${odataEq("name", workflowName as string)} and type eq 1`;
 
         const workflows = await client.query<Record<string, unknown>>(
           env,

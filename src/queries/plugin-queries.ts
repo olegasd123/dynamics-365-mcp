@@ -1,7 +1,7 @@
-import { buildQueryString } from "../utils/odata-helpers.js";
+import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
 
 function buildOrFilter(field: string, values: string[]): string {
-  return values.map((value) => `${field} eq '${value}'`).join(" or ");
+  return values.map((value) => odataEq(field, value)).join(" or ");
 }
 
 export function listPluginAssembliesQuery(): string {
@@ -24,7 +24,7 @@ export function listPluginAssembliesQuery(): string {
 export function listPluginTypesQuery(assemblyId: string): string {
   return buildQueryString({
     select: ["plugintypeid", "name", "typename", "friendlyname", "isworkflowactivity"],
-    filter: `pluginassemblyid/pluginassemblyid eq '${assemblyId}'`,
+    filter: odataEq("pluginassemblyid/pluginassemblyid", assemblyId),
     orderby: "name asc",
   });
 }
@@ -61,7 +61,7 @@ export function listPluginStepsQuery(pluginTypeId: string): string {
       "asyncautodelete",
       "supporteddeployment",
     ],
-    filter: `_eventhandler_value eq '${pluginTypeId}'`,
+    filter: odataEq("_eventhandler_value", pluginTypeId),
     expand: "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
     orderby: "name asc",
   });
@@ -101,7 +101,7 @@ export function listPluginImagesQuery(stepId: string): string {
       "attributes",
       "messagepropertyname",
     ],
-    filter: `_sdkmessageprocessingstepid_value eq '${stepId}'`,
+    filter: odataEq("_sdkmessageprocessingstepid_value", stepId),
   });
 }
 
@@ -131,7 +131,7 @@ export function listStepsForAssemblyQuery(assemblyName: string): string {
       "statecode",
       "filteringattributes",
     ],
-    filter: `eventhandler_plugintype/pluginassemblyid/name eq '${assemblyName}'`,
+    filter: odataEq("eventhandler_plugintype/pluginassemblyid/name", assemblyName),
     expand:
       "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),eventhandler_plugintype($select=name,typename)",
     orderby: "name asc",

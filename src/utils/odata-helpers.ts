@@ -29,3 +29,19 @@ export function buildQueryString(params: {
 
   return parts.join("&");
 }
+
+export function escapeODataString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+export function odataStringLiteral(value: string): string {
+  return `'${escapeODataString(value)}'`;
+}
+
+export function odataEq(field: string, value: string): string {
+  return `${field} eq ${odataStringLiteral(value)}`;
+}
+
+export function odataContains(field: string, value: string): string {
+  return `contains(${field},${odataStringLiteral(value)})`;
+}

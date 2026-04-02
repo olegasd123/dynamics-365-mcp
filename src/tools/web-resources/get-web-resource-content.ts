@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { buildQueryString } from "../../utils/odata-helpers.js";
+import { buildQueryString, odataEq } from "../../utils/odata-helpers.js";
 
 const TEXT_TYPES = new Set([1, 2, 3, 4, 9, 12]); // HTML, CSS, JS, XML, XSL, RESX
 
@@ -28,7 +28,7 @@ export function registerGetWebResourceContent(
           "webresourceset",
           buildQueryString({
             select: ["webresourceid", "name", "displayname", "webresourcetype", "content"],
-            filter: `name eq '${resourceName}'`,
+            filter: odataEq("name", resourceName),
           }),
         );
 

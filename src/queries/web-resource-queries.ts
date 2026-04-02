@@ -1,4 +1,4 @@
-import { buildQueryString } from "../utils/odata-helpers.js";
+import { buildQueryString, odataContains } from "../utils/odata-helpers.js";
 
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,
@@ -27,7 +27,7 @@ export function listWebResourcesQuery(options?: {
     filters.push(`webresourcetype eq ${WEB_RESOURCE_TYPE[options.type]}`);
   }
   if (options?.nameFilter) {
-    filters.push(`contains(name,'${options.nameFilter}')`);
+    filters.push(odataContains("name", options.nameFilter));
   }
 
   return buildQueryString({

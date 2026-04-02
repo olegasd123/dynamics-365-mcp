@@ -8,7 +8,7 @@ import type { WebResourceType } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { diffCollections, type DiffResult } from "../../utils/diff.js";
-import { buildQueryString } from "../../utils/odata-helpers.js";
+import { buildQueryString, odataContains } from "../../utils/odata-helpers.js";
 import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
 
 export interface CollectionComparisonData<T extends Record<string, unknown>> {
@@ -189,7 +189,7 @@ export async function compareWebResourcesData(
             resourceType
               ? `webresourcetype eq ${({ html: 1, css: 2, js: 3, xml: 4, png: 5, jpg: 6, gif: 7, xap: 8, xsl: 9, ico: 10, svg: 11, resx: 12 } as Record<string, number>)[resourceType]}`
               : "",
-            resourceNameFilter ? `contains(name,'${resourceNameFilter}')` : "",
+            resourceNameFilter ? odataContains("name", resourceNameFilter) : "",
           ]
             .filter(Boolean)
             .join(" and ") || undefined,

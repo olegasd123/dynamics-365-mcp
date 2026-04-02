@@ -4,7 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listPluginTypesForAssembliesQuery } from "../../queries/plugin-queries.js";
-import { buildQueryString } from "../../utils/odata-helpers.js";
+import { buildQueryString, odataEq } from "../../utils/odata-helpers.js";
 import { fetchPluginInventory } from "./plugin-inventory.js";
 
 const STAGE_LABELS: Record<number, string> = {
@@ -45,7 +45,7 @@ export function registerGetPluginDetails(
               "createdon",
               "modifiedon",
             ],
-            filter: `name eq '${pluginName}'`,
+            filter: odataEq("name", pluginName),
           }),
         );
 
