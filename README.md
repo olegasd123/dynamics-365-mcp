@@ -127,7 +127,7 @@ D365_CLIENT_SECRET=...
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
 | `get_plugin_details`       | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                  |
 | `list_workflows`           | List workflows/processes with status                          | `environment`, `category`, `status`          |
-| `list_actions`             | List custom actions and custom APIs                           | `environment`                                |
+| `list_actions`             | List workflow-based custom actions                            | `environment`                                |
 | `get_workflow_details`     | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName` |
 | `list_web_resources`       | List web resources by type                                    | `environment`, `type`, `nameFilter`          |
 | `get_web_resource_content` | Fetch decoded web resource content                            | `environment`, `name`                        |
@@ -143,7 +143,104 @@ D365_CLIENT_SECRET=...
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
-`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugins it now shows drift on three levels: assemblies, steps, and step images.
+`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugins it shows drift on three levels:
+
+- plugin assemblies
+- plugin steps
+- plugin step images
+
+### Comparison Output
+
+Pairwise comparison tools are best for deep checks between two environments.
+
+- Use `compare_plugins`, `compare_workflows`, or `compare_web_resources` when you already know the two environments you want to compare.
+- Use `compare_environment_matrix` when you want one baseline, usually `prod`, and many targets like `dev`, `test`, and `pre-prod`.
+
+Matrix status values:
+
+- `same`: same as baseline
+- `diff`: item exists in both, but fields are different
+- `missing`: item exists in baseline, but not in target
+- `extra`: item exists in target, but not in baseline
+
+## Examples
+
+### Compare One Plugin Across Two Environments
+
+Use this when you want a detailed plugin diff, including steps and images.
+
+```json
+{
+  "tool": "compare_plugins",
+  "arguments": {
+    "sourceEnvironment": "dev",
+    "targetEnvironment": "prod",
+    "pluginName": "Contoso.Plugins"
+  }
+}
+```
+
+### Compare Many Environments Against Prod
+
+Use this when you want one drift report for many environments.
+
+```json
+{
+  "tool": "compare_environment_matrix",
+  "arguments": {
+    "baselineEnvironment": "prod",
+    "targetEnvironments": ["dev", "test", "pre-prod"],
+    "componentType": "plugins"
+  }
+}
+```
+
+### Compare Plugin Drift On All Plugin Levels
+
+Use this when you want to see plugin assembly, step, and image drift for one plugin.
+
+```json
+{
+  "tool": "compare_environment_matrix",
+  "arguments": {
+    "baselineEnvironment": "prod",
+    "targetEnvironments": ["dev", "test"],
+    "componentType": "plugins",
+    "pluginName": "Contoso.Plugins"
+  }
+}
+```
+
+### Compare Web Resources With Content
+
+Use this when metadata is not enough and you need content hash drift too.
+
+```json
+{
+  "tool": "compare_web_resources",
+  "arguments": {
+    "sourceEnvironment": "dev",
+    "targetEnvironment": "prod",
+    "type": "js",
+    "nameFilter": "account",
+    "compareContent": true
+  }
+}
+```
+
+### Get One Workflow Definition
+
+Use `uniqueName` when possible. It is safer than display name.
+
+```json
+{
+  "tool": "get_workflow_details",
+  "arguments": {
+    "environment": "test",
+    "uniqueName": "contoso_AccountSync"
+  }
+}
+```
 
 ## Authentication Flow
 
@@ -170,6 +267,12 @@ All comparison tools return three categories: **only in source**, **only in targ
 - **Config errors**: Fail fast at startup if no valid environments configured
 - **Rate limits**: Respect `Retry-After` on 429 responses with automatic retry
 - **Timeouts**: 30s default per request, clear error message with environment + URL
+
+## Notes
+
+- User input that goes into OData filters is escaped before query build.
+- Plugin step and image tools use bulk fetch logic to reduce Dataverse requests.
+- Pairwise compare tools are still useful. The matrix tool does not replace them.
 
 ## Usage
 
