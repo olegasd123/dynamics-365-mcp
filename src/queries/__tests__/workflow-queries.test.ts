@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vitest";
+import {
+  getWorkflowDetailsQuery,
+  listActionsQuery,
+  listWorkflowsQuery,
+} from "../workflow-queries.js";
+
+describe("workflow queries", () => {
+  it("builds the workflows query with category and status filters", () => {
+    const query = listWorkflowsQuery({
+      category: "action",
+      status: "activated",
+    });
+
+    expect(query).toContain("$filter=type eq 1 and category eq 3 and statecode eq 1");
+    expect(query).toContain("$orderby=name asc");
+  });
+
+  it("builds the actions query", () => {
+    const query = listActionsQuery();
+
+    expect(query).toContain("$filter=type eq 1 and category eq 3");
+    expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
+  });
+
+  it("builds the workflow details query", () => {
+    const query = getWorkflowDetailsQuery();
+
+    expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
+    expect(query).toContain("triggeronupdateattributelist");
+    expect(query).toContain("inputparameters");
+  });
+});
