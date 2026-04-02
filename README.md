@@ -156,6 +156,55 @@ Set `D365_CONNECTION_STRINGS` to JSON:
 }
 ```
 
+## Run As HTTP Service
+
+Default mode is still `stdio`. This is best for local MCP client config.
+
+The server also supports HTTP mode for service scripts. Use this when you want a long-running process on a fixed port.
+
+- MCP endpoint: `/mcp`
+- Health endpoint: `/health`
+- Default host: `127.0.0.1`
+- Default port: `3003`
+
+### Start On macOS Or Linux
+
+```bash
+./scripts/mcp-service.sh start 3003 ~/.dynamics365-mcp/config.json
+```
+
+Stop:
+
+```bash
+./scripts/mcp-service.sh stop 3003
+```
+
+Restart:
+
+```bash
+./scripts/mcp-service.sh restart 3003 ~/.dynamics365-mcp/config.json
+```
+
+### Start On Windows
+
+```bat
+scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics365-mcp\config.json
+```
+
+Stop:
+
+```bat
+scripts\mcp-service.bat stop 3003
+```
+
+Restart:
+
+```bat
+scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
+```
+
+The scripts store PID files in `run/` and logs in `logs/`.
+
 ## Tools
 
 ### Metadata Query Tools
