@@ -1,0 +1,77 @@
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AppConfig } from "../../config/types.js";
+import { getEnvironment } from "../../config/environments.js";
+import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { listWorkflowsQuery, WORKFLOW_CATEGORY, WORKFLOW_STATE } from "../../queries/workflow-queries.js";
+import type { WorkflowCategory, WorkflowState } from "../../queries/workflow-queries.js";
+import { formatTable } from "../../utils/formatters.js";
+
+const CATEGORY_LABELS: Record<number, string> = {
+  0: "Workflow",
+  1: "Dialog",
+  2: "Business Rule",
+  3: "Action",
+  4: "BPF",
+  5: "Modern Flow",
+};
+
+const STATE_LABELS: Record<number, string> = {
+  0: "Draft",
+  1: "Activated",
+  2: "Suspended",
+};
+
+export function registerListWorkflows(server: McpServer, config: AppConfig, client: DynamicsClient) {
+  server.tool(
+    "list_workflows",
+    "List workflows and processes in Dynamics 365 with their status.",
+    {
+      environment: z.string().optional().describe("Environment name"),
+      category: z.enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"]).optional().describe("Filter by category"),
+      status: z.enum(["draft", "activated", "suspended"]).optional().describe("Filter by status"),
+    },
+    async ({ environment, category, status }) => {
+      try {
+        const env = getEnvironment(config, environment);
+        const workflows = await client.query<Record<string, unknown>>(
+          env,
+          "workflows",
+          listWorkflowsQuery({
+            category: category as WorkflowCategory | undefined,
+            status: status as WorkflowState | undefined,
+          })
+        );
+
+        if (workflows.length === 0) {
+          return {
+            content: [{ type: "text" as const, text: `No workflows found in '${env.name}' with the specified filters.` }],
+          };
+        }
+
+        const headers = ["Name", "Category", "Status", "Entity", "Managed", "Modified"];
+        const rows = workflows.map((w) => [
+          String(w.name || ""),
+          CATEGORY_LABELS[w.category as number] || String(w.category),
+          STATE_LABELS[w.statecode as number] || String(w.statecode),
+          String(w.primaryentity || "none"),
+          w.ismanaged ? "Yes" : "No",
+          String(w.modifiedon || "").slice(0, 10),
+        ]);
+
+        const filterDesc = [
+          category ? `category=${category}` : "",
+          status ? `status=${status}` : "",
+        ].filter(Boolean).join(", ");
+
+        const text = `## Workflows in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\nFound ${workflows.length} workflow(s).\n\n${formatTable(headers, rows)}`;
+        return { content: [{ type: "text" as const, text }] };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+}
