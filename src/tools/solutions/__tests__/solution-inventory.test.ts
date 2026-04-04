@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
-import { fetchSolutionComponentSets, resolveSolution } from "../solution-inventory.js";
+import {
+  fetchSolutionComponentSets,
+  fetchSolutionInventory,
+  resolveSolution,
+} from "../solution-inventory.js";
 
 describe("solution inventory", () => {
   const env: EnvironmentConfig = {
@@ -51,19 +55,68 @@ describe("solution inventory", () => {
             componenttype: 92,
             rootsolutioncomponentid: "sc-1",
           },
+          {
+            solutioncomponentid: "sc-6",
+            objectid: "img-1",
+            componenttype: 93,
+            rootsolutioncomponentid: "sc-1",
+          },
+        ],
+        pluginassemblies: [
+          {
+            pluginassemblyid: "asm-1",
+            name: "Core.Plugins",
+          },
+        ],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "AccountPlugin",
+            typename: "Core.Plugins.AccountPlugin",
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [
+          {
+            sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
+            name: "Account Create",
+            stage: 20,
+            mode: 0,
+            rank: 1,
+            statecode: 0,
+            sdkmessageid: { name: "Create" },
+            sdkmessagefilterid: { primaryobjecttypecode: "account" },
+          },
+        ],
+        sdkmessageprocessingstepimages: [
+          {
+            sdkmessageprocessingstepimageid: "img-1",
+            _sdkmessageprocessingstepid_value: "step-1",
+            name: "PreImage",
+            entityalias: "pre",
+            imagetype: 0,
+            attributes: "name",
+            messagepropertyname: "Target",
+          },
         ],
       },
     });
 
     const solution = await resolveSolution(env, client, "contoso_core");
     const componentSets = await fetchSolutionComponentSets(env, client, "Core");
+    const inventory = await fetchSolutionInventory(env, client, "Core");
 
     expect(solution.friendlyname).toBe("Core");
     expect(componentSets.pluginAssemblyIds).toEqual(new Set(["asm-1"]));
     expect(componentSets.workflowIds).toEqual(new Set(["wf-1"]));
     expect(componentSets.webResourceIds).toEqual(new Set(["wr-1"]));
+    expect(componentSets.pluginStepIds).toEqual(new Set(["step-1"]));
+    expect(componentSets.pluginImageIds).toEqual(new Set(["img-1"]));
     expect(componentSets.unsupportedRootComponents).toHaveLength(1);
-    expect(componentSets.childComponents).toHaveLength(1);
+    expect(componentSets.childComponents).toHaveLength(2);
+    expect(inventory.pluginSteps).toHaveLength(1);
+    expect(inventory.pluginImages).toHaveLength(1);
   });
 
   it("throws an ambiguous error when multiple solutions match the same display name", async () => {

@@ -19,6 +19,18 @@ describe("compare_solutions tool", () => {
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
           { solutioncomponentid: "sc-2", objectid: "wf-1", componenttype: 29 },
           { solutioncomponentid: "sc-3", objectid: "wr-1", componenttype: 61 },
+          {
+            solutioncomponentid: "sc-4",
+            objectid: "step-1",
+            componenttype: 92,
+            rootsolutioncomponentid: "sc-1",
+          },
+          {
+            solutioncomponentid: "sc-5",
+            objectid: "img-1",
+            componenttype: 93,
+            rootsolutioncomponentid: "sc-1",
+          },
         ],
         pluginassemblies: [
           {
@@ -27,6 +39,41 @@ describe("compare_solutions tool", () => {
             version: "1.0.0",
             isolationmode: 2,
             ismanaged: false,
+          },
+        ],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "AccountPlugin",
+            typename: "Core.Plugins.AccountPlugin",
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [
+          {
+            sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
+            name: "Account Create",
+            stage: 20,
+            mode: 0,
+            rank: 1,
+            statecode: 0,
+            filteringattributes: "name",
+            supporteddeployment: 0,
+            asyncautodelete: false,
+            sdkmessageid: { name: "Create" },
+            sdkmessagefilterid: { primaryobjecttypecode: "account" },
+          },
+        ],
+        sdkmessageprocessingstepimages: [
+          {
+            sdkmessageprocessingstepimageid: "img-1",
+            _sdkmessageprocessingstepid_value: "step-1",
+            name: "PreImage",
+            entityalias: "pre",
+            imagetype: 0,
+            attributes: "name",
+            messagepropertyname: "Target",
           },
         ],
         workflows: [
@@ -57,6 +104,18 @@ describe("compare_solutions tool", () => {
         solutioncomponents: [
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
           { solutioncomponentid: "sc-2", objectid: "wf-1", componenttype: 29 },
+          {
+            solutioncomponentid: "sc-4",
+            objectid: "step-1",
+            componenttype: 92,
+            rootsolutioncomponentid: "sc-1",
+          },
+          {
+            solutioncomponentid: "sc-5",
+            objectid: "img-1",
+            componenttype: 93,
+            rootsolutioncomponentid: "sc-1",
+          },
         ],
         pluginassemblies: [
           {
@@ -65,6 +124,41 @@ describe("compare_solutions tool", () => {
             version: "2.0.0",
             isolationmode: 2,
             ismanaged: false,
+          },
+        ],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "AccountPlugin",
+            typename: "Core.Plugins.AccountPlugin",
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [
+          {
+            sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
+            name: "Account Create",
+            stage: 40,
+            mode: 0,
+            rank: 1,
+            statecode: 0,
+            filteringattributes: "name,address1_city",
+            supporteddeployment: 0,
+            asyncautodelete: false,
+            sdkmessageid: { name: "Create" },
+            sdkmessagefilterid: { primaryobjecttypecode: "account" },
+          },
+        ],
+        sdkmessageprocessingstepimages: [
+          {
+            sdkmessageprocessingstepimageid: "img-1",
+            _sdkmessageprocessingstepid_value: "step-1",
+            name: "PreImage",
+            entityalias: "pre",
+            imagetype: 0,
+            attributes: "name,address1_city",
+            messagepropertyname: "Target",
           },
         ],
         workflows: [
@@ -104,6 +198,11 @@ describe("compare_solutions tool", () => {
     expect(text).toContain("### Plugin Assemblies");
     expect(text).toContain("Core.Plugins");
     expect(text).toContain("version: `1.0.0` -> `2.0.0`");
+    expect(text).toContain("### Plugin Steps");
+    expect(text).toContain("Account Create");
+    expect(text).toContain("stage: `20` -> `40`");
+    expect(text).toContain("### Plugin Images");
+    expect(text).toContain("attributes: `name` -> `name,address1_city`");
     expect(text).toContain("### Web Resources");
     expect(text).toContain("Only in dev:");
   });

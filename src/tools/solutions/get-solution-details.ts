@@ -39,6 +39,23 @@ const WEB_RESOURCE_TYPE_LABELS: Record<number, string> = {
   12: "RESX",
 };
 
+const STAGE_LABELS: Record<number, string> = {
+  10: "Pre-Validation",
+  20: "Pre-Operation",
+  40: "Post-Operation",
+};
+
+const MODE_LABELS: Record<number, string> = {
+  0: "Synchronous",
+  1: "Asynchronous",
+};
+
+const IMAGE_TYPE_LABELS: Record<number, string> = {
+  0: "PreImage",
+  1: "PostImage",
+  2: "Both",
+};
+
 export function registerGetSolutionDetails(
   server: McpServer,
   config: AppConfig,
@@ -70,7 +87,11 @@ export function registerGetSolutionDetails(
         lines.push(
           `- **Supported Root Components**: Plugins ${inventory.pluginAssemblies.length} | Workflows ${inventory.workflows.length} | Web Resources ${inventory.webResources.length}`,
         );
+        lines.push(
+          `- **Supported Child Components**: Plugin Steps ${inventory.pluginSteps.length} | Plugin Images ${inventory.pluginImages.length}`,
+        );
         lines.push(`- **Other Root Components**: ${inventory.unsupportedRootComponents.length}`);
+        lines.push(`- **Other Child Components**: ${inventory.unsupportedChildComponents.length}`);
 
         if (inventory.pluginAssemblies.length > 0) {
           lines.push("");
@@ -124,6 +145,43 @@ export function registerGetSolutionDetails(
           );
         }
 
+        if (inventory.pluginSteps.length > 0) {
+          lines.push("");
+          lines.push("### Plugin Steps");
+          lines.push(
+            formatTable(
+              ["Assembly", "Step", "Message", "Entity", "Stage", "Mode", "Rank"],
+              inventory.pluginSteps.map((step) => [
+                step.assemblyName,
+                step.name,
+                step.messageName,
+                step.primaryEntity,
+                STAGE_LABELS[step.stage as number] || String(step.stage || ""),
+                MODE_LABELS[step.mode as number] || String(step.mode || ""),
+                String(step.rank || ""),
+              ]),
+            ),
+          );
+        }
+
+        if (inventory.pluginImages.length > 0) {
+          lines.push("");
+          lines.push("### Plugin Images");
+          lines.push(
+            formatTable(
+              ["Assembly", "Step", "Image", "Type", "Alias", "Attributes"],
+              inventory.pluginImages.map((image) => [
+                image.assemblyName,
+                image.stepName,
+                image.name,
+                IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype || ""),
+                String(image.entityalias || ""),
+                String(image.attributes || ""),
+              ]),
+            ),
+          );
+        }
+
         if (inventory.unsupportedRootComponents.length > 0) {
           lines.push("");
           lines.push("### Other Root Components");
@@ -135,6 +193,21 @@ export function registerGetSolutionDetails(
                 component.objectid,
                 ROOT_BEHAVIOR_LABELS[component.rootcomponentbehavior as number] ||
                   String(component.rootcomponentbehavior ?? ""),
+              ]),
+            ),
+          );
+        }
+
+        if (inventory.unsupportedChildComponents.length > 0) {
+          lines.push("");
+          lines.push("### Other Child Components");
+          lines.push(
+            formatTable(
+              ["Type", "Object ID", "Root Component ID"],
+              inventory.unsupportedChildComponents.map((component) => [
+                getSolutionComponentTypeLabel(component.componenttype),
+                component.objectid,
+                String(component.rootsolutioncomponentid || ""),
               ]),
             ),
           );

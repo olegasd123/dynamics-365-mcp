@@ -38,6 +38,26 @@ export function registerCompareSolutions(
           (item) => String(item.name),
           ["version", "isolationmode", "ismanaged"],
         );
+        const pluginStepDiff = diffCollections(
+          sourceInventory.pluginSteps,
+          targetInventory.pluginSteps,
+          (item) => buildPluginStepComparisonKey(item),
+          [
+            "stage",
+            "mode",
+            "statecode",
+            "rank",
+            "filteringattributes",
+            "supporteddeployment",
+            "asyncautodelete",
+          ],
+        );
+        const pluginImageDiff = diffCollections(
+          sourceInventory.pluginImages,
+          targetInventory.pluginImages,
+          (item) => buildPluginImageComparisonKey(item),
+          ["entityalias", "imagetype", "attributes", "messagepropertyname"],
+        );
         const workflowDiff = diffCollections(
           sourceInventory.workflows,
           targetInventory.workflows,
@@ -61,6 +81,26 @@ export function registerCompareSolutions(
         lines.push("");
         lines.push(
           renderDiffSection("Plugin Assemblies", pluginDiff, sourceEnvironment, targetEnvironment, "name"),
+        );
+        lines.push("");
+        lines.push(
+          renderDiffSection(
+            "Plugin Steps",
+            pluginStepDiff,
+            sourceEnvironment,
+            targetEnvironment,
+            "displayName",
+          ),
+        );
+        lines.push("");
+        lines.push(
+          renderDiffSection(
+            "Plugin Images",
+            pluginImageDiff,
+            sourceEnvironment,
+            targetEnvironment,
+            "displayName",
+          ),
         );
         lines.push("");
         lines.push(
@@ -163,4 +203,25 @@ function formatValue(value: unknown): string {
     return value;
   }
   return JSON.stringify(value);
+}
+
+function buildPluginStepComparisonKey(item: Record<string, unknown>): string {
+  return [
+    String(item.assemblyName || ""),
+    String(item.pluginTypeFullName || item.pluginTypeName || ""),
+    String(item.messageName || ""),
+    String(item.primaryEntity || ""),
+    String(item.name || ""),
+  ].join(" | ");
+}
+
+function buildPluginImageComparisonKey(item: Record<string, unknown>): string {
+  return [
+    String(item.assemblyName || ""),
+    String(item.pluginTypeName || ""),
+    String(item.messageName || ""),
+    String(item.primaryEntity || ""),
+    String(item.stepName || ""),
+    String(item.name || ""),
+  ].join(" | ");
 }

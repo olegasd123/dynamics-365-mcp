@@ -4,17 +4,26 @@ import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
 import { listSolutionsQuery, listSolutionComponentsQuery } from "../../queries/solution-queries.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
+import {
+  fetchPluginInventory,
+  type PluginImageRecord,
+  type PluginStepRecord,
+} from "../plugins/plugin-inventory.js";
 
 export const SOLUTION_COMPONENT_TYPE = {
   workflow: 29,
   webResource: 61,
   pluginAssembly: 91,
+  pluginStep: 92,
+  pluginImage: 93,
 } as const;
 
 const COMPONENT_TYPE_LABELS: Record<number, string> = {
   29: "Workflow",
   61: "Web Resource",
   91: "Plugin Assembly",
+  92: "Plugin Step",
+  93: "Plugin Image",
 };
 
 export interface SolutionRecord extends Record<string, unknown> {
@@ -42,13 +51,18 @@ export interface SolutionComponentSets {
   pluginAssemblyIds: Set<string>;
   workflowIds: Set<string>;
   webResourceIds: Set<string>;
+  pluginStepIds: Set<string>;
+  pluginImageIds: Set<string>;
   unsupportedRootComponents: SolutionComponentRecord[];
+  unsupportedChildComponents: SolutionComponentRecord[];
 }
 
 export interface SolutionInventory extends SolutionComponentSets {
   pluginAssemblies: Record<string, unknown>[];
   workflows: Record<string, unknown>[];
   webResources: Record<string, unknown>[];
+  pluginSteps: PluginStepRecord[];
+  pluginImages: PluginImageRecord[];
 }
 
 export async function listSolutions(
@@ -143,6 +157,8 @@ export async function fetchSolutionComponentSets(
   );
   const workflowIds = collectObjectIds(rootComponents, SOLUTION_COMPONENT_TYPE.workflow);
   const webResourceIds = collectObjectIds(rootComponents, SOLUTION_COMPONENT_TYPE.webResource);
+  const pluginStepIds = collectObjectIds(childComponents, SOLUTION_COMPONENT_TYPE.pluginStep);
+  const pluginImageIds = collectObjectIds(childComponents, SOLUTION_COMPONENT_TYPE.pluginImage);
 
   return {
     solution,
@@ -152,11 +168,18 @@ export async function fetchSolutionComponentSets(
     pluginAssemblyIds,
     workflowIds,
     webResourceIds,
+    pluginStepIds,
+    pluginImageIds,
     unsupportedRootComponents: rootComponents.filter(
       (component) =>
         component.componenttype !== SOLUTION_COMPONENT_TYPE.pluginAssembly &&
         component.componenttype !== SOLUTION_COMPONENT_TYPE.workflow &&
         component.componenttype !== SOLUTION_COMPONENT_TYPE.webResource,
+    ),
+    unsupportedChildComponents: childComponents.filter(
+      (component) =>
+        component.componenttype !== SOLUTION_COMPONENT_TYPE.pluginStep &&
+        component.componenttype !== SOLUTION_COMPONENT_TYPE.pluginImage,
     ),
   };
 }
@@ -194,12 +217,21 @@ export async function fetchSolutionInventory(
       componentSets.webResourceIds,
     ),
   ]);
+  const pluginInventory = await fetchPluginInventory(env, client, pluginAssemblies);
+  const pluginSteps = pluginInventory.steps.filter((step) =>
+    componentSets.pluginStepIds.has(step.sdkmessageprocessingstepid),
+  );
+  const pluginImages = pluginInventory.images.filter((image) =>
+    componentSets.pluginImageIds.has(String(image.sdkmessageprocessingstepimageid || "")),
+  );
 
   return {
     ...componentSets,
     pluginAssemblies,
     workflows,
     webResources,
+    pluginSteps,
+    pluginImages,
   };
 }
 

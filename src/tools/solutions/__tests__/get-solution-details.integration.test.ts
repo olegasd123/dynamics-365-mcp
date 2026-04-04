@@ -29,6 +29,12 @@ describe("get_solution_details tool", () => {
           { solutioncomponentid: "sc-4", objectid: "form-1", componenttype: 24 },
           {
             solutioncomponentid: "sc-5",
+            objectid: "step-1",
+            componenttype: 92,
+            rootsolutioncomponentid: "sc-1",
+          },
+          {
+            solutioncomponentid: "sc-6",
             objectid: "img-1",
             componenttype: 93,
             rootsolutioncomponentid: "sc-1",
@@ -42,6 +48,41 @@ describe("get_solution_details tool", () => {
             isolationmode: 2,
             ismanaged: false,
             modifiedon: "2026-03-02T12:00:00Z",
+          },
+        ],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "AccountPlugin",
+            typename: "Core.Plugins.AccountPlugin",
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [
+          {
+            sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
+            name: "Account Create",
+            stage: 20,
+            mode: 0,
+            rank: 1,
+            statecode: 0,
+            filteringattributes: "name",
+            supporteddeployment: 0,
+            asyncautodelete: false,
+            sdkmessageid: { name: "Create" },
+            sdkmessagefilterid: { primaryobjecttypecode: "account" },
+          },
+        ],
+        sdkmessageprocessingstepimages: [
+          {
+            sdkmessageprocessingstepimageid: "img-1",
+            _sdkmessageprocessingstepid_value: "step-1",
+            name: "PreImage",
+            entityalias: "pre",
+            imagetype: 0,
+            attributes: "name",
+            messagepropertyname: "Target",
           },
         ],
         workflows: [
@@ -77,8 +118,13 @@ describe("get_solution_details tool", () => {
     expect(response.isError).toBeUndefined();
     expect(text).toContain("## Solution: Core");
     expect(text).toContain("**Supported Root Components**: Plugins 1 | Workflows 1 | Web Resources 1");
+    expect(text).toContain("**Supported Child Components**: Plugin Steps 1 | Plugin Images 1");
     expect(text).toContain("### Plugin Assemblies");
     expect(text).toContain("Core.Plugins");
+    expect(text).toContain("### Plugin Steps");
+    expect(text).toContain("Account Create");
+    expect(text).toContain("### Plugin Images");
+    expect(text).toContain("PreImage");
     expect(text).toContain("### Workflows");
     expect(text).toContain("Account Sync");
     expect(text).toContain("### Web Resources");

@@ -38,6 +38,7 @@ export interface PluginImageRecord extends Record<string, unknown> {
   pluginTypeId: string;
   pluginTypeName: string;
   sdkmessageprocessingstepid: string;
+  sdkmessageprocessingstepimageid: string;
   stepName: string;
   stepKey: string;
   name: string;
@@ -219,6 +220,7 @@ function normalizePluginImage(
     pluginTypeId: stepRecord.pluginTypeId,
     pluginTypeName: stepRecord.pluginTypeName,
     sdkmessageprocessingstepid: stepRecord.sdkmessageprocessingstepid,
+    sdkmessageprocessingstepimageid: String(image.sdkmessageprocessingstepimageid || ""),
     stepName: stepRecord.name,
     stepKey: stepRecord.key,
     messageName: stepRecord.messageName,
