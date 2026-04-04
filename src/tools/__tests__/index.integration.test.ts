@@ -21,6 +21,7 @@ describe("registerAllTools", () => {
       "compare_web_resources",
       "compare_workflows",
       "get_plugin_details",
+      "get_solution_dependencies",
       "get_solution_details",
       "get_web_resource_content",
       "get_workflow_details",

@@ -20,6 +20,7 @@ import { registerGetWebResourceContent } from "./web-resources/get-web-resource-
 // Solution tools
 import { registerListSolutions } from "./solutions/list-solutions.js";
 import { registerGetSolutionDetails } from "./solutions/get-solution-details.js";
+import { registerGetSolutionDependencies } from "./solutions/get-solution-dependencies.js";
 
 // Comparison tools
 import { registerComparePlugins } from "./comparison/compare-plugins.js";
@@ -51,6 +52,7 @@ export function registerAllTools(
   // Solution tools
   registerListSolutions(server, config, client);
   registerGetSolutionDetails(server, config, client);
+  registerGetSolutionDependencies(server, config, client);
 
   // Comparison tools
   registerComparePlugins(server, config, client);

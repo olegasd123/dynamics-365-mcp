@@ -40,6 +40,7 @@ src/
     solutions/
       list-solutions.ts
       get-solution-details.ts
+      get-solution-dependencies.ts
     comparison/
       compare-plugins.ts
       compare-solutions.ts
@@ -51,6 +52,7 @@ src/
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
     solution-queries.ts             # OData query builders for solutions and solution components
+    dependency-queries.ts           # Dataverse dependency function query helpers
   utils/
     odata-helpers.ts                # $select, $filter, $expand builder utilities
     diff.ts                         # Generic diff engine for cross-environment comparison
@@ -230,6 +232,7 @@ Priority order:
 | `get_plugin_details`       | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                  |
 | `list_solutions`           | List solutions by display name and unique name                | `environment`, `nameFilter`                  |
 | `get_solution_details`     | Show solution summary and supported components                | `environment`, `solution`                    |
+| `get_solution_dependencies` | Show dependency links for supported solution components      | `environment`, `solution`, `direction`       |
 | `list_workflows`           | List workflows/processes with status                          | `environment`, `category`, `status`          |
 | `list_actions`             | List workflow-based custom actions                            | `environment`                                |
 | `get_workflow_details`     | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName` |
@@ -256,6 +259,16 @@ Users can now work with a solution by display name or unique name.
 - `list_web_resources` supports `solution`
 
 The server resolves the solution first, then filters supported root components from that solution.
+
+### Dependency View
+
+Use `get_solution_dependencies` when you want to see which supported solution components:
+
+- require other components
+- are used by other components
+- point outside the current solution
+
+This tool uses Dataverse dependency functions instead of guessing links from names.
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
