@@ -62,12 +62,25 @@ describe("get_solution_dependencies tool", () => {
         ],
         webresourceset: [
           { webresourceid: "wr-1", name: "contoso_/scripts/app.js", webresourcetype: 3, ismanaged: false },
+          { webresourceid: "wr-2", name: "contoso_/scripts/shared.js", webresourcetype: 3, ismanaged: false },
+        ],
+        workflows: [
+          {
+            workflowid: "wf-2",
+            name: "External Flow",
+            uniquename: "contoso_ExternalFlow",
+            category: 0,
+            statecode: 1,
+            statuscode: 2,
+            mode: 0,
+            ismanaged: false,
+          },
         ],
         [retrieveRequiredComponentsPath("sc-step", 92)]: [
           {
             dependencyid: "dep-1",
             dependencytype: 2,
-            requiredcomponentobjectid: "wr-1",
+            requiredcomponentobjectid: "wr-2",
             requiredcomponenttype: 61,
             dependentcomponentobjectid: "step-1",
             dependentcomponenttype: 92,
@@ -79,8 +92,8 @@ describe("get_solution_dependencies tool", () => {
             dependencytype: 2,
             requiredcomponentobjectid: "step-1",
             requiredcomponenttype: 92,
-            dependentcomponentobjectid: "view-1",
-            dependentcomponenttype: 26,
+            dependentcomponentobjectid: "wf-2",
+            dependentcomponenttype: 29,
           },
         ],
       },
@@ -100,8 +113,8 @@ describe("get_solution_dependencies tool", () => {
     expect(text).toContain("**Components Scanned**: 1");
     expect(text).toContain("Requires");
     expect(text).toContain("Used By");
-    expect(text).toContain("contoso_/scripts/app.js");
-    expect(text).toContain("Component Type 26 view-1");
+    expect(text).toContain("contoso_/scripts/shared.js");
+    expect(text).toContain("External Flow");
     expect(text).toContain("No");
     expect(text).toContain("Published");
   });

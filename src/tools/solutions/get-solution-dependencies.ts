@@ -4,12 +4,19 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { formatTable } from "../../utils/formatters.js";
+import { listPluginAssembliesByIdsQuery } from "../../queries/plugin-queries.js";
+import { listWebResourcesByIdsQuery } from "../../queries/web-resource-queries.js";
+import { listWorkflowsByIdsQuery } from "../../queries/workflow-queries.js";
 import {
   fetchSolutionInventory,
   getSolutionComponentTypeLabel,
   SOLUTION_COMPONENT_TYPE,
   type SolutionInventory,
 } from "./solution-inventory.js";
+import {
+  fetchPluginImagesByIds,
+  fetchPluginStepsByIds,
+} from "../plugins/plugin-inventory.js";
 import {
   dependencySelectQuery,
   retrieveDependentComponentsPath,
@@ -133,6 +140,7 @@ export function registerGetSolutionDependencies(
             )
           ).flat(),
         );
+        await resolveExternalSupportedComponentNames(env, client, dependencyRecords, namedComponentMap);
 
         const requiredCount = dependencyRecords.filter((record) => record.direction === "required").length;
         const dependentCount = dependencyRecords.filter((record) => record.direction === "dependents").length;
@@ -387,6 +395,101 @@ async function fetchDependenciesForComponent(
   return results;
 }
 
+async function resolveExternalSupportedComponentNames(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  dependencyRecords: NormalizedDependencyRecord[],
+  namedComponentMap: Map<string, string>,
+): Promise<void> {
+  const unresolved = dependencyRecords.filter(
+    (record) =>
+      !namedComponentMap.has(createComponentKey(record.otherComponentType, record.otherObjectId)) &&
+      isSupportedComponentType(record.otherComponentType),
+  );
+
+  if (unresolved.length === 0) {
+    return;
+  }
+
+  const pluginAssemblyIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginAssembly);
+  const workflowIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.workflow);
+  const webResourceIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.webResource);
+  const pluginStepIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginStep);
+  const pluginImageIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginImage);
+
+  const [pluginAssemblies, workflows, webResources, pluginSteps, pluginImages] = await Promise.all([
+    pluginAssemblyIds.length === 0
+      ? Promise.resolve([])
+      : client
+          .query<Record<string, unknown>>(
+            env,
+            "pluginassemblies",
+            listPluginAssembliesByIdsQuery(pluginAssemblyIds),
+          )
+          .then((records) =>
+            records.filter((record) => pluginAssemblyIds.includes(String(record.pluginassemblyid || ""))),
+          ),
+    workflowIds.length === 0
+      ? Promise.resolve([])
+      : client
+          .query<Record<string, unknown>>(env, "workflows", listWorkflowsByIdsQuery(workflowIds))
+          .then((records) => records.filter((record) => workflowIds.includes(String(record.workflowid || "")))),
+    webResourceIds.length === 0
+      ? Promise.resolve([])
+      : client
+          .query<Record<string, unknown>>(env, "webresourceset", listWebResourcesByIdsQuery(webResourceIds))
+          .then((records) =>
+            records.filter((record) => webResourceIds.includes(String(record.webresourceid || ""))),
+          ),
+    fetchPluginStepsByIds(env, client, pluginStepIds),
+    fetchPluginImagesByIds(env, client, pluginImageIds),
+  ]);
+
+  for (const assembly of pluginAssemblies) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.pluginAssembly, String(assembly.pluginassemblyid || "")),
+      String(assembly.name || ""),
+    );
+  }
+
+  for (const workflow of workflows) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.workflow, String(workflow.workflowid || "")),
+      String(workflow.name || workflow.uniquename || ""),
+    );
+  }
+
+  for (const resource of webResources) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.webResource, String(resource.webresourceid || "")),
+      String(resource.name || ""),
+    );
+  }
+
+  for (const step of pluginSteps) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.pluginStep, step.sdkmessageprocessingstepid),
+      step.displayName,
+    );
+  }
+
+  for (const image of pluginImages) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.pluginImage, image.sdkmessageprocessingstepimageid),
+      image.displayName,
+    );
+  }
+
+  for (const record of dependencyRecords) {
+    const resolvedName = namedComponentMap.get(
+      createComponentKey(record.otherComponentType, record.otherObjectId),
+    );
+    if (resolvedName) {
+      record.otherDisplayName = resolvedName;
+    }
+  }
+}
+
 function normalizeDependencyRecord(
   direction: "required" | "dependents",
   sourceComponent: NamedSolutionComponent,
@@ -444,6 +547,20 @@ function deduplicateDependencyRecords(
   return deduped;
 }
 
+function collectDependencyIds(
+  records: NormalizedDependencyRecord[],
+  componentType: number,
+): string[] {
+  return [
+    ...new Set(
+      records
+        .filter((record) => record.otherComponentType === componentType)
+        .map((record) => record.otherObjectId)
+        .filter(Boolean),
+    ),
+  ];
+}
+
 function countDirection(
   records: NormalizedDependencyRecord[],
   direction: "required" | "dependents",
@@ -456,4 +573,14 @@ function countDirection(
 
 function createComponentKey(componentType: number, objectId: string): string {
   return `${componentType}:${objectId}`;
+}
+
+function isSupportedComponentType(componentType: number): boolean {
+  return (
+    componentType === SOLUTION_COMPONENT_TYPE.pluginAssembly ||
+    componentType === SOLUTION_COMPONENT_TYPE.pluginStep ||
+    componentType === SOLUTION_COMPONENT_TYPE.pluginImage ||
+    componentType === SOLUTION_COMPONENT_TYPE.workflow ||
+    componentType === SOLUTION_COMPONENT_TYPE.webResource
+  );
 }

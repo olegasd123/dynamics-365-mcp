@@ -33,6 +33,14 @@ export function getPluginAssemblyByNameQuery(
   });
 }
 
+export function listPluginAssembliesByIdsQuery(assemblyIds: string[]): string {
+  return buildQueryString({
+    select: DEFAULT_PLUGIN_ASSEMBLY_SELECT,
+    filter: buildOrFilter("pluginassemblyid", assemblyIds),
+    orderby: "name asc",
+  });
+}
+
 export function listPluginTypesQuery(assemblyId: string): string {
   return buildQueryString({
     select: ["plugintypeid", "name", "typename", "friendlyname", "isworkflowactivity"],
@@ -52,6 +60,21 @@ export function listPluginTypesForAssembliesQuery(assemblyIds: string[]): string
       "_pluginassemblyid_value",
     ],
     filter: buildOrFilter("_pluginassemblyid_value", assemblyIds),
+    orderby: "name asc",
+  });
+}
+
+export function listPluginTypesByIdsQuery(pluginTypeIds: string[]): string {
+  return buildQueryString({
+    select: [
+      "plugintypeid",
+      "name",
+      "typename",
+      "friendlyname",
+      "isworkflowactivity",
+      "_pluginassemblyid_value",
+    ],
+    filter: buildOrFilter("plugintypeid", pluginTypeIds),
     orderby: "name asc",
   });
 }
@@ -102,6 +125,29 @@ export function listPluginStepsForPluginTypesQuery(pluginTypeIds: string[]): str
   });
 }
 
+export function listPluginStepsByIdsQuery(stepIds: string[]): string {
+  return buildQueryString({
+    select: [
+      "sdkmessageprocessingstepid",
+      "_eventhandler_value",
+      "name",
+      "stage",
+      "mode",
+      "rank",
+      "statecode",
+      "statuscode",
+      "filteringattributes",
+      "description",
+      "configuration",
+      "asyncautodelete",
+      "supporteddeployment",
+    ],
+    filter: buildOrFilter("sdkmessageprocessingstepid", stepIds),
+    expand: "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
+    orderby: "name asc",
+  });
+}
+
 export function listPluginImagesQuery(stepId: string): string {
   return buildQueryString({
     select: [
@@ -129,6 +175,21 @@ export function listPluginImagesForStepsQuery(stepIds: string[]): string {
       "messagepropertyname",
     ],
     filter: buildOrFilter("_sdkmessageprocessingstepid_value", stepIds),
+  });
+}
+
+export function listPluginImagesByIdsQuery(imageIds: string[]): string {
+  return buildQueryString({
+    select: [
+      "sdkmessageprocessingstepimageid",
+      "_sdkmessageprocessingstepid_value",
+      "name",
+      "entityalias",
+      "imagetype",
+      "attributes",
+      "messagepropertyname",
+    ],
+    filter: buildOrFilter("sdkmessageprocessingstepimageid", imageIds),
   });
 }
 
