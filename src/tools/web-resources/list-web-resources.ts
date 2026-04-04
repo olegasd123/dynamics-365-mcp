@@ -6,6 +6,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
 import { formatTable } from "../../utils/formatters.js";
+import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
 const TYPE_LABELS: Record<number, string> = {
   1: "HTML",
@@ -37,11 +38,15 @@ export function registerListWebResources(
         .optional()
         .describe("Filter by web resource type"),
       nameFilter: z.string().optional().describe("Filter by name (contains match)"),
+      solution: z
+        .string()
+        .optional()
+        .describe("Optional solution display name or unique name"),
     },
-    async ({ environment, type, nameFilter }) => {
+    async ({ environment, type, nameFilter, solution }) => {
       try {
         const env = getEnvironment(config, environment);
-        const resources = await client.query<Record<string, unknown>>(
+        let resources = await client.query<Record<string, unknown>>(
           env,
           "webresourceset",
           listWebResourcesQuery({
@@ -49,6 +54,13 @@ export function registerListWebResources(
             nameFilter,
           }),
         );
+
+        if (solution) {
+          const solutionComponents = await fetchSolutionComponentSets(env, client, solution);
+          resources = resources.filter((resource) =>
+            solutionComponents.webResourceIds.has(String(resource.webresourceid || "")),
+          );
+        }
 
         if (resources.length === 0) {
           return {
@@ -73,6 +85,7 @@ export function registerListWebResources(
         const filterDesc = [
           type ? `type=${type}` : "",
           nameFilter ? `name contains '${nameFilter}'` : "",
+          solution ? `solution='${solution}'` : "",
         ]
           .filter(Boolean)
           .join(", ");

@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import { registerListWorkflows } from "../list-workflows.js";
+import {
+  FakeServer,
+  createRecordingClient,
+  createTestConfig,
+} from "../../__tests__/tool-test-helpers.js";
+
+describe("list_workflows solution filter", () => {
+  it("filters workflows by solution", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        solutions: [
+          { solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" },
+        ],
+        solutioncomponents: [
+          { solutioncomponentid: "sc-1", objectid: "wf-1", componenttype: 29 },
+        ],
+        workflows: [
+          {
+            workflowid: "wf-1",
+            name: "Account Sync",
+            uniquename: "contoso_AccountSync",
+            category: 0,
+            statecode: 1,
+            primaryentity: "account",
+            ismanaged: false,
+            modifiedon: "2026-03-01T12:00:00Z",
+          },
+          {
+            workflowid: "wf-2",
+            name: "Contact Sync",
+            uniquename: "contoso_ContactSync",
+            category: 0,
+            statecode: 1,
+            primaryentity: "contact",
+            ismanaged: false,
+            modifiedon: "2026-03-01T12:00:00Z",
+          },
+        ],
+      },
+    });
+
+    registerListWorkflows(server as never, config, client);
+
+    const response = await server.getHandler("list_workflows")({
+      solution: "Core",
+    });
+
+    const text = response.content[0].text;
+    expect(response.isError).toBeUndefined();
+    expect(text).toContain("Account Sync");
+    expect(text).not.toContain("Contact Sync");
+  });
+});

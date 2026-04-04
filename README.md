@@ -37,8 +37,12 @@ src/
     web-resources/
       list-web-resources.ts
       get-web-resource-content.ts
+    solutions/
+      list-solutions.ts
+      get-solution-details.ts
     comparison/
       compare-plugins.ts
+      compare-solutions.ts
       compare-workflows.ts
       compare-web-resources.ts
       compare-environment-matrix.ts
@@ -46,6 +50,7 @@ src/
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
+    solution-queries.ts             # OData query builders for solutions and solution components
   utils/
     odata-helpers.ts                # $select, $filter, $expand builder utilities
     diff.ts                         # Generic diff engine for cross-environment comparison
@@ -223,6 +228,8 @@ Priority order:
 | `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
 | `get_plugin_details`       | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                  |
+| `list_solutions`           | List solutions by display name and unique name                | `environment`, `nameFilter`                  |
+| `get_solution_details`     | Show solution summary and supported components                | `environment`, `solution`                    |
 | `list_workflows`           | List workflows/processes with status                          | `environment`, `category`, `status`          |
 | `list_actions`             | List workflow-based custom actions                            | `environment`                                |
 | `get_workflow_details`     | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName` |
@@ -234,9 +241,21 @@ Priority order:
 | Tool                    | Description                              | Key Parameters                                                       |
 | ----------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
+| `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
 | `compare_web_resources` | Compare web resource content             | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`       |
 | `compare_environment_matrix` | Compare one baseline against many environments | `baselineEnvironment`, `targetEnvironments`, `componentType` |
+
+### Solution-Aware Filtering
+
+Users can now work with a solution by display name or unique name.
+
+- `list_plugins` supports `solution`
+- `list_workflows` supports `solution`
+- `list_actions` supports `solution`
+- `list_web_resources` supports `solution`
+
+The server resolves the solution first, then filters supported root components from that solution.
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 

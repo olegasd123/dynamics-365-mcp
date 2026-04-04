@@ -8,6 +8,7 @@ import {
 } from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchPluginSteps } from "./plugin-inventory.js";
+import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
 export function registerListPlugins(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
@@ -19,10 +20,17 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         .enum(["all", "no_steps"])
         .optional()
         .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugins"),
+      solution: z
+        .string()
+        .optional()
+        .describe("Optional solution display name or unique name"),
     },
-    async ({ environment, filter }) => {
+    async ({ environment, filter, solution }) => {
       try {
         const env = getEnvironment(config, environment);
+        const solutionComponents = solution
+          ? await fetchSolutionComponentSets(env, client, solution)
+          : undefined;
         const assemblies = await client.query<Record<string, unknown>>(
           env,
           "pluginassemblies",
@@ -31,12 +39,23 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
 
         let results = assemblies;
 
+        if (solutionComponents) {
+          results = results.filter((assembly) =>
+            solutionComponents.pluginAssemblyIds.has(String(assembly.pluginassemblyid || "")),
+          );
+        }
+
         if (filter === "no_steps") {
           const steps = await fetchPluginSteps(env, client, assemblies);
           const assemblyIdsWithSteps = new Set(steps.map((step) => String(step.assemblyId || "")));
           results = assemblies.filter(
             (assembly) => !assemblyIdsWithSteps.has(String(assembly.pluginassemblyid || "")),
           );
+          if (solutionComponents) {
+            results = results.filter((assembly) =>
+              solutionComponents.pluginAssemblyIds.has(String(assembly.pluginassemblyid || "")),
+            );
+          }
         }
 
         if (results.length === 0) {
@@ -46,8 +65,8 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
                 type: "text" as const,
                 text:
                   filter === "no_steps"
-                    ? `No orphaned plugins found in '${env.name}'.`
-                    : `No plugins found in '${env.name}'.`,
+                    ? `No orphaned plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
+                    : `No plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`,
               },
             ],
           };
@@ -62,7 +81,13 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
           String(a.modifiedon || "").slice(0, 10),
         ]);
 
-        const text = `## Plugins in '${env.name}'${filter === "no_steps" ? " (orphaned — no steps)" : ""}\n\nFound ${results.length} plugin(s).\n\n${formatTable(headers, rows)}`;
+        const suffix = [
+          filter === "no_steps" ? "orphaned - no steps" : "",
+          solution ? `solution='${solution}'` : "",
+        ]
+          .filter(Boolean)
+          .join(", ");
+        const text = `## Plugins in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\nFound ${results.length} plugin(s).\n\n${formatTable(headers, rows)}`;
 
         return { content: [{ type: "text" as const, text }] };
       } catch (error) {
