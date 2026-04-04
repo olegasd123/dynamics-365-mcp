@@ -1,5 +1,9 @@
 import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
 
+function buildOrFilter(field: string, values: string[]): string {
+  return values.map((value) => odataEq(field, value)).join(" or ");
+}
+
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,
   css: 2,
@@ -55,6 +59,22 @@ export function getWebResourceContentByNameQuery(resourceName: string): string {
   return buildQueryString({
     select: ["webresourceid", "name", "displayname", "webresourcetype", "content"],
     filter: odataEq("name", resourceName),
+  });
+}
+
+export function listWebResourcesByIdsQuery(resourceIds: string[]): string {
+  return buildQueryString({
+    select: [
+      "webresourceid",
+      "name",
+      "displayname",
+      "webresourcetype",
+      "ismanaged",
+      "description",
+      "modifiedon",
+    ],
+    filter: buildOrFilter("webresourceid", resourceIds),
+    orderby: "name asc",
   });
 }
 

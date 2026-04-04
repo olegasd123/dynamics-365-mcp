@@ -6,6 +6,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory, WorkflowState } from "../../queries/workflow-queries.js";
 import { formatTable } from "../../utils/formatters.js";
+import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
   0: "Workflow",
@@ -37,11 +38,15 @@ export function registerListWorkflows(
         .optional()
         .describe("Filter by category"),
       status: z.enum(["draft", "activated", "suspended"]).optional().describe("Filter by status"),
+      solution: z
+        .string()
+        .optional()
+        .describe("Optional solution display name or unique name"),
     },
-    async ({ environment, category, status }) => {
+    async ({ environment, category, status, solution }) => {
       try {
         const env = getEnvironment(config, environment);
-        const workflows = await client.query<Record<string, unknown>>(
+        let workflows = await client.query<Record<string, unknown>>(
           env,
           "workflows",
           listWorkflowsQuery({
@@ -49,6 +54,13 @@ export function registerListWorkflows(
             status: status as WorkflowState | undefined,
           }),
         );
+
+        if (solution) {
+          const solutionComponents = await fetchSolutionComponentSets(env, client, solution);
+          workflows = workflows.filter((workflow) =>
+            solutionComponents.workflowIds.has(String(workflow.workflowid || "")),
+          );
+        }
 
         if (workflows.length === 0) {
           return {
@@ -74,6 +86,7 @@ export function registerListWorkflows(
         const filterDesc = [
           category ? `category=${category}` : "",
           status ? `status=${status}` : "",
+          solution ? `solution='${solution}'` : "",
         ]
           .filter(Boolean)
           .join(", ");

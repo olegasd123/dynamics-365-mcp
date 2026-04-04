@@ -1,5 +1,9 @@
 import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
 
+function buildOrFilter(field: string, values: string[]): string {
+  return values.map((value) => odataEq(field, value)).join(" or ");
+}
+
 const WORKFLOW_CATEGORY = {
   workflow: 0,
   dialog: 1,
@@ -68,6 +72,27 @@ export function listActionsQuery(): string {
       "modifiedon",
     ],
     filter: "type eq 1 and category eq 3",
+    orderby: "name asc",
+  });
+}
+
+export function listWorkflowsByIdsQuery(workflowIds: string[]): string {
+  return buildQueryString({
+    select: [
+      "workflowid",
+      "name",
+      "uniquename",
+      "category",
+      "statecode",
+      "statuscode",
+      "mode",
+      "primaryentity",
+      "ismanaged",
+      "description",
+      "createdon",
+      "modifiedon",
+    ],
+    filter: buildOrFilter("workflowid", workflowIds),
     orderby: "name asc",
   });
 }

@@ -1,9 +1,12 @@
+export type AuthType = "clientSecret" | "deviceCode";
+
 export interface EnvironmentConfig {
   name: string;
   url: string;
   tenantId: string;
-  clientId: string;
-  clientSecret: string;
+  authType?: AuthType;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 export interface AppConfig {

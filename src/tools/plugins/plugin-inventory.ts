@@ -1,8 +1,12 @@
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
+  listPluginAssembliesByIdsQuery,
+  listPluginImagesByIdsQuery,
   listPluginImagesForStepsQuery,
+  listPluginStepsByIdsQuery,
   listPluginStepsForPluginTypesQuery,
+  listPluginTypesByIdsQuery,
   listPluginTypesForAssembliesQuery,
 } from "../../queries/plugin-queries.js";
 
@@ -38,6 +42,7 @@ export interface PluginImageRecord extends Record<string, unknown> {
   pluginTypeId: string;
   pluginTypeName: string;
   sdkmessageprocessingstepid: string;
+  sdkmessageprocessingstepimageid: string;
   stepName: string;
   stepKey: string;
   name: string;
@@ -134,6 +139,125 @@ export async function fetchPluginInventory(
   };
 }
 
+export async function fetchPluginStepsByIds(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  stepIds: string[],
+): Promise<PluginStepRecord[]> {
+  const uniqueStepIds = [...new Set(stepIds.filter(Boolean))];
+
+  if (uniqueStepIds.length === 0) {
+    return [];
+  }
+
+  const steps = (
+    await Promise.all(
+      chunkValues(uniqueStepIds).map((chunk) =>
+        client.query<Record<string, unknown>>(
+          env,
+          "sdkmessageprocessingsteps",
+          listPluginStepsByIdsQuery(chunk),
+        ),
+      ),
+    )
+  )
+    .flat()
+    .filter((step) => uniqueStepIds.includes(String(step.sdkmessageprocessingstepid || "")));
+
+  if (steps.length === 0) {
+    return [];
+  }
+
+  const pluginTypeIds = [...new Set(steps.map((step) => String(step._eventhandler_value || "")).filter(Boolean))];
+  const pluginTypes = (
+    await Promise.all(
+      chunkValues(pluginTypeIds).map((chunk) =>
+        client.query<Record<string, unknown>>(
+          env,
+          "plugintypes",
+          listPluginTypesByIdsQuery(chunk),
+        ),
+      ),
+    )
+  )
+    .flat()
+    .filter((type) => pluginTypeIds.includes(String(type.plugintypeid || "")));
+
+  if (pluginTypes.length === 0) {
+    return [];
+  }
+
+  const assemblyIds = [
+    ...new Set(pluginTypes.map((type) => String(type._pluginassemblyid_value || "")).filter(Boolean)),
+  ];
+  const assemblies = (
+    await Promise.all(
+      chunkValues(assemblyIds).map((chunk) =>
+        client.query<Record<string, unknown>>(
+          env,
+          "pluginassemblies",
+          listPluginAssembliesByIdsQuery(chunk),
+        ),
+      ),
+    )
+  )
+    .flat()
+    .filter((assembly) => assemblyIds.includes(String(assembly.pluginassemblyid || "")));
+
+  const assemblyMap = new Map(
+    assemblies.map((assembly) => [String(assembly.pluginassemblyid || ""), String(assembly.name || "")]),
+  );
+  const typeRecords = pluginTypes.map((type) => normalizePluginType(type, assemblyMap));
+  const typeMap = new Map(typeRecords.map((type) => [type.pluginTypeId, type]));
+
+  return steps
+    .map((step) => normalizePluginStep(typeMap.get(String(step._eventhandler_value || "")), step))
+    .filter((step): step is PluginStepRecord => step !== null);
+}
+
+export async function fetchPluginImagesByIds(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  imageIds: string[],
+): Promise<PluginImageRecord[]> {
+  const uniqueImageIds = [...new Set(imageIds.filter(Boolean))];
+
+  if (uniqueImageIds.length === 0) {
+    return [];
+  }
+
+  const images = (
+    await Promise.all(
+      chunkValues(uniqueImageIds).map((chunk) =>
+        client.query<Record<string, unknown>>(
+          env,
+          "sdkmessageprocessingstepimages",
+          listPluginImagesByIdsQuery(chunk),
+        ),
+      ),
+    )
+  )
+    .flat()
+    .filter((image) => uniqueImageIds.includes(String(image.sdkmessageprocessingstepimageid || "")));
+
+  if (images.length === 0) {
+    return [];
+  }
+
+  const steps = await fetchPluginStepsByIds(
+    env,
+    client,
+    images.map((image) => String(image._sdkmessageprocessingstepid_value || "")),
+  );
+  const stepMap = new Map(steps.map((step) => [step.sdkmessageprocessingstepid, step]));
+
+  return images
+    .map((image) =>
+      normalizePluginImage(stepMap.get(String(image._sdkmessageprocessingstepid_value || "")), image),
+    )
+    .filter((image): image is PluginImageRecord => image !== null);
+}
+
 function normalizePluginType(
   type: Record<string, unknown>,
   assemblyMap: Map<string, string>,
@@ -219,6 +343,7 @@ function normalizePluginImage(
     pluginTypeId: stepRecord.pluginTypeId,
     pluginTypeName: stepRecord.pluginTypeName,
     sdkmessageprocessingstepid: stepRecord.sdkmessageprocessingstepid,
+    sdkmessageprocessingstepimageid: String(image.sdkmessageprocessingstepimageid || ""),
     stepName: stepRecord.name,
     stepKey: stepRecord.key,
     messageName: stepRecord.messageName,

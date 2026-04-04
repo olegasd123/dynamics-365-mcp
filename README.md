@@ -8,7 +8,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
 - **Transport**: stdio
-- **Auth**: Azure AD OAuth2 — client credentials flow (app registration + client secret)
+- **Auth**: Azure AD OAuth2 — client secret or interactive device code
 - **Package manager**: npm
 
 ## Architecture
@@ -18,9 +18,9 @@ src/
   index.ts                          # Entry point: McpServer + StdioServerTransport
   config/
     types.ts                        # Environment config interfaces
-    environments.ts                 # Config loader (JSON file, env vars, connection string)
+    environments.ts                 # Config loader (JSON file, connection string envs)
   auth/
-    token-manager.ts                # OAuth2 client credentials + per-env token cache
+    token-manager.ts                # OAuth2 token flows + per-env token cache
   client/
     dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
   tools/
@@ -37,8 +37,13 @@ src/
     web-resources/
       list-web-resources.ts
       get-web-resource-content.ts
+    solutions/
+      list-solutions.ts
+      get-solution-details.ts
+      get-solution-dependencies.ts
     comparison/
       compare-plugins.ts
+      compare-solutions.ts
       compare-workflows.ts
       compare-web-resources.ts
       compare-environment-matrix.ts
@@ -46,6 +51,8 @@ src/
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
+    solution-queries.ts             # OData query builders for solutions and solution components
+    dependency-queries.ts           # Dataverse dependency function query helpers
   utils/
     odata-helpers.ts                # $select, $filter, $expand builder utilities
     diff.ts                         # Generic diff engine for cross-environment comparison
@@ -84,6 +91,7 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json
       "name": "dev",
       "url": "https://dev-org.crm.dynamics.com",
       "tenantId": "...",
+      "authType": "clientSecret",
       "clientId": "...",
       "clientSecret": "..."
     },
@@ -91,6 +99,7 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json
       "name": "prod",
       "url": "https://prod-org.crm.dynamics.com",
       "tenantId": "...",
+      "authType": "clientSecret",
       "clientId": "...",
       "clientSecret": "..."
     }
@@ -98,6 +107,27 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json
   "defaultEnvironment": "dev"
 }
 ```
+
+### JSON Config File With Interactive Auth
+
+Use this when the user can sign in in a browser and does not have a client secret.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://dev-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "deviceCode",
+      "clientId": "..."
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+`clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
 
 ### Connection String (single env)
 
@@ -107,14 +137,88 @@ Via `D365_CONNECTION_STRING` env var:
 AuthType=ClientSecret;Url=https://org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=...
 ```
 
-### Individual Env Vars (single env)
+Interactive auth:
 
 ```
-D365_URL=https://org.crm.dynamics.com
-D365_TENANT_ID=...
-D365_CLIENT_ID=...
-D365_CLIENT_SECRET=...
+AuthType=DeviceCode;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...
 ```
+
+### Connection Strings JSON (multiple envs)
+
+Set `D365_CONNECTION_STRINGS` to JSON:
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "connectionString": "AuthType=ClientSecret;Url=https://dev-org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=..."
+    },
+    {
+      "name": "prod",
+      "connectionString": "AuthType=ClientSecret;Url=https://prod-org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=..."
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+## Run As HTTP Service
+
+Default mode is still `stdio`. This is best for local MCP client config.
+
+The server also supports HTTP mode for service scripts. Use this when you want a long-running process on a fixed port.
+
+- MCP endpoint: `/mcp`
+- Health endpoint: `/health`
+- Default host: `127.0.0.1`
+- Default port: `3003`
+
+### Start On macOS Or Linux
+
+```bash
+./scripts/mcp-service.sh start 3003 ~/.dynamics365-mcp/config.json
+```
+
+Stop:
+
+```bash
+./scripts/mcp-service.sh stop 3003
+```
+
+Restart:
+
+```bash
+./scripts/mcp-service.sh restart 3003 ~/.dynamics365-mcp/config.json
+```
+
+### Start On Windows
+
+```bat
+scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics365-mcp\config.json
+```
+
+Stop:
+
+```bat
+scripts\mcp-service.bat stop 3003
+```
+
+Restart:
+
+```bat
+scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
+```
+
+The scripts store PID files in `run/` and logs in `logs/`.
+
+The scripts also auto-load the repo `.env` file if it exists. This is useful for values like `D365_MCP_CONFIG`, `MCP_PORT`, `MCP_HOST`, `MCP_PATH`, and `NODE_BIN`.
+
+Priority order:
+
+- CLI arguments
+- `.env`
+- script defaults
 
 ## Tools
 
@@ -126,6 +230,9 @@ D365_CLIENT_SECRET=...
 | `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
 | `get_plugin_details`       | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                  |
+| `list_solutions`           | List solutions by display name and unique name                | `environment`, `nameFilter`                  |
+| `get_solution_details`     | Show solution summary and supported components                | `environment`, `solution`                    |
+| `get_solution_dependencies` | Show dependency links for supported solution components      | `environment`, `solution`, `direction`       |
 | `list_workflows`           | List workflows/processes with status                          | `environment`, `category`, `status`          |
 | `list_actions`             | List workflow-based custom actions                            | `environment`                                |
 | `get_workflow_details`     | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName` |
@@ -137,9 +244,31 @@ D365_CLIENT_SECRET=...
 | Tool                    | Description                              | Key Parameters                                                       |
 | ----------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
+| `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
 | `compare_web_resources` | Compare web resource content             | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`       |
 | `compare_environment_matrix` | Compare one baseline against many environments | `baselineEnvironment`, `targetEnvironments`, `componentType` |
+
+### Solution-Aware Filtering
+
+Users can now work with a solution by display name or unique name.
+
+- `list_plugins` supports `solution`
+- `list_workflows` supports `solution`
+- `list_actions` supports `solution`
+- `list_web_resources` supports `solution`
+
+The server resolves the solution first, then filters supported root components from that solution.
+
+### Dependency View
+
+Use `get_solution_dependencies` when you want to see which supported solution components:
+
+- require other components
+- are used by other components
+- point outside the current solution
+
+This tool uses Dataverse dependency functions instead of guessing links from names.
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
@@ -247,12 +376,13 @@ Use `uniqueName` when possible. It is safer than display name.
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
 3. If token is valid (not within 5 min of expiry), return cached token
-4. Otherwise, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
+4. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
    - `grant_type=client_credentials`
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-5. Cache new token with `expiresAt = now + expires_in - 300s`
+5. For `deviceCode` auth, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+6. Cache new token with `expiresAt = now + expires_in - 300s`
 
 ## Cross-Environment Comparison Design
 

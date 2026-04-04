@@ -17,8 +17,14 @@ import { registerGetWorkflowDetails } from "./workflows/get-workflow-details.js"
 import { registerListWebResources } from "./web-resources/list-web-resources.js";
 import { registerGetWebResourceContent } from "./web-resources/get-web-resource-content.js";
 
+// Solution tools
+import { registerListSolutions } from "./solutions/list-solutions.js";
+import { registerGetSolutionDetails } from "./solutions/get-solution-details.js";
+import { registerGetSolutionDependencies } from "./solutions/get-solution-dependencies.js";
+
 // Comparison tools
 import { registerComparePlugins } from "./comparison/compare-plugins.js";
+import { registerCompareSolutions } from "./comparison/compare-solutions.js";
 import { registerCompareWorkflows } from "./comparison/compare-workflows.js";
 import { registerCompareWebResources } from "./comparison/compare-web-resources.js";
 import { registerCompareEnvironmentMatrix } from "./comparison/compare-environment-matrix.js";
@@ -43,8 +49,14 @@ export function registerAllTools(
   registerListWebResources(server, config, client);
   registerGetWebResourceContent(server, config, client);
 
+  // Solution tools
+  registerListSolutions(server, config, client);
+  registerGetSolutionDetails(server, config, client);
+  registerGetSolutionDependencies(server, config, client);
+
   // Comparison tools
   registerComparePlugins(server, config, client);
+  registerCompareSolutions(server, config, client);
   registerCompareWorkflows(server, config, client);
   registerCompareWebResources(server, config, client);
   registerCompareEnvironmentMatrix(server, config, client);

@@ -61,6 +61,7 @@ describe("environments config", () => {
           name: "dev",
           url: "https://dev.crm.dynamics.com",
           tenantId: "tenant",
+          authType: "clientSecret",
           clientId: "client",
           clientSecret: "secret",
         },
@@ -82,6 +83,7 @@ describe("environments config", () => {
           name: "default",
           url: "https://org.crm.dynamics.com",
           tenantId: "tenant",
+          authType: "clientSecret",
           clientId: "client",
           clientSecret: "secret",
         },
@@ -90,26 +92,46 @@ describe("environments config", () => {
     });
   });
 
-  it("loads config from individual environment variables", async () => {
+  it("loads config from multiple connection strings", async () => {
     const dir = createTempDir();
-    process.env.D365_URL = "https://org.crm.dynamics.com/";
-    process.env.D365_TENANT_ID = "tenant";
-    process.env.D365_CLIENT_ID = "client";
-    process.env.D365_CLIENT_SECRET = "secret";
+    process.env.D365_CONNECTION_STRINGS = JSON.stringify({
+      environments: [
+        {
+          name: "dev",
+          connectionString:
+            "AuthType=ClientSecret;Url=https://dev.crm.dynamics.com/;ClientId=dev-client;ClientSecret=dev-secret;TenantId=dev-tenant",
+        },
+        {
+          name: "prod",
+          connectionString:
+            "AuthType=ClientSecret;Url=https://prod.crm.dynamics.com/;ClientId=prod-client;ClientSecret=prod-secret;TenantId=prod-tenant",
+        },
+      ],
+      defaultEnvironment: "prod",
+    });
 
     const { loadConfig } = await importEnvironmentsModule(dir);
 
     expect(loadConfig()).toEqual({
       environments: [
         {
-          name: "default",
-          url: "https://org.crm.dynamics.com",
-          tenantId: "tenant",
-          clientId: "client",
-          clientSecret: "secret",
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          tenantId: "dev-tenant",
+          authType: "clientSecret",
+          clientId: "dev-client",
+          clientSecret: "dev-secret",
+        },
+        {
+          name: "prod",
+          url: "https://prod.crm.dynamics.com",
+          tenantId: "prod-tenant",
+          authType: "clientSecret",
+          clientId: "prod-client",
+          clientSecret: "prod-secret",
         },
       ],
-      defaultEnvironment: "default",
+      defaultEnvironment: "prod",
     });
   });
 
@@ -118,11 +140,19 @@ describe("environments config", () => {
     const { getEnvironment } = await importEnvironmentsModule(dir);
     const config = {
       environments: [
-        { name: "dev", url: "https://dev", tenantId: "t1", clientId: "c1", clientSecret: "s1" },
+        {
+          name: "dev",
+          url: "https://dev",
+          tenantId: "t1",
+          authType: "clientSecret" as const,
+          clientId: "c1",
+          clientSecret: "s1",
+        },
         {
           name: "prod",
           url: "https://prod",
           tenantId: "t2",
+          authType: "clientSecret" as const,
           clientId: "c2",
           clientSecret: "s2",
         },
@@ -139,5 +169,63 @@ describe("environments config", () => {
     const { loadConfig } = await importEnvironmentsModule(dir);
 
     expect(() => loadConfig()).toThrow("No Dynamics 365 configuration found");
+  });
+
+  it("loads device code auth from the JSON config file", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "dev",
+            url: "https://dev.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "deviceCode",
+          },
+        ],
+        defaultEnvironment: "dev",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          tenantId: "tenant",
+          authType: "deviceCode",
+          clientId: undefined,
+          clientSecret: undefined,
+        },
+      ],
+      defaultEnvironment: "dev",
+    });
+  });
+
+  it("loads device code auth from a connection string", async () => {
+    const dir = createTempDir();
+    process.env.D365_CONNECTION_STRING = "AuthType=DeviceCode;Url=https://org.crm.dynamics.com/;TenantId=tenant";
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "default",
+          url: "https://org.crm.dynamics.com",
+          tenantId: "tenant",
+          authType: "deviceCode",
+          clientId: undefined,
+        },
+      ],
+      defaultEnvironment: "default",
+    });
   });
 });
