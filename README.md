@@ -37,6 +37,12 @@ src/
       list-views.ts
       get-view-details.ts
       get-view-fetchxml.ts
+    custom-apis/
+      list-custom-apis.ts
+      get-custom-api-details.ts
+    flows/
+      list-cloud-flows.ts
+      get-flow-details.ts
     plugins/
       list-plugins.ts
       list-plugin-steps.ts
@@ -57,6 +63,7 @@ src/
       compare-table-schema.ts
       compare-forms.ts
       compare-views.ts
+      compare-custom-apis.ts
       compare-plugins.ts
       compare-solutions.ts
       compare-workflows.ts
@@ -66,6 +73,8 @@ src/
     table-queries.ts                # Dataverse table metadata query builders
     form-queries.ts                 # Form metadata query builders
     view-queries.ts                 # View metadata query builders
+    custom-api-queries.ts           # Custom API metadata query builders
+    flow-queries.ts                 # Cloud flow query builders on workflow metadata
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
@@ -253,6 +262,10 @@ Priority order:
 | `list_views`               | List system or personal views                                 | `environment`, `table`, `scope`, `solution`  |
 | `get_view_details`         | Show one view with normalized query summary                   | `environment`, `viewName`, `table`, `scope`  |
 | `get_view_fetchxml`        | Return normalized FetchXML for one view                       | `environment`, `viewName`, `table`, `scope`  |
+| `list_custom_apis`         | List Dataverse Custom APIs                                    | `environment`, `nameFilter`                  |
+| `get_custom_api_details`   | Show Custom API request and response metadata                 | `environment`, `apiName`                     |
+| `list_cloud_flows`         | List cloud flows from workflow metadata                       | `environment`, `status`, `solution`          |
+| `get_flow_details`         | Show one cloud flow with parsed trigger/action summary        | `environment`, `flowName`, `solution`        |
 | `list_plugins`             | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                      |
 | `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
@@ -273,6 +286,7 @@ Priority order:
 | `compare_table_schema`  | Compare one table schema across envs     | `sourceEnvironment`, `targetEnvironment`, `table`, `targetTable`     |
 | `compare_forms`         | Compare forms across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `type`, `solution` |
 | `compare_views`         | Compare views across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
+| `compare_custom_apis`   | Compare Custom APIs across envs          | `sourceEnvironment`, `targetEnvironment`, `apiName`                  |
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
 | `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
@@ -296,6 +310,8 @@ Users can now work with a solution by display name or unique name.
 - `list_views` supports `solution` for system views
 - `get_view_details` supports `solution` for system views
 - `get_view_fetchxml` supports `solution` for system views
+- `list_cloud_flows` supports `solution`
+- `get_flow_details` supports `solution`
 
 The server resolves the solution first, then filters supported root components from that solution.
 

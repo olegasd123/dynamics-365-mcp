@@ -37,6 +37,14 @@ import { registerListViews } from "./views/list-views.js";
 import { registerGetViewDetails } from "./views/get-view-details.js";
 import { registerGetViewFetchXml } from "./views/get-view-fetchxml.js";
 
+// Custom API tools
+import { registerListCustomApis } from "./custom-apis/list-custom-apis.js";
+import { registerGetCustomApiDetails } from "./custom-apis/get-custom-api-details.js";
+
+// Flow tools
+import { registerListCloudFlows } from "./flows/list-cloud-flows.js";
+import { registerGetFlowDetails } from "./flows/get-flow-details.js";
+
 // Comparison tools
 import { registerComparePlugins } from "./comparison/compare-plugins.js";
 import { registerCompareSolutions } from "./comparison/compare-solutions.js";
@@ -46,6 +54,7 @@ import { registerCompareEnvironmentMatrix } from "./comparison/compare-environme
 import { registerCompareTableSchema } from "./comparison/compare-table-schema.js";
 import { registerCompareForms } from "./comparison/compare-forms.js";
 import { registerCompareViews } from "./comparison/compare-views.js";
+import { registerCompareCustomApis } from "./comparison/compare-custom-apis.js";
 
 export function registerAllTools(
   server: McpServer,
@@ -87,6 +96,14 @@ export function registerAllTools(
   registerGetViewDetails(server, config, client);
   registerGetViewFetchXml(server, config, client);
 
+  // Custom API tools
+  registerListCustomApis(server, config, client);
+  registerGetCustomApiDetails(server, config, client);
+
+  // Flow tools
+  registerListCloudFlows(server, config, client);
+  registerGetFlowDetails(server, config, client);
+
   // Comparison tools
   registerComparePlugins(server, config, client);
   registerCompareSolutions(server, config, client);
@@ -96,4 +113,5 @@ export function registerAllTools(
   registerCompareTableSchema(server, config, client);
   registerCompareForms(server, config, client);
   registerCompareViews(server, config, client);
+  registerCompareCustomApis(server, config, client);
 }

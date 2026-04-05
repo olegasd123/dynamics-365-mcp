@@ -15,6 +15,7 @@ describe("registerAllTools", () => {
     registerAllTools(server as never, config, client);
 
     expect(server.getToolNames()).toEqual([
+      "compare_custom_apis",
       "compare_environment_matrix",
       "compare_forms",
       "compare_plugins",
@@ -23,6 +24,8 @@ describe("registerAllTools", () => {
       "compare_views",
       "compare_web_resources",
       "compare_workflows",
+      "get_custom_api_details",
+      "get_flow_details",
       "get_form_details",
       "get_plugin_details",
       "get_solution_dependencies",
@@ -33,6 +36,8 @@ describe("registerAllTools", () => {
       "get_web_resource_content",
       "get_workflow_details",
       "list_actions",
+      "list_cloud_flows",
+      "list_custom_apis",
       "list_forms",
       "list_plugin_images",
       "list_plugin_steps",

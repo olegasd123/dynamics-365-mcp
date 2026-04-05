@@ -102,6 +102,8 @@ Cover model-driven app UI assets.
 
 ## Milestone 3: Modern Automation And APIs
 
+Status: Done
+
 ### Goal
 
 Cover missing parts used in modern Dataverse systems.

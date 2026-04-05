@@ -18,6 +18,12 @@ import type { FormType } from "../../queries/form-queries.js";
 import type { ViewScope } from "../../queries/view-queries.js";
 import { fetchFormDetails } from "../forms/form-metadata.js";
 import { fetchViewDetails } from "../views/view-metadata.js";
+import {
+  fetchCustomApiInventory,
+  listCustomApis,
+  type CustomApiParameterRecord,
+  type CustomApiRecord,
+} from "../custom-apis/custom-api-metadata.js";
 
 export interface CollectionComparisonData<T extends Record<string, unknown>> {
   sourceItems: T[];
@@ -64,6 +70,20 @@ export interface ViewComparisonOptions {
   viewName?: string;
   solution?: string;
   targetSolution?: string;
+}
+
+export interface CustomApiComparisonData
+  extends CollectionComparisonData<CustomApiRecord> {
+  requestParameterSourceItems: CustomApiParameterRecord[];
+  requestParameterTargetItems: CustomApiParameterRecord[];
+  requestParameterResult: DiffResult<CustomApiParameterRecord>;
+  responsePropertySourceItems: CustomApiParameterRecord[];
+  responsePropertyTargetItems: CustomApiParameterRecord[];
+  responsePropertyResult: DiffResult<CustomApiParameterRecord>;
+}
+
+export interface CustomApiComparisonOptions {
+  apiName?: string;
 }
 
 export async function comparePluginsData(
@@ -436,4 +456,91 @@ export async function compareViewsData(
   }
 
   return { sourceItems, targetItems, result };
+}
+
+export async function compareCustomApisData(
+  config: AppConfig,
+  client: DynamicsClient,
+  sourceEnvironment: string,
+  targetEnvironment: string,
+  options?: CustomApiComparisonOptions,
+): Promise<CustomApiComparisonData> {
+  const sourceEnv = getEnvironment(config, sourceEnvironment);
+  const targetEnv = getEnvironment(config, targetEnvironment);
+
+  let [sourceItems, targetItems] = await Promise.all([
+    listCustomApis(sourceEnv, client),
+    listCustomApis(targetEnv, client),
+  ]);
+
+  if (options?.apiName) {
+    const needle = options.apiName.toLowerCase();
+    sourceItems = sourceItems.filter(
+      (api) =>
+        api.name.toLowerCase().includes(needle) || api.uniquename.toLowerCase().includes(needle),
+    );
+    targetItems = targetItems.filter(
+      (api) =>
+        api.name.toLowerCase().includes(needle) || api.uniquename.toLowerCase().includes(needle),
+    );
+  }
+
+  const result = diffCollections(
+    sourceItems,
+    targetItems,
+    (api) => String(api.uniquename || api.name),
+    [
+      "bindingTypeLabel",
+      "boundentitylogicalname",
+      "isfunction",
+      "isprivate",
+      "allowedProcessingStepLabel",
+      "executeprivilegename",
+      "workflowsdkstepenabled",
+      "ismanaged",
+      "stateLabel",
+      "plugintypeid",
+      "sdkmessageid",
+      "powerfxruleid",
+    ],
+  );
+
+  const [sourceInventory, targetInventory] = await Promise.all([
+    fetchCustomApiInventory(sourceEnv, client, sourceItems),
+    fetchCustomApiInventory(targetEnv, client, targetItems),
+  ]);
+  const sourceApiKeyById = new Map(
+    sourceInventory.apis.map((api) => [api.customapiid, api.uniquename || api.name]),
+  );
+  const targetApiKeyById = new Map(
+    targetInventory.apis.map((api) => [api.customapiid, api.uniquename || api.name]),
+  );
+
+  const requestParameterResult = diffCollections(
+    sourceInventory.requestParameters,
+    targetInventory.requestParameters,
+    (parameter) =>
+      `${sourceApiKeyById.get(parameter.customapiid) || targetApiKeyById.get(parameter.customapiid) || parameter.customapiid} | ${parameter.uniquename || parameter.name} | ${parameter.kind}`,
+    ["typeLabel", "isoptional", "logicalentityname", "ismanaged", "stateLabel"],
+  );
+
+  const responsePropertyResult = diffCollections(
+    sourceInventory.responseProperties,
+    targetInventory.responseProperties,
+    (property) =>
+      `${sourceApiKeyById.get(property.customapiid) || targetApiKeyById.get(property.customapiid) || property.customapiid} | ${property.uniquename || property.name} | ${property.kind}`,
+    ["typeLabel", "logicalentityname", "ismanaged", "stateLabel"],
+  );
+
+  return {
+    sourceItems,
+    targetItems,
+    result,
+    requestParameterSourceItems: sourceInventory.requestParameters,
+    requestParameterTargetItems: targetInventory.requestParameters,
+    requestParameterResult,
+    responsePropertySourceItems: sourceInventory.responseProperties,
+    responsePropertyTargetItems: targetInventory.responseProperties,
+    responsePropertyResult,
+  };
 }
