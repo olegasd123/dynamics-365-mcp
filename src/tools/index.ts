@@ -45,6 +45,18 @@ import { registerGetCustomApiDetails } from "./custom-apis/get-custom-api-detail
 import { registerListCloudFlows } from "./flows/list-cloud-flows.js";
 import { registerGetFlowDetails } from "./flows/get-flow-details.js";
 
+// Security tools
+import { registerListSecurityRoles } from "./security/list-security-roles.js";
+import { registerGetRolePrivileges } from "./security/get-role-privileges.js";
+
+// Usage tools
+import { registerFindTableUsage } from "./usage/find-table-usage.js";
+import { registerFindColumnUsage } from "./usage/find-column-usage.js";
+import { registerFindWebResourceUsage } from "./usage/find-web-resource-usage.js";
+
+// Health tools
+import { registerEnvironmentHealthReport } from "./health/environment-health-report.js";
+
 // Comparison tools
 import { registerComparePlugins } from "./comparison/compare-plugins.js";
 import { registerCompareSolutions } from "./comparison/compare-solutions.js";
@@ -55,6 +67,7 @@ import { registerCompareTableSchema } from "./comparison/compare-table-schema.js
 import { registerCompareForms } from "./comparison/compare-forms.js";
 import { registerCompareViews } from "./comparison/compare-views.js";
 import { registerCompareCustomApis } from "./comparison/compare-custom-apis.js";
+import { registerCompareSecurityRoles } from "./comparison/compare-security-roles.js";
 
 export function registerAllTools(
   server: McpServer,
@@ -104,6 +117,18 @@ export function registerAllTools(
   registerListCloudFlows(server, config, client);
   registerGetFlowDetails(server, config, client);
 
+  // Security tools
+  registerListSecurityRoles(server, config, client);
+  registerGetRolePrivileges(server, config, client);
+
+  // Usage tools
+  registerFindTableUsage(server, config, client);
+  registerFindColumnUsage(server, config, client);
+  registerFindWebResourceUsage(server, config, client);
+
+  // Health tools
+  registerEnvironmentHealthReport(server, config, client);
+
   // Comparison tools
   registerComparePlugins(server, config, client);
   registerCompareSolutions(server, config, client);
@@ -114,4 +139,5 @@ export function registerAllTools(
   registerCompareForms(server, config, client);
   registerCompareViews(server, config, client);
   registerCompareCustomApis(server, config, client);
+  registerCompareSecurityRoles(server, config, client);
 }

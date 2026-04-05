@@ -33,6 +33,7 @@ export interface CloudFlowRecord extends Record<string, unknown> {
   workflowidunique: string;
   name: string;
   uniquename: string;
+  category: number;
   statecode: number;
   stateLabel: string;
   statuscode: number;
@@ -72,7 +73,9 @@ export async function listCloudFlows(
         nameFilter: options?.nameFilter,
       }),
     )
-  ).map(normalizeFlow);
+  )
+    .map(normalizeFlow)
+    .filter((flow) => flow.category === 5);
 
   if (options?.solution) {
     const solutionComponents = await fetchSolutionComponentSets(env, client, options.solution);
@@ -161,6 +164,7 @@ function normalizeFlow(record: Record<string, unknown>): CloudFlowRecord {
     workflowidunique: String(record.workflowidunique || ""),
     name: String(record.name || ""),
     uniquename: String(record.uniquename || ""),
+    category: Number(record.category || 0),
     statecode,
     stateLabel: STATE_LABELS[statecode] || String(statecode),
     statuscode: Number(record.statuscode || 0),

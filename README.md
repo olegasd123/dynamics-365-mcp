@@ -43,6 +43,15 @@ src/
     flows/
       list-cloud-flows.ts
       get-flow-details.ts
+    security/
+      list-security-roles.ts
+      get-role-privileges.ts
+    usage/
+      find-table-usage.ts
+      find-column-usage.ts
+      find-web-resource-usage.ts
+    health/
+      environment-health-report.ts
     plugins/
       list-plugins.ts
       list-plugin-steps.ts
@@ -64,6 +73,7 @@ src/
       compare-forms.ts
       compare-views.ts
       compare-custom-apis.ts
+      compare-security-roles.ts
       compare-plugins.ts
       compare-solutions.ts
       compare-workflows.ts
@@ -75,6 +85,7 @@ src/
     view-queries.ts                 # View metadata query builders
     custom-api-queries.ts           # Custom API metadata query builders
     flow-queries.ts                 # Cloud flow query builders on workflow metadata
+    security-queries.ts             # Security role and privilege query builders
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
@@ -266,6 +277,12 @@ Priority order:
 | `get_custom_api_details`   | Show Custom API request and response metadata                 | `environment`, `apiName`                     |
 | `list_cloud_flows`         | List cloud flows from workflow metadata                       | `environment`, `status`, `solution`          |
 | `get_flow_details`         | Show one cloud flow with parsed trigger/action summary        | `environment`, `flowName`, `solution`        |
+| `list_security_roles`      | List security roles                                           | `environment`, `nameFilter`                  |
+| `get_role_privileges`      | Show privileges for one role                                  | `environment`, `roleName`, `businessUnit`    |
+| `find_table_usage`         | Find where one table is used                                  | `environment`, `table`                       |
+| `find_column_usage`        | Find where one column is used                                 | `environment`, `column`, `table`             |
+| `find_web_resource_usage`  | Find where one web resource is used                           | `environment`, `name`                        |
+| `environment_health_report`| Build a release-health summary                                | `environment`, `solution`                    |
 | `list_plugins`             | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                      |
 | `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
@@ -287,6 +304,7 @@ Priority order:
 | `compare_forms`         | Compare forms across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `type`, `solution` |
 | `compare_views`         | Compare views across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
 | `compare_custom_apis`   | Compare Custom APIs across envs          | `sourceEnvironment`, `targetEnvironment`, `apiName`                  |
+| `compare_security_roles`| Compare security roles across envs       | `sourceEnvironment`, `targetEnvironment`, `roleName`                 |
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
 | `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
