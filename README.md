@@ -30,6 +30,13 @@ src/
       get-table-schema.ts
       list-table-columns.ts
       list-table-relationships.ts
+    forms/
+      list-forms.ts
+      get-form-details.ts
+    views/
+      list-views.ts
+      get-view-details.ts
+      get-view-fetchxml.ts
     plugins/
       list-plugins.ts
       list-plugin-steps.ts
@@ -48,6 +55,8 @@ src/
       get-solution-dependencies.ts
     comparison/
       compare-table-schema.ts
+      compare-forms.ts
+      compare-views.ts
       compare-plugins.ts
       compare-solutions.ts
       compare-workflows.ts
@@ -55,6 +64,8 @@ src/
       compare-environment-matrix.ts
   queries/
     table-queries.ts                # Dataverse table metadata query builders
+    form-queries.ts                 # Form metadata query builders
+    view-queries.ts                 # View metadata query builders
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
@@ -237,6 +248,11 @@ Priority order:
 | `get_table_schema`         | Show columns, alternate keys, and relationships for one table | `environment`, `table`, `solution`           |
 | `list_table_columns`       | List table columns and choice details                         | `environment`, `table`, `solution`           |
 | `list_table_relationships` | List table relationships                                      | `environment`, `table`, `solution`           |
+| `list_forms`               | List model-driven forms                                       | `environment`, `table`, `type`, `solution`   |
+| `get_form_details`         | Show one form with normalized XML summary                     | `environment`, `formName`, `table`, `solution` |
+| `list_views`               | List system or personal views                                 | `environment`, `table`, `scope`, `solution`  |
+| `get_view_details`         | Show one view with normalized query summary                   | `environment`, `viewName`, `table`, `scope`  |
+| `get_view_fetchxml`        | Return normalized FetchXML for one view                       | `environment`, `viewName`, `table`, `scope`  |
 | `list_plugins`             | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                      |
 | `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
@@ -255,6 +271,8 @@ Priority order:
 | Tool                    | Description                              | Key Parameters                                                       |
 | ----------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
 | `compare_table_schema`  | Compare one table schema across envs     | `sourceEnvironment`, `targetEnvironment`, `table`, `targetTable`     |
+| `compare_forms`         | Compare forms across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `type`, `solution` |
+| `compare_views`         | Compare views across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
 | `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
@@ -273,6 +291,11 @@ Users can now work with a solution by display name or unique name.
 - `get_table_schema` supports `solution`
 - `list_table_columns` supports `solution`
 - `list_table_relationships` supports `solution`
+- `list_forms` supports `solution`
+- `get_form_details` supports `solution`
+- `list_views` supports `solution` for system views
+- `get_view_details` supports `solution` for system views
+- `get_view_fetchxml` supports `solution` for system views
 
 The server resolves the solution first, then filters supported root components from that solution.
 

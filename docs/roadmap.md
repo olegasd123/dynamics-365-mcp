@@ -63,6 +63,8 @@ Make the MCP useful for schema work, not only plugin and workflow work.
 
 ## Milestone 2: App Layer Metadata
 
+Status: Done
+
 ### Goal
 
 Cover model-driven app UI assets.

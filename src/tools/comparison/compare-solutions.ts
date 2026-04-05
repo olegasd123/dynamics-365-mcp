@@ -39,6 +39,18 @@ export function registerCompareSolutions(
           (item) => String(item.name),
           ["version", "isolationmode", "ismanaged"],
         );
+        const formDiff = diffCollections(
+          sourceInventory.forms,
+          targetInventory.forms,
+          (item) => String(item.uniquename || `${item.objecttypecode}:${item.type}:${item.name}`),
+          ["objecttypecode", "type", "isdefault", "ismanaged", "formactivationstate"],
+        );
+        const viewDiff = diffCollections(
+          sourceInventory.views,
+          targetInventory.views,
+          (item) => String(`${item.returnedtypecode}:${item.name}`),
+          ["returnedtypecode", "querytype", "isdefault", "isquickfindquery", "ismanaged"],
+        );
         const pluginStepDiff = diffCollections(
           sourceInventory.pluginSteps,
           targetInventory.pluginSteps,
@@ -84,6 +96,26 @@ export function registerCompareSolutions(
           formatNamedDiffSection({
             title: "Plugin Assemblies",
             result: pluginDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "name",
+          }),
+        );
+        lines.push("");
+        lines.push(
+          formatNamedDiffSection({
+            title: "Forms",
+            result: formDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "name",
+          }),
+        );
+        lines.push("");
+        lines.push(
+          formatNamedDiffSection({
+            title: "Views",
+            result: viewDiff,
             sourceLabel: sourceEnvironment,
             targetLabel: targetEnvironment,
             nameField: "name",
