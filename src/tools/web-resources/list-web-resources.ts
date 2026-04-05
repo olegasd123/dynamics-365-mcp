@@ -5,6 +5,7 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
@@ -63,14 +64,13 @@ export function registerListWebResources(
         }
 
         if (resources.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No web resources found in '${env.name}' with the specified filters.`,
-              },
-            ],
-          };
+          const text = `No web resources found in '${env.name}' with the specified filters.`;
+          return createToolSuccessResponse("list_web_resources", text, text, {
+            environment: env.name,
+            filters: { type: type || null, nameFilter: nameFilter || null, solution: solution || null },
+            count: 0,
+            items: [],
+          });
         }
 
         const headers = ["Name", "Display Name", "Type", "Managed", "Modified"];
@@ -90,18 +90,19 @@ export function registerListWebResources(
           .filter(Boolean)
           .join(", ");
 
+        const items = resources.map((resource) => ({
+          ...resource,
+          typeLabel: TYPE_LABELS[resource.webresourcetype as number] || String(resource.webresourcetype),
+        }));
         const text = `## Web Resources in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\nFound ${resources.length} resource(s).\n\n${formatTable(headers, rows)}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_web_resources", text, `Found ${resources.length} web resource(s) in '${env.name}'.`, {
+          environment: env.name,
+          filters: { type: type || null, nameFilter: nameFilter || null, solution: solution || null },
+          count: resources.length,
+          items,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_web_resources", error);
       }
     },
   );

@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { findColumnUsageData } from "./usage-analysis.js";
 
@@ -122,14 +123,12 @@ export function registerFindColumnUsage(
           );
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("find_column_usage", lines.join("\n"), `Analyzed usage for column '${usage.columnName}' in '${env.name}'.`, {
+          environment: env.name,
+          usage,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("find_column_usage", error);
       }
     },
   );

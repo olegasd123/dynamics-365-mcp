@@ -6,6 +6,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listCustomApis } from "../custom-apis/custom-api-metadata.js";
 import { listCloudFlows } from "../flows/flow-metadata.js";
@@ -204,14 +205,23 @@ export function registerEnvironmentHealthReport(
           );
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("environment_health_report", lines.join("\n"), `Built health report for '${env.name}'.`, {
+          environment: env.name,
+          solution: solution || null,
+          riskLevel,
+          totalIssues: issueCount,
+          checks: {
+            disabledPluginSteps,
+            riskyClassicWorkflows,
+            riskyCloudFlows,
+            inactiveCustomApis,
+            missingComponents,
+            unsupportedSummary,
+            unmanagedCounts,
+          },
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("environment_health_report", error);
       }
     },
   );

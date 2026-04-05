@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { ViewScope } from "../../queries/view-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listViews } from "./view-metadata.js";
 
@@ -41,11 +42,13 @@ export function registerListViews(
         });
 
         if (views.length === 0) {
-          return {
-            content: [
-              { type: "text" as const, text: `No views found in '${env.name}' with the specified filters.` },
-            ],
-          };
+          const text = `No views found in '${env.name}' with the specified filters.`;
+          return createToolSuccessResponse("list_views", text, text, {
+            environment: env.name,
+            filters: { table: table || null, scope: scope || null, nameFilter: nameFilter || null, solution: solution || null },
+            count: 0,
+            items: [],
+          });
         }
 
         const rows = views.map((view) => [
@@ -72,14 +75,14 @@ export function registerListViews(
           ["Table", "Scope", "Name", "Type", "Default", "Quick Find", "State", "Modified"],
           rows,
         )}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_views", text, `Found ${views.length} view(s) in '${env.name}'.`, {
+          environment: env.name,
+          filters: { table: table || null, scope: scope || null, nameFilter: nameFilter || null, solution: solution || null },
+          count: views.length,
+          items: views,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_views", error);
       }
     },
   );

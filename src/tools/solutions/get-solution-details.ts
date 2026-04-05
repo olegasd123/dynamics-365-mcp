@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
   fetchSolutionInventory,
@@ -264,17 +265,26 @@ export function registerGetSolutionDetails(
           );
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n\n") }] };
+        return createToolSuccessResponse("get_solution_details", lines.join("\n\n"), `Loaded solution '${inventory.solution.friendlyname}' in '${env.name}'.`, {
+          environment: env.name,
+          solution: inventory.solution,
+          counts: {
+            rootComponents: inventory.rootComponents.length,
+            childComponents: inventory.childComponents.length,
+            pluginAssemblies: inventory.pluginAssemblies.length,
+            forms: inventory.forms.length,
+            views: inventory.views.length,
+            workflows: inventory.workflows.length,
+            webResources: inventory.webResources.length,
+            pluginSteps: inventory.pluginSteps.length,
+            pluginImages: inventory.pluginImages.length,
+            unsupportedRootComponents: inventory.unsupportedRootComponents.length,
+            unsupportedChildComponents: inventory.unsupportedChildComponents.length,
+          },
+          inventory,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_solution_details", error);
       }
     },
   );

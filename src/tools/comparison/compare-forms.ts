@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { FormType } from "../../queries/form-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareFormsData } from "./comparison-data.js";
 
@@ -34,14 +35,14 @@ export function registerCompareForms(
         });
 
         const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("compare_forms", text, `Compared forms between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+          sourceEnvironment,
+          targetEnvironment,
+          filters: { table: table || null, type: type || null, formName: formName || null, solution: solution || null, targetSolution: targetSolution || null },
+          comparison: result,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_forms", error);
       }
     },
   );

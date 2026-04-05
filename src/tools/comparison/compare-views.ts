@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { ViewScope } from "../../queries/view-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareViewsData } from "./comparison-data.js";
 
@@ -34,14 +35,14 @@ export function registerCompareViews(
         });
 
         const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("compare_views", text, `Compared views between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+          sourceEnvironment,
+          targetEnvironment,
+          filters: { table: table || null, scope: scope || null, viewName: viewName || null, solution: solution || null, targetSolution: targetSolution || null },
+          comparison: result,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_views", error);
       }
     },
   );

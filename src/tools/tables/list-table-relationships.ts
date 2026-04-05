@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
   buildRelationshipDetails,
@@ -35,14 +36,14 @@ export function registerListTableRelationships(
         const result = await fetchTableRelationships(env, client, table, solution);
 
         if (result.relationships.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No relationships found for table '${result.table.logicalName}' in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `No relationships found for table '${result.table.logicalName}' in '${env.name}'.`;
+          return createToolSuccessResponse("list_table_relationships", text, text, {
+            environment: env.name,
+            solution: solution || null,
+            table: result.table,
+            count: 0,
+            items: [],
+          });
         }
 
         const rows = result.relationships.map((relationship) => [
@@ -59,17 +60,20 @@ export function registerListTableRelationships(
           rows,
         )}`;
 
-        return { content: [{ type: "text" as const, text }] };
+        const items = result.relationships.map((relationship) => ({
+          ...relationship,
+          relatedTable: buildRelationshipRelatedTable(relationship),
+          details: buildRelationshipDetails(relationship),
+        }));
+        return createToolSuccessResponse("list_table_relationships", text, `Found ${result.relationships.length} relationship(s) for table '${result.table.logicalName}' in '${env.name}'.`, {
+          environment: env.name,
+          solution: solution || null,
+          table: result.table,
+          count: result.relationships.length,
+          items,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_table_relationships", error);
       }
     },
   );

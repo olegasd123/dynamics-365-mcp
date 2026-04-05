@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchFlowDetails } from "./flow-metadata.js";
 
@@ -60,14 +61,13 @@ export function registerGetFlowDetails(
           ),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("get_flow_details", lines.join("\n"), `Loaded cloud flow '${flow.name}' in '${env.name}'.`, {
+          environment: env.name,
+          solution: solution || null,
+          flow,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_flow_details", error);
       }
     },
   );

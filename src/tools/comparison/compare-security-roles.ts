@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { diffCollections } from "../../utils/diff.js";
 import { formatNamedDiffSection } from "./diff-section.js";
 import { fetchRolePrivileges } from "../security/role-metadata.js";
@@ -69,14 +70,17 @@ export function registerCompareSecurityRoles(
           }),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("compare_security_roles", lines.join("\n"), `Compared security role '${roleName}' between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+          sourceEnvironment,
+          targetEnvironment,
+          roleName,
+          sourceBusinessUnit: sourceBusinessUnit || null,
+          targetBusinessUnit: targetBusinessUnit || null,
+          roleComparison: roleDiff,
+          privilegeComparison: privilegeDiff,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_security_roles", error);
       }
     },
   );

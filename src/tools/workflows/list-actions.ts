@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listActionsQuery } from "../../queries/workflow-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
@@ -41,14 +42,13 @@ export function registerListActions(server: McpServer, config: AppConfig, client
         }
 
         if (actions.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No custom actions found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`,
-              },
-            ],
-          };
+          const text = `No custom actions found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`;
+          return createToolSuccessResponse("list_actions", text, text, {
+            environment: env.name,
+            solution: solution || null,
+            count: 0,
+            items: [],
+          });
         }
 
         const headers = ["Name", "Unique Name", "Status", "Entity", "Managed", "Modified"];
@@ -61,18 +61,19 @@ export function registerListActions(server: McpServer, config: AppConfig, client
           String(a.modifiedon || "").slice(0, 10),
         ]);
 
+        const items = actions.map((action) => ({
+          ...action,
+          stateLabel: STATE_LABELS[action.statecode as number] || String(action.statecode),
+        }));
         const text = `## Custom Actions in '${env.name}'${solution ? ` (solution='${solution}')` : ""}\n\nFound ${actions.length} action(s).\n\n${formatTable(headers, rows)}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_actions", text, `Found ${actions.length} custom action(s) in '${env.name}'.`, {
+          environment: env.name,
+          solution: solution || null,
+          count: actions.length,
+          items,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_actions", error);
       }
     },
   );

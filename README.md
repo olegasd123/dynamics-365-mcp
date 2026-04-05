@@ -367,12 +367,12 @@ Matrix status values:
 
 ## Structured Output
 
-Core tools now return two result forms at the same time:
+All tools now return two result forms at the same time:
 
 - `content`: readable text for users
 - `structuredContent`: stable JSON for agents and follow-up tool logic
 
-The shared top-level JSON shape is:
+The top-level JSON shape is the same for every tool:
 
 ```json
 {
@@ -398,18 +398,14 @@ Error shape:
 }
 ```
 
-Current core structured-output tools:
+The `data` payload depends on the tool, but it follows the same idea:
 
-- `list_tables`
-- `get_table_schema`
-- `list_plugins`
-- `get_plugin_details`
-- `list_workflows`
-- `get_workflow_details`
-- `compare_plugins`
-- `compare_workflows`
-- `compare_table_schema`
-- `compare_environment_matrix`
+- list tools usually return fields like `environment`, `filters`, `count`, and `items`
+- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin`, or `solution`
+- compare tools usually return environment names, filters, and one or more diff objects
+- error results always use the shared `error.name` and `error.message` fields
+
+This means an MCP client or another agent can read the text for people, or use `structuredContent` for stable follow-up logic without parsing markdown tables.
 
 ## Examples
 

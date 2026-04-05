@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { ViewScope } from "../../queries/view-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchViewDetails } from "./view-metadata.js";
 
@@ -74,14 +75,13 @@ export function registerGetViewDetails(
           ),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("get_view_details", lines.join("\n"), `Loaded view '${view.name}' in '${env.name}'.`, {
+          environment: env.name,
+          filters: { table: table || null, scope: scope || null, solution: solution || null },
+          view,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_view_details", error);
       }
     },
   );

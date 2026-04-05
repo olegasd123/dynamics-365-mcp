@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listPluginAssembliesByIdsQuery } from "../../queries/plugin-queries.js";
 import { listWebResourcesByIdsQuery } from "../../queries/web-resource-queries.js";
@@ -104,14 +105,19 @@ export function registerGetSolutionDependencies(
         );
 
         if (selectedComponents.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No supported solution components matched in '${env.name}' for solution '${solution}'.`,
-              },
-            ],
-          };
+          const text = `No supported solution components matched in '${env.name}' for solution '${solution}'.`;
+          return createToolSuccessResponse("get_solution_dependencies", text, text, {
+            environment: env.name,
+            solution,
+            direction: selectedDirection,
+            filters: {
+              componentType: componentType || null,
+              componentName: componentName || null,
+              maxRows: rowLimit,
+            },
+            count: 0,
+            items: [],
+          });
         }
 
         const solutionComponentKeySet = new Set(
@@ -184,7 +190,23 @@ export function registerGetSolutionDependencies(
         if (dependencyRecords.length === 0) {
           lines.push("");
           lines.push("No dependency rows found for the selected scope.");
-          return { content: [{ type: "text" as const, text: lines.join("\n\n") }] };
+          return createToolSuccessResponse("get_solution_dependencies", lines.join("\n\n"), `No dependency rows found for solution '${solution}' in '${env.name}'.`, {
+            environment: env.name,
+            solution,
+            direction: selectedDirection,
+            filters: {
+              componentType: componentType || null,
+              componentName: componentName || null,
+              maxRows: rowLimit,
+            },
+            selectedComponents,
+            counts: {
+              required: requiredCount,
+              dependents: dependentCount,
+              external: externalCount,
+            },
+            dependencyRows: [],
+          });
         }
 
         const rows = dependencyRecords.slice(0, rowLimit).map((record) => [
@@ -204,17 +226,26 @@ export function registerGetSolutionDependencies(
           lines.push(`Showing ${rowLimit} of ${dependencyRecords.length} rows.`);
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n\n") }] };
+        return createToolSuccessResponse("get_solution_dependencies", lines.join("\n\n"), `Loaded dependency rows for solution '${solution}' in '${env.name}'.`, {
+          environment: env.name,
+          solution,
+          direction: selectedDirection,
+          filters: {
+            componentType: componentType || null,
+            componentName: componentName || null,
+            maxRows: rowLimit,
+          },
+          selectedComponents,
+          counts: {
+            required: requiredCount,
+            dependents: dependentCount,
+            external: externalCount,
+            total: dependencyRecords.length,
+          },
+          dependencyRows: dependencyRecords,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_solution_dependencies", error);
       }
     },
   );
