@@ -1,6 +1,6 @@
 # Dynamics 365 CRM MCP Server
 
-An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying plugins, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
+An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugins, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
 
 ## Tech Stack
 
@@ -25,6 +25,11 @@ src/
     dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
   tools/
     index.ts                        # Tool registration barrel
+    tables/
+      list-tables.ts
+      get-table-schema.ts
+      list-table-columns.ts
+      list-table-relationships.ts
     plugins/
       list-plugins.ts
       list-plugin-steps.ts
@@ -42,12 +47,14 @@ src/
       get-solution-details.ts
       get-solution-dependencies.ts
     comparison/
+      compare-table-schema.ts
       compare-plugins.ts
       compare-solutions.ts
       compare-workflows.ts
       compare-web-resources.ts
       compare-environment-matrix.ts
   queries/
+    table-queries.ts                # Dataverse table metadata query builders
     plugin-queries.ts               # OData query builders for plugin entities
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
@@ -226,6 +233,10 @@ Priority order:
 
 | Tool                       | Description                                                   | Key Parameters                               |
 | -------------------------- | ------------------------------------------------------------- | -------------------------------------------- |
+| `list_tables`              | List Dataverse tables with main schema flags                  | `environment`, `nameFilter`, `solution`      |
+| `get_table_schema`         | Show columns, alternate keys, and relationships for one table | `environment`, `table`, `solution`           |
+| `list_table_columns`       | List table columns and choice details                         | `environment`, `table`, `solution`           |
+| `list_table_relationships` | List table relationships                                      | `environment`, `table`, `solution`           |
 | `list_plugins`             | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                      |
 | `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
 | `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
@@ -243,6 +254,7 @@ Priority order:
 
 | Tool                    | Description                              | Key Parameters                                                       |
 | ----------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
+| `compare_table_schema`  | Compare one table schema across envs     | `sourceEnvironment`, `targetEnvironment`, `table`, `targetTable`     |
 | `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
 | `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
 | `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
@@ -257,6 +269,10 @@ Users can now work with a solution by display name or unique name.
 - `list_workflows` supports `solution`
 - `list_actions` supports `solution`
 - `list_web_resources` supports `solution`
+- `list_tables` supports `solution`
+- `get_table_schema` supports `solution`
+- `list_table_columns` supports `solution`
+- `list_table_relationships` supports `solution`
 
 The server resolves the solution first, then filters supported root components from that solution.
 

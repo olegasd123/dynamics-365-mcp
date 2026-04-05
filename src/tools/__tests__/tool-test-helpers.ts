@@ -46,9 +46,13 @@ export function createTestConfig(environmentNames: string[]): AppConfig {
 }
 
 export function createRecordingClient(
-  datasets: Record<string, Record<string, Record<string, unknown>[]>>,
+  datasets: Record<string, Record<string, unknown>>,
 ) {
   const calls: Array<{ environment: string; entitySet: string; queryParams?: string }> = [];
+
+  function getDatasetValue(envName: string, key: string): unknown {
+    return (datasets[envName] || {})[key];
+  }
 
   const client = {
     async query<T>(
@@ -61,7 +65,40 @@ export function createRecordingClient(
         entitySet,
         queryParams,
       });
-      return ((datasets[env.name] || {})[entitySet] || []) as T[];
+      const value = getDatasetValue(env.name, entitySet);
+      return (Array.isArray(value) ? value : []) as T[];
+    },
+    async queryPath<T>(
+      env: EnvironmentConfig,
+      resourcePath: string,
+      queryParams?: string,
+    ): Promise<T[]> {
+      calls.push({
+        environment: env.name,
+        entitySet: resourcePath,
+        queryParams,
+      });
+      const value = getDatasetValue(env.name, resourcePath);
+      return (Array.isArray(value) ? value : []) as T[];
+    },
+    async getPath<T>(
+      env: EnvironmentConfig,
+      resourcePath: string,
+      queryParams?: string,
+    ): Promise<T | null> {
+      calls.push({
+        environment: env.name,
+        entitySet: resourcePath,
+        queryParams,
+      });
+      const value = getDatasetValue(env.name, resourcePath);
+      if (value === undefined) {
+        return null;
+      }
+      if (Array.isArray(value)) {
+        return ((value[0] ?? null) as T | null) ?? null;
+      }
+      return value as T;
     },
   };
 

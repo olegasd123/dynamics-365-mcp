@@ -25,6 +25,8 @@ The next work should extend this model instead of changing it.
 
 ## Milestone 1: Table Metadata
 
+Status: Done
+
 ### Goal
 
 Make the MCP useful for schema work, not only plugin and workflow work.
@@ -196,6 +198,6 @@ Each milestone should include:
 
 ## Recommended First Build
 
-Start with Milestone 1.
+Milestone 1 is complete.
 
 If only one next area can be built now, table metadata gives the best value and fits the current project design best.

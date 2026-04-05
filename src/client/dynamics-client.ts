@@ -35,6 +35,15 @@ export class DynamicsClient {
     this.tokenManager = tokenManager;
   }
 
+  private buildUrl(
+    env: EnvironmentConfig,
+    resourcePath: string,
+    queryParams?: string,
+  ): string {
+    const baseUrl = `${env.url}/api/data/v9.2/${resourcePath}`;
+    return queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+  }
+
   private async makeRequest(
     env: EnvironmentConfig,
     url: string,
@@ -90,11 +99,18 @@ export class DynamicsClient {
     queryParams?: string,
     options?: RequestOptions,
   ): Promise<T[]> {
+    return this.queryPath(env, entitySet, queryParams, options);
+  }
+
+  async queryPath<T = Record<string, unknown>>(
+    env: EnvironmentConfig,
+    resourcePath: string,
+    queryParams?: string,
+    options?: RequestOptions,
+  ): Promise<T[]> {
     const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
     const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
-
-    const baseUrl = `${env.url}/api/data/v9.2/${entitySet}`;
-    let url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+    let url = this.buildUrl(env, resourcePath, queryParams);
 
     const allResults: T[] = [];
     let pageCount = 0;
@@ -136,10 +152,16 @@ export class DynamicsClient {
     id: string,
     queryParams?: string,
   ): Promise<T | null> {
-    const timeout = DEFAULT_TIMEOUT;
-    const baseUrl = `${env.url}/api/data/v9.2/${entitySet}(${id})`;
-    const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+    return this.getPath(env, `${entitySet}(${id})`, queryParams);
+  }
 
+  async getPath<T = Record<string, unknown>>(
+    env: EnvironmentConfig,
+    resourcePath: string,
+    queryParams?: string,
+  ): Promise<T | null> {
+    const timeout = DEFAULT_TIMEOUT;
+    const url = this.buildUrl(env, resourcePath, queryParams);
     const response = await this.requestWithRetry(env, url, timeout);
 
     if (response.status === 404) {

@@ -3,8 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { diffCollections, type DiffResult } from "../../utils/diff.js";
+import { diffCollections } from "../../utils/diff.js";
 import { fetchSolutionInventory } from "../solutions/solution-inventory.js";
+import { formatNamedDiffSection } from "./diff-section.js";
 
 export function registerCompareSolutions(
   server: McpServer,
@@ -80,47 +81,53 @@ export function registerCompareSolutions(
         );
         lines.push("");
         lines.push(
-          renderDiffSection("Plugin Assemblies", pluginDiff, sourceEnvironment, targetEnvironment, "name"),
+          formatNamedDiffSection({
+            title: "Plugin Assemblies",
+            result: pluginDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "name",
+          }),
         );
         lines.push("");
         lines.push(
-          renderDiffSection(
-            "Plugin Steps",
-            pluginStepDiff,
-            sourceEnvironment,
-            targetEnvironment,
-            "displayName",
-          ),
+          formatNamedDiffSection({
+            title: "Plugin Steps",
+            result: pluginStepDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "displayName",
+          }),
         );
         lines.push("");
         lines.push(
-          renderDiffSection(
-            "Plugin Images",
-            pluginImageDiff,
-            sourceEnvironment,
-            targetEnvironment,
-            "displayName",
-          ),
+          formatNamedDiffSection({
+            title: "Plugin Images",
+            result: pluginImageDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "displayName",
+          }),
         );
         lines.push("");
         lines.push(
-          renderDiffSection(
-            "Workflows",
-            workflowDiff,
-            sourceEnvironment,
-            targetEnvironment,
-            "name",
-          ),
+          formatNamedDiffSection({
+            title: "Workflows",
+            result: workflowDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "name",
+          }),
         );
         lines.push("");
         lines.push(
-          renderDiffSection(
-            "Web Resources",
-            webResourceDiff,
-            sourceEnvironment,
-            targetEnvironment,
-            "name",
-          ),
+          formatNamedDiffSection({
+            title: "Web Resources",
+            result: webResourceDiff,
+            sourceLabel: sourceEnvironment,
+            targetLabel: targetEnvironment,
+            nameField: "name",
+          }),
         );
 
         return { content: [{ type: "text" as const, text: lines.join("\n") }] };
@@ -137,72 +144,6 @@ export function registerCompareSolutions(
       }
     },
   );
-}
-
-function renderDiffSection<T extends Record<string, unknown>>(
-  title: string,
-  result: DiffResult<T>,
-  sourceEnvironment: string,
-  targetEnvironment: string,
-  nameField: string,
-): string {
-  const lines: string[] = [];
-  lines.push(`### ${title}`);
-  lines.push(
-    `Matching: ${result.matching} | Differences: ${result.differences.length} | Only in ${sourceEnvironment}: ${result.onlyInSource.length} | Only in ${targetEnvironment}: ${result.onlyInTarget.length}`,
-  );
-
-  if (
-    result.matching === 0 &&
-    result.differences.length === 0 &&
-    result.onlyInSource.length === 0 &&
-    result.onlyInTarget.length === 0
-  ) {
-    lines.push("");
-    lines.push("No supported components found.");
-    return lines.join("\n");
-  }
-
-  if (result.onlyInSource.length > 0) {
-    lines.push("");
-    lines.push(`Only in ${sourceEnvironment}:`);
-    for (const item of result.onlyInSource) {
-      lines.push(`- ${String(item[nameField] || "unknown")}`);
-    }
-  }
-
-  if (result.onlyInTarget.length > 0) {
-    lines.push("");
-    lines.push(`Only in ${targetEnvironment}:`);
-    for (const item of result.onlyInTarget) {
-      lines.push(`- ${String(item[nameField] || "unknown")}`);
-    }
-  }
-
-  if (result.differences.length > 0) {
-    lines.push("");
-    lines.push("Differences:");
-    for (const diff of result.differences) {
-      lines.push(`- ${diff.key}`);
-      for (const change of diff.changedFields) {
-        lines.push(
-          `  ${change.field}: \`${formatValue(change.sourceValue)}\` -> \`${formatValue(change.targetValue)}\``,
-        );
-      }
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "(none)";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  return JSON.stringify(value);
 }
 
 function buildPluginStepComparisonKey(item: Record<string, unknown>): string {
