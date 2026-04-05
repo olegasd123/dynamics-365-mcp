@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { buildTableFlags } from "./table-display.js";
 import { listTables } from "./table-metadata.js";
@@ -30,16 +31,23 @@ export function registerListTables(
       try {
         const env = getEnvironment(config, environment);
         const tables = await listTables(env, client, { nameFilter, solution });
+        const items = tables.map((table) => ({
+          ...table,
+          flags: buildTableFlags(table),
+        }));
+        const filters = {
+          nameFilter: nameFilter || null,
+          solution: solution || null,
+        };
 
         if (tables.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No tables found in '${env.name}' with the specified filters.`,
-              },
-            ],
-          };
+          const text = `No tables found in '${env.name}' with the specified filters.`;
+          return createToolSuccessResponse("list_tables", text, text, {
+            environment: env.name,
+            filters,
+            count: 0,
+            items: [],
+          });
         }
 
         const rows = tables.map((table) => [
@@ -74,17 +82,19 @@ export function registerListTables(
           rows,
         )}`;
 
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse(
+          "list_tables",
+          text,
+          `Found ${tables.length} table(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters,
+            count: tables.length,
+            items,
+          },
+        );
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_tables", error);
       }
     },
   );

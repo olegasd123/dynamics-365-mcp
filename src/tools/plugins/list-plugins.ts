@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import {
   listPluginAssembliesQuery,
 } from "../../queries/plugin-queries.js";
@@ -58,18 +59,26 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
           }
         }
 
+        const items = results.map((assembly) => ({
+          ...assembly,
+          isolation: assembly.isolationmode === 2 ? "Sandbox" : "None",
+          managed: Boolean(assembly.ismanaged),
+          modifiedOn: String(assembly.modifiedon || "").slice(0, 10),
+        }));
+
         if (results.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text:
-                  filter === "no_steps"
-                    ? `No orphaned plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
-                    : `No plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`,
-              },
-            ],
-          };
+          const text =
+            filter === "no_steps"
+              ? `No orphaned plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
+              : `No plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`;
+
+          return createToolSuccessResponse("list_plugins", text, text, {
+            environment: env.name,
+            filter: filter || "all",
+            solution: solution || null,
+            count: 0,
+            items: [],
+          });
         }
 
         const headers = ["Name", "Version", "Isolation", "Managed", "Modified"];
@@ -89,17 +98,20 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
           .join(", ");
         const text = `## Plugins in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\nFound ${results.length} plugin(s).\n\n${formatTable(headers, rows)}`;
 
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse(
+          "list_plugins",
+          text,
+          `Found ${results.length} plugin(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            filter: filter || "all",
+            solution: solution || null,
+            count: results.length,
+            items,
+          },
+        );
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_plugins", error);
       }
     },
   );

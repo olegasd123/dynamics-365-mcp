@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareWorkflowsData } from "./comparison-data.js";
 
@@ -57,17 +58,20 @@ export function registerCompareWorkflows(
         }
 
         const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse(
+          "compare_workflows",
+          text,
+          `Compared workflows between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            category: category || null,
+            workflowName: workflowName || null,
+            comparison: result,
+          },
+        );
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_workflows", error);
       }
     },
   );

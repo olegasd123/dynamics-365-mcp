@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
   buildColumnDetails,
@@ -35,6 +36,15 @@ export function registerGetTableSchema(
       try {
         const env = getEnvironment(config, environment);
         const schema = await fetchTableSchema(env, client, table, solution);
+        const structuredColumns = schema.columns.map((column) => ({
+          ...column,
+          details: buildColumnDetails(column) || null,
+        }));
+        const structuredRelationships = schema.relationships.map((relationship) => ({
+          ...relationship,
+          relatedTable: buildRelationshipRelatedTable(relationship),
+          details: buildRelationshipDetails(relationship),
+        }));
         const lines: string[] = [];
 
         lines.push(`## Table: ${schema.table.logicalName}`);
@@ -112,17 +122,29 @@ export function registerGetTableSchema(
           );
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        return createToolSuccessResponse(
+          "get_table_schema",
+          lines.join("\n"),
+          `Loaded schema for table '${schema.table.logicalName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            solution: solution || null,
+            table: {
+              ...schema.table,
+              flags: buildTableFlags(schema.table),
             },
-          ],
-          isError: true,
-        };
+            counts: {
+              columns: schema.columns.length,
+              keys: schema.keys.length,
+              relationships: schema.relationships.length,
+            },
+            columns: structuredColumns,
+            keys: schema.keys,
+            relationships: structuredRelationships,
+          },
+        );
+      } catch (error) {
+        return createToolErrorResponse("get_table_schema", error);
       }
     },
   );

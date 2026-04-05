@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { comparePluginsData } from "./comparison-data.js";
 
@@ -54,17 +55,25 @@ export function registerComparePlugins(
           );
         }
 
-        return { content: [{ type: "text" as const, text }] };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        return createToolSuccessResponse(
+          "compare_plugins",
+          text,
+          `Compared plugins between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            pluginName: pluginName || null,
+            counts: {
+              sourceAssemblies: sourceItems.length,
+              targetAssemblies: targetItems.length,
             },
-          ],
-          isError: true,
-        };
+            assemblies: result,
+            steps: stepResult || null,
+            images: imageResult || null,
+          },
+        );
+      } catch (error) {
+        return createToolErrorResponse("compare_plugins", error);
       }
     },
   );

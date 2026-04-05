@@ -173,6 +173,27 @@ describe("compare_environment_matrix tool", () => {
     expect(text).toContain("dev: attributes");
     expect(text).toContain("test");
     expect(text).toContain("Aligned");
+    expect(response.structuredContent).toMatchObject({
+      tool: "compare_environment_matrix",
+      ok: true,
+      data: {
+        baselineEnvironment: "prod",
+        targetEnvironments: ["dev", "test"],
+        componentTypes: ["plugins"],
+      },
+    });
+
+    const payload = response.structuredContent as {
+      data: {
+        sections: Array<{
+          componentType: string;
+          reports: Array<{ title: string; report: { summaries: Array<{ environment: string }> } }>;
+        }>;
+      };
+    };
+    expect(payload.data.sections[0].componentType).toBe("plugins");
+    expect(payload.data.sections[0].reports[0].title).toBe("Plugin Assemblies");
+    expect(payload.data.sections[0].reports[0].report.summaries[0].environment).toBe("dev");
   });
 
   it("returns an error when no target environments remain after filtering", async () => {
@@ -194,6 +215,13 @@ describe("compare_environment_matrix tool", () => {
 
     expect(response.isError).toBe(true);
     expect(response.content[0].text).toContain("No target environments found for baseline 'prod'.");
+    expect(response.structuredContent).toMatchObject({
+      tool: "compare_environment_matrix",
+      ok: false,
+      error: {
+        message: "No target environments found for baseline 'prod'.",
+      },
+    });
   });
 
   it("returns an error when the client query fails", async () => {
@@ -217,5 +245,12 @@ describe("compare_environment_matrix tool", () => {
     expect(response.content[0].text).toContain(
       "Dynamics API error [prod] (429): Rate limit exceeded",
     );
+    expect(response.structuredContent).toMatchObject({
+      tool: "compare_environment_matrix",
+      ok: false,
+      error: {
+        message: "Dynamics API error [prod] (429): Rate limit exceeded",
+      },
+    });
   });
 });

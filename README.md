@@ -365,6 +365,52 @@ Matrix status values:
 - `missing`: item exists in baseline, but not in target
 - `extra`: item exists in target, but not in baseline
 
+## Structured Output
+
+Core tools now return two result forms at the same time:
+
+- `content`: readable text for users
+- `structuredContent`: stable JSON for agents and follow-up tool logic
+
+The shared top-level JSON shape is:
+
+```json
+{
+  "version": "1",
+  "tool": "tool_name",
+  "ok": true,
+  "summary": "Short summary",
+  "data": {}
+}
+```
+
+Error shape:
+
+```json
+{
+  "version": "1",
+  "tool": "tool_name",
+  "ok": false,
+  "error": {
+    "name": "Error",
+    "message": "Error text"
+  }
+}
+```
+
+Current core structured-output tools:
+
+- `list_tables`
+- `get_table_schema`
+- `list_plugins`
+- `get_plugin_details`
+- `list_workflows`
+- `get_workflow_details`
+- `compare_plugins`
+- `compare_workflows`
+- `compare_table_schema`
+- `compare_environment_matrix`
+
 ## Examples
 
 ### Compare One Plugin Across Two Environments

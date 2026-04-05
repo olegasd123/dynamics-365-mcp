@@ -2,6 +2,7 @@ import type { AppConfig, EnvironmentConfig } from "../../config/types.js";
 
 export interface ToolResponse {
   content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }
 

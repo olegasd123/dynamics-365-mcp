@@ -56,6 +56,28 @@ describe("get_workflow_details tool", () => {
     expect(text).toContain('"Target":"account"');
     expect(text).toContain("### Definition (clientdata)");
     expect(text).toContain('"steps": [');
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_workflow_details",
+      ok: true,
+      data: {
+        environment: "dev",
+        found: true,
+        workflow: {
+          name: "Account Sync",
+          uniqueName: "contoso_AccountSync",
+          categoryLabel: "Action",
+          stateLabel: "Activated",
+          modeLabel: "Real-time",
+          scopeLabel: "Organization",
+        },
+      },
+    });
+
+    const payload = response.structuredContent as {
+      data: { workflow: { triggers: string[]; inputParameters: { Target: string } } };
+    };
+    expect(payload.data.workflow.triggers).toEqual(["Create", "Update (name,revenue)"]);
+    expect(payload.data.workflow.inputParameters.Target).toBe("account");
   });
 
   it("returns an error when no identity is provided", async () => {
@@ -69,6 +91,13 @@ describe("get_workflow_details tool", () => {
 
     expect(response.isError).toBe(true);
     expect(response.content[0].text).toContain("Please provide either workflowName or uniqueName.");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_workflow_details",
+      ok: false,
+      error: {
+        message: "Please provide either workflowName or uniqueName.",
+      },
+    });
   });
 
   it("returns a not found message when the workflow does not exist", async () => {
@@ -88,6 +117,15 @@ describe("get_workflow_details tool", () => {
 
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("Workflow 'missing_workflow' not found in 'dev'.");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_workflow_details",
+      ok: true,
+      data: {
+        environment: "dev",
+        found: false,
+        uniqueName: "missing_workflow",
+      },
+    });
   });
 
   it("returns an error when the client query fails", async () => {
@@ -109,5 +147,12 @@ describe("get_workflow_details tool", () => {
     expect(response.content[0].text).toContain(
       "Dynamics API error [dev] (500): Workflow details failed",
     );
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_workflow_details",
+      ok: false,
+      error: {
+        message: "Dynamics API error [dev] (500): Workflow details failed",
+      },
+    });
   });
 });

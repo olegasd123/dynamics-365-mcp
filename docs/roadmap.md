@@ -9,11 +9,13 @@ This roadmap turns the main improvement ideas into clear milestones.
 - Improve speed and stability on large environments
 - Add stronger tests for startup and transport flows
 
-## Milestone 1: Agent-Friendly Output
+## Milestone 1: Agent-Friendly Output [Done]
 
 ### Goal
 
 Make tool results easier to reuse in other prompts and agent flows.
+
+Status: completed on 2026-04-06
 
 ### Scope
 
@@ -24,10 +26,10 @@ Make tool results easier to reuse in other prompts and agent flows.
 
 ### Main Features
 
-- `output: "text" | "json" | "both"` option on core tools
-- Standard fields like `summary`, `items`, `counts`, `filters`, and `errors`
+- Return text plus `structuredContent` by default on core tools
+- Standard top-level fields: `version`, `tool`, `ok`, `summary`, and `data` / `error`
 - Shared formatter / serializer utilities
-- README examples for JSON output
+- README notes for structured output
 
 ### Exit Criteria
 
