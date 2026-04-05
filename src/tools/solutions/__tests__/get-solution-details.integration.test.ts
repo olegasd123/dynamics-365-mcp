@@ -24,20 +24,43 @@ describe("get_solution_details tool", () => {
         ],
         solutioncomponents: [
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
-          { solutioncomponentid: "sc-2", objectid: "wf-1", componenttype: 29 },
-          { solutioncomponentid: "sc-3", objectid: "wr-1", componenttype: 61 },
-          { solutioncomponentid: "sc-4", objectid: "form-1", componenttype: 24 },
+          { solutioncomponentid: "sc-2", objectid: "form-1", componenttype: 24 },
+          { solutioncomponentid: "sc-3", objectid: "view-1", componenttype: 26 },
+          { solutioncomponentid: "sc-4", objectid: "wf-1", componenttype: 29 },
+          { solutioncomponentid: "sc-5", objectid: "wr-1", componenttype: 61 },
           {
-            solutioncomponentid: "sc-5",
+            solutioncomponentid: "sc-6",
             objectid: "step-1",
             componenttype: 92,
             rootsolutioncomponentid: "sc-1",
           },
           {
-            solutioncomponentid: "sc-6",
+            solutioncomponentid: "sc-7",
             objectid: "img-1",
             componenttype: 93,
             rootsolutioncomponentid: "sc-1",
+          },
+        ],
+        systemforms: [
+          {
+            formid: "form-1",
+            name: "Account Main",
+            objecttypecode: "account",
+            type: 2,
+            isdefault: true,
+            ismanaged: false,
+            modifiedon: "2026-03-02T12:00:00Z",
+          },
+        ],
+        savedqueries: [
+          {
+            savedqueryid: "view-1",
+            name: "Active Accounts",
+            returnedtypecode: "account",
+            querytype: 0,
+            isdefault: true,
+            isquickfindquery: false,
+            modifiedon: "2026-03-02T12:00:00Z",
           },
         ],
         pluginassemblies: [
@@ -117,10 +140,16 @@ describe("get_solution_details tool", () => {
     const text = response.content[0].text;
     expect(response.isError).toBeUndefined();
     expect(text).toContain("## Solution: Core");
-    expect(text).toContain("**Supported Root Components**: Plugins 1 | Workflows 1 | Web Resources 1");
+    expect(text).toContain(
+      "**Supported Root Components**: Plugins 1 | Forms 1 | Views 1 | Workflows 1 | Web Resources 1",
+    );
     expect(text).toContain("**Supported Child Components**: Plugin Steps 1 | Plugin Images 1");
     expect(text).toContain("### Plugin Assemblies");
     expect(text).toContain("Core.Plugins");
+    expect(text).toContain("### Forms");
+    expect(text).toContain("Account Main");
+    expect(text).toContain("### Views");
+    expect(text).toContain("Active Accounts");
     expect(text).toContain("### Plugin Steps");
     expect(text).toContain("Account Create");
     expect(text).toContain("### Plugin Images");
@@ -129,6 +158,6 @@ describe("get_solution_details tool", () => {
     expect(text).toContain("Account Sync");
     expect(text).toContain("### Web Resources");
     expect(text).toContain("contoso_/scripts/app.js");
-    expect(text).toContain("### Other Root Components");
+    expect(text).not.toContain("### Other Root Components");
   });
 });

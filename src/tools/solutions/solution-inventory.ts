@@ -1,7 +1,9 @@
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { listFormsQuery } from "../../queries/form-queries.js";
 import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
 import { listSolutionsQuery, listSolutionComponentsQuery } from "../../queries/solution-queries.js";
+import { listSavedViewsQuery } from "../../queries/view-queries.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import {
@@ -11,6 +13,8 @@ import {
 } from "../plugins/plugin-inventory.js";
 
 export const SOLUTION_COMPONENT_TYPE = {
+  form: 24,
+  view: 26,
   workflow: 29,
   webResource: 61,
   pluginAssembly: 91,
@@ -19,6 +23,8 @@ export const SOLUTION_COMPONENT_TYPE = {
 } as const;
 
 const COMPONENT_TYPE_LABELS: Record<number, string> = {
+  24: "Form",
+  26: "View",
   29: "Workflow",
   61: "Web Resource",
   91: "Plugin Assembly",
@@ -49,6 +55,8 @@ export interface SolutionComponentSets {
   rootComponents: SolutionComponentRecord[];
   childComponents: SolutionComponentRecord[];
   pluginAssemblyIds: Set<string>;
+  formIds: Set<string>;
+  viewIds: Set<string>;
   workflowIds: Set<string>;
   webResourceIds: Set<string>;
   pluginStepIds: Set<string>;
@@ -59,6 +67,8 @@ export interface SolutionComponentSets {
 
 export interface SolutionInventory extends SolutionComponentSets {
   pluginAssemblies: Record<string, unknown>[];
+  forms: Record<string, unknown>[];
+  views: Record<string, unknown>[];
   workflows: Record<string, unknown>[];
   webResources: Record<string, unknown>[];
   pluginSteps: PluginStepRecord[];
@@ -155,6 +165,8 @@ export async function fetchSolutionComponentSets(
     rootComponents,
     SOLUTION_COMPONENT_TYPE.pluginAssembly,
   );
+  const formIds = collectObjectIds(rootComponents, SOLUTION_COMPONENT_TYPE.form);
+  const viewIds = collectObjectIds(rootComponents, SOLUTION_COMPONENT_TYPE.view);
   const workflowIds = collectObjectIds(rootComponents, SOLUTION_COMPONENT_TYPE.workflow);
   const webResourceIds = collectObjectIds(rootComponents, SOLUTION_COMPONENT_TYPE.webResource);
   const pluginStepIds = collectObjectIds(childComponents, SOLUTION_COMPONENT_TYPE.pluginStep);
@@ -166,6 +178,8 @@ export async function fetchSolutionComponentSets(
     rootComponents,
     childComponents,
     pluginAssemblyIds,
+    formIds,
+    viewIds,
     workflowIds,
     webResourceIds,
     pluginStepIds,
@@ -173,6 +187,8 @@ export async function fetchSolutionComponentSets(
     unsupportedRootComponents: rootComponents.filter(
       (component) =>
         component.componenttype !== SOLUTION_COMPONENT_TYPE.pluginAssembly &&
+        component.componenttype !== SOLUTION_COMPONENT_TYPE.form &&
+        component.componenttype !== SOLUTION_COMPONENT_TYPE.view &&
         component.componenttype !== SOLUTION_COMPONENT_TYPE.workflow &&
         component.componenttype !== SOLUTION_COMPONENT_TYPE.webResource,
     ),
@@ -191,7 +207,7 @@ export async function fetchSolutionInventory(
 ): Promise<SolutionInventory> {
   const componentSets = await fetchSolutionComponentSets(env, client, solutionRef);
 
-  const [pluginAssemblies, workflows, webResources] = await Promise.all([
+  const [pluginAssemblies, forms, views, workflows, webResources] = await Promise.all([
     fetchRecordsByIds(
       env,
       client,
@@ -199,6 +215,22 @@ export async function fetchSolutionInventory(
       listPluginAssembliesQuery(),
       "pluginassemblyid",
       componentSets.pluginAssemblyIds,
+    ),
+    fetchRecordsByIds(
+      env,
+      client,
+      "systemforms",
+      listFormsQuery(),
+      "formid",
+      componentSets.formIds,
+    ),
+    fetchRecordsByIds(
+      env,
+      client,
+      "savedqueries",
+      listSavedViewsQuery(),
+      "savedqueryid",
+      componentSets.viewIds,
     ),
     fetchRecordsByIds(
       env,
@@ -228,6 +260,8 @@ export async function fetchSolutionInventory(
   return {
     ...componentSets,
     pluginAssemblies,
+    forms,
+    views,
     workflows,
     webResources,
     pluginSteps,

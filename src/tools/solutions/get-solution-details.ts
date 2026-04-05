@@ -24,6 +24,21 @@ const WORKFLOW_CATEGORY_LABELS: Record<number, string> = {
   5: "Modern Flow",
 };
 
+const FORM_TYPE_LABELS: Record<number, string> = {
+  2: "Main",
+  7: "Quick Create",
+  11: "Card",
+  12: "Main",
+};
+
+const VIEW_QUERY_TYPE_LABELS: Record<number, string> = {
+  0: "Public",
+  1: "Advanced Find",
+  2: "Associated",
+  4: "Quick Find",
+  64: "Lookup",
+};
+
 const WEB_RESOURCE_TYPE_LABELS: Record<number, string> = {
   1: "HTML",
   2: "CSS",
@@ -85,7 +100,7 @@ export function registerGetSolutionDetails(
         lines.push(`- **Root Components**: ${inventory.rootComponents.length}`);
         lines.push(`- **Child Components**: ${inventory.childComponents.length}`);
         lines.push(
-          `- **Supported Root Components**: Plugins ${inventory.pluginAssemblies.length} | Workflows ${inventory.workflows.length} | Web Resources ${inventory.webResources.length}`,
+          `- **Supported Root Components**: Plugins ${inventory.pluginAssemblies.length} | Forms ${inventory.forms.length} | Views ${inventory.views.length} | Workflows ${inventory.workflows.length} | Web Resources ${inventory.webResources.length}`,
         );
         lines.push(
           `- **Supported Child Components**: Plugin Steps ${inventory.pluginSteps.length} | Plugin Images ${inventory.pluginImages.length}`,
@@ -105,6 +120,42 @@ export function registerGetSolutionDetails(
                 assembly.isolationmode === 2 ? "Sandbox" : "None",
                 assembly.ismanaged ? "Yes" : "No",
                 String(assembly.modifiedon || "").slice(0, 10),
+              ]),
+            ),
+          );
+        }
+
+        if (inventory.forms.length > 0) {
+          lines.push("");
+          lines.push("### Forms");
+          lines.push(
+            formatTable(
+              ["Table", "Name", "Type", "Default", "Managed", "Modified"],
+              inventory.forms.map((form) => [
+                String(form.objecttypecode || ""),
+                String(form.name || ""),
+                FORM_TYPE_LABELS[form.type as number] || String(form.type || ""),
+                form.isdefault ? "Yes" : "No",
+                form.ismanaged ? "Yes" : "No",
+                String(form.modifiedon || "").slice(0, 10),
+              ]),
+            ),
+          );
+        }
+
+        if (inventory.views.length > 0) {
+          lines.push("");
+          lines.push("### Views");
+          lines.push(
+            formatTable(
+              ["Table", "Name", "Type", "Default", "Quick Find", "Modified"],
+              inventory.views.map((view) => [
+                String(view.returnedtypecode || ""),
+                String(view.name || ""),
+                VIEW_QUERY_TYPE_LABELS[view.querytype as number] || String(view.querytype || ""),
+                view.isdefault ? "Yes" : "No",
+                view.isquickfindquery ? "Yes" : "No",
+                String(view.modifiedon || "").slice(0, 10),
               ]),
             ),
           );
