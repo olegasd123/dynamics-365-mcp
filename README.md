@@ -167,6 +167,8 @@ Use this when the user can sign in in a browser and does not have a client secre
 
 `clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
 
+Device-code tokens are stored in `~/.dynamics365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
+
 ### Connection String (single env)
 
 Via `D365_CONNECTION_STRING` env var:
@@ -251,6 +253,8 @@ scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
 The scripts store PID files in `run/` and logs in `logs/`.
 
 The scripts also auto-load the repo `.env` file if it exists. This is useful for values like `D365_MCP_CONFIG`, `MCP_PORT`, `MCP_HOST`, `MCP_PATH`, and `NODE_BIN`.
+
+In HTTP mode, `/health` returns a JSON summary with service info, config info, request counters, auth cache state, and client cache state.
 
 Priority order:
 
@@ -521,14 +525,16 @@ Use `uniqueName` when possible. It is safer than display name.
 
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
-3. If token is valid (not within 5 min of expiry), return cached token
-4. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
+3. For `deviceCode` auth, check the persisted token cache on disk
+4. If a valid access token exists, return it
+5. If a stored refresh token exists, try silent refresh before asking the user to sign in again
+6. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
    - `grant_type=client_credentials`
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-5. For `deviceCode` auth, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
-6. Cache new token with `expiresAt = now + expires_in - 300s`
+7. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+8. Cache the new access token in memory and save device-code tokens to disk when possible
 
 ## Cross-Environment Comparison Design
 
@@ -541,8 +547,10 @@ Use `uniqueName` when possible. It is safer than display name.
 - **Auth failures**: `AuthenticationError` with environment name; tool returns `isError: true`
 - **API errors**: Parse OData `{ error: { code, message } }` → `DynamicsApiError`
 - **Config errors**: Fail fast at startup if no valid environments configured
-- **Rate limits**: Respect `Retry-After` on 429 responses with automatic retry
-- **Timeouts**: 30s default per request, clear error message with environment + URL
+- **Unauthorized responses**: On the first `401`, clear the cached token, refresh it once, and retry once
+- **Transient failures**: Retry `408`, `429`, `500`, `502`, `503`, `504`, plus selected timeout and network errors with backoff
+- **Rate limits**: Respect `Retry-After` when Dataverse returns it
+- **Timeouts and network errors**: Use `DynamicsRequestError` with clear environment and request URL details
 
 ## Notes
 

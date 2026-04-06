@@ -96,11 +96,13 @@ Status: completed on 2026-04-06
 - Repeated calls in one session are faster because of cache hits
 - Benchmark notes or test fixtures show measurable improvement
 
-## Milestone 4: Auth And Runtime Hardening
+## Milestone 4: Auth And Runtime Hardening [Done]
 
 ### Goal
 
 Reduce failures in long-running or repeated use.
+
+Status: completed on 2026-04-06
 
 ### Scope
 

@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthenticationError, TokenManager } from "../token-manager.js";
 
@@ -26,9 +29,20 @@ function createJsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
+const tempDirs: string[] = [];
+
+function createTempCachePath(): string {
+  const dir = mkdtempSync(join(tmpdir(), "d365-mcp-token-test-"));
+  tempDirs.push(dir);
+  return join(dir, "token-cache.json");
+}
+
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 describe("TokenManager", () => {
@@ -86,7 +100,9 @@ describe("TokenManager", () => {
 
   it("supports device code auth without a client secret", async () => {
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((callback: TimerHandler) => {
+    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+    ) => {
       if (typeof callback === "function") {
         callback();
       }
@@ -119,7 +135,9 @@ describe("TokenManager", () => {
     ).resolves.toBe("interactive-token");
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain("client_id=04b07795-8ddb-461a-bbee-02f9e1bf7b46");
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain(
+      "client_id=04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+    );
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain(
       "scope=https%3A%2F%2Forg.crm.dynamics.com%2Fuser_impersonation",
     );
@@ -127,6 +145,127 @@ describe("TokenManager", () => {
       "\n[interactive] Open https://microsoft.com/devicelogin and enter ABC-123\n\n",
     );
 
+    timeoutSpy.mockRestore();
+  });
+
+  it("persists device code tokens and reuses them after restart", async () => {
+    const cachePath = createTempCachePath();
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+    ) => {
+      if (typeof callback === "function") {
+        callback();
+      }
+      return 0 as NodeJS.Timeout;
+    }) as typeof setTimeout);
+
+    global.fetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          device_code: "device-code",
+          expires_in: 900,
+          interval: 0,
+          message: "Open https://microsoft.com/devicelogin and enter ABC-123",
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          access_token: "interactive-token",
+          refresh_token: "refresh-token",
+          expires_in: 3600,
+        }),
+      );
+
+    const firstManager = new TokenManager(cachePath);
+    await expect(
+      firstManager.getToken({
+        name: "interactive",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "deviceCode",
+      }),
+    ).resolves.toBe("interactive-token");
+
+    const secondManager = new TokenManager(cachePath);
+    global.fetch = vi.fn<typeof fetch>();
+
+    await expect(
+      secondManager.getToken({
+        name: "interactive",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "deviceCode",
+      }),
+    ).resolves.toBe("interactive-token");
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(stderrSpy).toHaveBeenCalled();
+    timeoutSpy.mockRestore();
+  });
+
+  it("uses the persisted refresh token before starting a new device code flow", async () => {
+    const cachePath = createTempCachePath();
+    const nowSpy = vi.spyOn(Date, "now");
+    const now = 1_700_000_000_000;
+    nowSpy.mockReturnValue(now);
+    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
+      callback: TimerHandler,
+    ) => {
+      if (typeof callback === "function") {
+        callback();
+      }
+      return 0 as NodeJS.Timeout;
+    }) as typeof setTimeout);
+
+    global.fetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          device_code: "device-code",
+          expires_in: 900,
+          interval: 0,
+          message: "Sign in",
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          access_token: "expired-soon-token",
+          refresh_token: "refresh-token",
+          expires_in: 301,
+        }),
+      );
+
+    const firstManager = new TokenManager(cachePath);
+    await firstManager.getToken({
+      name: "interactive",
+      url: "https://org.crm.dynamics.com",
+      tenantId: "tenant-id",
+      authType: "deviceCode",
+    });
+
+    nowSpy.mockReturnValue(now + 61_000);
+    global.fetch = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      createJsonResponse({
+        access_token: "refreshed-token",
+        refresh_token: "refresh-token-2",
+        expires_in: 3600,
+      }),
+    );
+
+    const secondManager = new TokenManager(cachePath);
+    await expect(
+      secondManager.getToken({
+        name: "interactive",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "deviceCode",
+      }),
+    ).resolves.toBe("refreshed-token");
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch.mock.calls[0]?.[1]?.body).toContain("grant_type=refresh_token");
     timeoutSpy.mockRestore();
   });
 });

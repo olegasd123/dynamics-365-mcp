@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
+import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -28,6 +29,15 @@ interface HttpResponse extends ServerResponse {
   status(code: number): HttpResponse;
 }
 
+export interface HttpHealthState {
+  startedAt: string;
+  requestCount: number;
+  activeRequestCount: number;
+  errorCount: number;
+  lastErrorMessage: string | null;
+  lastErrorAt: string | null;
+}
+
 function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClient): McpServer {
   const server = new McpServer({
     name: "dynamics-365-mcp",
@@ -38,7 +48,7 @@ function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClie
   return server;
 }
 
-function parseRuntimeOptions(argv: string[], env: NodeJS.ProcessEnv): RuntimeOptions {
+export function parseRuntimeOptions(argv: string[], env: NodeJS.ProcessEnv): RuntimeOptions {
   const args = new Map<string, string>();
 
   for (const rawArg of argv) {
@@ -75,6 +85,55 @@ function parseRuntimeOptions(argv: string[], env: NodeJS.ProcessEnv): RuntimeOpt
   };
 }
 
+export function createHttpHealthState(): HttpHealthState {
+  return {
+    startedAt: new Date().toISOString(),
+    requestCount: 0,
+    activeRequestCount: 0,
+    errorCount: 0,
+    lastErrorMessage: null,
+    lastErrorAt: null,
+  };
+}
+
+export function buildHealthPayload(
+  config: ReturnType<typeof loadConfig>,
+  options: RuntimeOptions,
+  tokenManager: TokenManager,
+  client: DynamicsClient,
+  healthState: HttpHealthState,
+) {
+  return {
+    status: "ok",
+    service: {
+      name: "dynamics-365-mcp",
+      version: "0.1.0",
+      transport: "http",
+      host: options.host,
+      port: options.port,
+      path: options.path,
+      pid: process.pid,
+      startedAt: healthState.startedAt,
+      uptimeSeconds: Math.floor((Date.now() - Date.parse(healthState.startedAt)) / 1000),
+      nodeVersion: process.version,
+    },
+    configuration: {
+      defaultEnvironment: config.defaultEnvironment,
+      environmentNames: config.environments.map((environment) => environment.name),
+      environmentCount: config.environments.length,
+    },
+    requests: {
+      total: healthState.requestCount,
+      active: healthState.activeRequestCount,
+      errors: healthState.errorCount,
+      lastErrorMessage: healthState.lastErrorMessage,
+      lastErrorAt: healthState.lastErrorAt,
+    },
+    auth: tokenManager.getHealthSnapshot(),
+    client: client.getHealthSnapshot(),
+  };
+}
+
 function installShutdownHandlers(server: Server): void {
   let shuttingDown = false;
 
@@ -100,23 +159,25 @@ function installShutdownHandlers(server: Server): void {
 
 async function startHttpServer(
   config: ReturnType<typeof loadConfig>,
+  tokenManager: TokenManager,
   client: DynamicsClient,
   options: RuntimeOptions,
 ): Promise<void> {
   const app = createMcpExpressApp({ host: options.host });
+  const healthState = createHttpHealthState();
 
   app.get("/health", (_req: HttpRequest, res: HttpResponse) => {
-    res.json({
-      status: "ok",
-      transport: "http",
-      path: options.path,
-      environments: config.environments.map((environment) => environment.name),
-      defaultEnvironment: config.defaultEnvironment,
-    });
+    res.json(buildHealthPayload(config, options, tokenManager, client, healthState));
   });
 
   app.post(options.path, async (req: HttpRequest, res: HttpResponse) => {
     const server = buildServer(config, client);
+    healthState.requestCount += 1;
+    healthState.activeRequestCount += 1;
+
+    const releaseRequest = () => {
+      healthState.activeRequestCount = Math.max(healthState.activeRequestCount - 1, 0);
+    };
 
     try {
       const transport = new StreamableHTTPServerTransport({
@@ -127,10 +188,16 @@ async function startHttpServer(
       await transport.handleRequest(req, res, req.body);
 
       res.on("close", () => {
+        releaseRequest();
         void transport.close();
         void server.close();
       });
     } catch (error) {
+      releaseRequest();
+      healthState.errorCount += 1;
+      healthState.lastErrorMessage = error instanceof Error ? error.message : String(error);
+      healthState.lastErrorAt = new Date().toISOString();
+
       console.error("Error handling MCP HTTP request:", error);
 
       if (!res.headersSent) {
@@ -183,7 +250,7 @@ async function startHttpServer(
   });
 }
 
-async function main() {
+export async function main() {
   const config = loadConfig();
   const options = parseRuntimeOptions(process.argv.slice(2), process.env);
 
@@ -191,7 +258,7 @@ async function main() {
   const client = new DynamicsClient(tokenManager);
 
   if (options.transport === "http") {
-    await startHttpServer(config, client, options);
+    await startHttpServer(config, tokenManager, client, options);
     return;
   }
 
@@ -200,7 +267,13 @@ async function main() {
   await server.connect(transport);
 }
 
-main().catch((error) => {
-  console.error("Failed to start Dynamics 365 MCP server:", error);
-  process.exit(1);
-});
+function isEntrypoint(): boolean {
+  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+if (isEntrypoint()) {
+  main().catch((error) => {
+    console.error("Failed to start Dynamics 365 MCP server:", error);
+    process.exit(1);
+  });
+}
