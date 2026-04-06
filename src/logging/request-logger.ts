@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
@@ -40,7 +41,7 @@ interface HttpCallResponse {
 
 type ToolHandlerExtra = RequestHandlerExtra<Request, Notification> | undefined;
 
-const DEFAULT_LOG_DIR = "logs";
+const DEFAULT_LOG_DIR = resolve(homedir(), ".dynamics-365-mcp", "logs");
 const DEFAULT_MAX_BODY_CHARS = 0;
 const SENSITIVE_KEY_PATTERN = /(authorization|clientsecret|client_secret|token|secret|password|cookie)/i;
 const instrumentedServers = new WeakSet<object>();
@@ -48,16 +49,19 @@ const instrumentedServers = new WeakSet<object>();
 export class RequestLogger {
   private config: LoggerConfig = {
     enabled: false,
-    logsDir: resolve(process.cwd(), DEFAULT_LOG_DIR),
+    logsDir: DEFAULT_LOG_DIR,
     maxBodyChars: DEFAULT_MAX_BODY_CHARS,
   };
 
   private readonly storage = new AsyncLocalStorage<RequestLogContext>();
 
   configureFromEnv(env: NodeJS.ProcessEnv, cwd = process.cwd()): void {
+    const logsDir = env.D365_MCP_LOG_DIR
+      ? resolve(cwd, env.D365_MCP_LOG_DIR)
+      : DEFAULT_LOG_DIR;
     this.config = {
       enabled: parseBoolean(env.D365_MCP_LOG_ENABLED),
-      logsDir: resolve(cwd, env.D365_MCP_LOG_DIR || DEFAULT_LOG_DIR),
+      logsDir,
       maxBodyChars: parseNumber(env.D365_MCP_LOG_MAX_BODY_CHARS, DEFAULT_MAX_BODY_CHARS),
     };
   }

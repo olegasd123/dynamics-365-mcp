@@ -210,6 +210,9 @@ The scripts auto-load the repo `.env` file if it exists. This is useful for:
 - `D365_MCP_LOG_ENABLED`
 - `D365_MCP_LOG_DIR`
 - `D365_MCP_LOG_MAX_BODY_CHARS`
+- `D365_MCP_HOME`
+- `D365_MCP_RUN_DIR`
+- `D365_MCP_SERVICE_LOG_DIR`
 - `MCP_PORT`
 - `MCP_HOST`
 - `MCP_PATH`
@@ -230,13 +233,13 @@ MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp
 D365_MCP_LOG_ENABLED=false
-D365_MCP_LOG_DIR=logs
+D365_MCP_LOG_DIR=~/.dynamics-365-mcp/logs
 D365_MCP_LOG_MAX_BODY_CHARS=0
 ```
 
 If request logs are enabled, the server writes one file per MCP tool call:
 
-- folder: `logs/DDMMYYYY`
+- folder: `~/.dynamics-365-mcp/logs/DDMMYYYY`
 - file: `HHMMSSmmm-tool-name-...-req-<id>.txt`
 
 Each file can include:

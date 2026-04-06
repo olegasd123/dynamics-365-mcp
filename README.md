@@ -255,7 +255,7 @@ Restart:
 scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
-The scripts store PID files in `run/` and logs in `logs/`.
+The scripts store PID files in `~/.dynamics-365-mcp/run/` and service logs in `~/.dynamics-365-mcp/logs/` by default.
 
 The scripts also auto-load the repo `.env` file if it exists. This is useful for values like `D365_MCP_CONFIG`, `MCP_PORT`, `MCP_HOST`, `MCP_PATH`, and `NODE_BIN`.
 
@@ -584,7 +584,7 @@ Use this when you want one report that combines direct usage and dependency risk
 
 ## Optional Request Logs
 
-Set `D365_MCP_LOG_ENABLED=true` to write request logs to `logs/DDMMYYYY`.
+Set `D365_MCP_LOG_ENABLED=true` to write request logs to `~/.dynamics-365-mcp/logs/DDMMYYYY`.
 
 Each tool call writes one log file. The file can include:
 
@@ -595,7 +595,7 @@ Each tool call writes one log file. The file can include:
 
 Optional settings:
 
-- `D365_MCP_LOG_DIR=logs`
+- `D365_MCP_LOG_DIR=~/.dynamics-365-mcp/logs`
 - `D365_MCP_LOG_MAX_BODY_CHARS=0`
 
 ## Notes
