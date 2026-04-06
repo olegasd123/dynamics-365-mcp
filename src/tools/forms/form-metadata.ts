@@ -2,12 +2,14 @@ import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
   getFormDetailsByIdentityQuery,
+  listFormsByIdsQuery,
   listFormsQuery,
   type FormType,
 } from "../../queries/form-queries.js";
 import { listSolutionComponentsQuery } from "../../queries/solution-queries.js";
 import { resolveSolution } from "../solutions/solution-inventory.js";
 import { summarizeFormXml, type FormXmlSummary } from "../../utils/xml-metadata.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 const FORM_COMPONENT_TYPE = 24;
 
@@ -49,19 +51,29 @@ export async function listForms(
     solution?: string;
   },
 ): Promise<FormRecord[]> {
+  if (options?.solution) {
+    const formIds = await fetchSolutionFormIds(env, client, options.solution);
+    const records = await queryRecordsByIdsInChunks<Record<string, unknown>>(
+      env,
+      client,
+      "systemforms",
+      [...formIds],
+      "formid",
+      listFormsByIdsQuery,
+    );
+
+    return records
+      .map(normalizeForm)
+      .filter((form) => matchesFormFilter(form, options))
+      .sort(compareForms);
+  }
+
   const records = await client.query<Record<string, unknown>>(
     env,
     "systemforms",
     listFormsQuery(options),
   );
-  let forms = records.map(normalizeForm);
-
-  if (options?.solution) {
-    const formIds = await fetchSolutionFormIds(env, client, options.solution);
-    forms = forms.filter((form) => formIds.has(form.formid));
-  }
-
-  return forms.sort(compareForms);
+  return records.map(normalizeForm).sort(compareForms);
 }
 
 export async function resolveForm(
@@ -88,8 +100,7 @@ export async function resolveForm(
   const needle = formRef.trim().toLowerCase();
   const caseInsensitiveMatches = uniqueForms(
     forms.filter(
-      (form) =>
-        form.uniquename.toLowerCase() === needle || form.name.toLowerCase() === needle,
+      (form) => form.uniquename.toLowerCase() === needle || form.name.toLowerCase() === needle,
     ),
   );
 
@@ -100,8 +111,7 @@ export async function resolveForm(
   const partialMatches = uniqueForms(
     forms.filter(
       (form) =>
-        form.uniquename.toLowerCase().includes(needle) ||
-        form.name.toLowerCase().includes(needle),
+        form.uniquename.toLowerCase().includes(needle) || form.name.toLowerCase().includes(needle),
     ),
   );
 
@@ -226,6 +236,39 @@ function compareForms(left: FormRecord, right: FormRecord): number {
     left.name.localeCompare(right.name)
   );
 }
+
+function matchesFormFilter(
+  form: FormRecord,
+  options?: {
+    table?: string;
+    type?: FormType;
+    nameFilter?: string;
+    solution?: string;
+  },
+): boolean {
+  if (options?.table && form.objecttypecode !== options.table) {
+    return false;
+  }
+
+  if (options?.type && !FORM_TYPE_CODES[options.type].includes(form.type)) {
+    return false;
+  }
+
+  if (options?.nameFilter) {
+    const needle = options.nameFilter.toLowerCase();
+    return (
+      form.name.toLowerCase().includes(needle) || form.uniquename.toLowerCase().includes(needle)
+    );
+  }
+
+  return true;
+}
+
+const FORM_TYPE_CODES: Record<FormType, number[]> = {
+  main: [2, 12],
+  quickCreate: [7],
+  card: [11],
+};
 
 function formatFormMatch(form: FormRecord): string {
   return `${form.objecttypecode}/${form.typeLabel}/${form.name}`;

@@ -7,11 +7,7 @@ import { createToolErrorResponse, createToolSuccessResponse } from "../response.
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareFormsData } from "./comparison-data.js";
 
-export function registerCompareForms(
-  server: McpServer,
-  config: AppConfig,
-  client: DynamicsClient,
-) {
+export function registerCompareForms(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
     "compare_forms",
     "Compare system forms between two environments using normalized XML summaries.",
@@ -24,9 +20,23 @@ export function registerCompareForms(
       solution: z.string().optional().describe("Optional source solution"),
       targetSolution: z.string().optional().describe("Optional target solution"),
     },
-    async ({ sourceEnvironment, targetEnvironment, table, type, formName, solution, targetSolution }) => {
+    async ({
+      sourceEnvironment,
+      targetEnvironment,
+      table,
+      type,
+      formName,
+      solution,
+      targetSolution,
+    }) => {
       try {
-        const { result } = await compareFormsData(config, client, sourceEnvironment, targetEnvironment, {
+        const {
+          result,
+          warnings = [],
+          sourceCandidateCount,
+          targetCandidateCount,
+          truncated,
+        } = await compareFormsData(config, client, sourceEnvironment, targetEnvironment, {
           table,
           type: type as FormType | undefined,
           formName,
@@ -34,13 +44,35 @@ export function registerCompareForms(
           targetSolution,
         });
 
-        const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return createToolSuccessResponse("compare_forms", text, `Compared forms between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
-          sourceEnvironment,
-          targetEnvironment,
-          filters: { table: table || null, type: type || null, formName: formName || null, solution: solution || null, targetSolution: targetSolution || null },
-          comparison: result,
-        });
+        const lines: string[] = [];
+        if (warnings.length > 0) {
+          lines.push(...warnings.map((warning) => `Warning: ${warning}`), "");
+        }
+        lines.push(formatDiffResult(result, sourceEnvironment, targetEnvironment, "name"));
+        const text = lines.join("\n");
+        return createToolSuccessResponse(
+          "compare_forms",
+          text,
+          `Compared forms between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            filters: {
+              table: table || null,
+              type: type || null,
+              formName: formName || null,
+              solution: solution || null,
+              targetSolution: targetSolution || null,
+            },
+            warnings,
+            sourceCandidateCount:
+              sourceCandidateCount ?? result.onlyInSource.length + result.differences.length,
+            targetCandidateCount:
+              targetCandidateCount ?? result.onlyInTarget.length + result.differences.length,
+            truncated: truncated || false,
+            comparison: result,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("compare_forms", error);
       }

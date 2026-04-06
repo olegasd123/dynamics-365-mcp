@@ -105,6 +105,10 @@ export type ChoiceAttributeMetadataType =
   | "StateAttributeMetadata"
   | "StatusAttributeMetadata";
 
+function buildOrStringFilter(field: string, values: string[]): string {
+  return values.map((value) => odataEq(field, value)).join(" or ");
+}
+
 export function listTablesQuery(nameFilter?: string): string {
   const filters: string[] = [];
 
@@ -200,5 +204,13 @@ export function getTableByLogicalNameQuery(logicalName: string): string {
   return buildQueryString({
     select: TABLE_SELECT,
     filter: odataEq("LogicalName", logicalName),
+  });
+}
+
+export function listTablesByMetadataIdsQuery(metadataIds: string[]): string {
+  return buildQueryString({
+    select: TABLE_SELECT,
+    filter: buildOrStringFilter("MetadataId", metadataIds),
+    orderby: "LogicalName asc",
   });
 }

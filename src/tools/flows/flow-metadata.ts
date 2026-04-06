@@ -5,8 +5,9 @@ import {
   getCloudFlowDetailsByIdentityQuery,
   listCloudFlowsQuery,
 } from "../../queries/flow-queries.js";
-import type { WorkflowState } from "../../queries/workflow-queries.js";
+import { listWorkflowsByIdsQuery, type WorkflowState } from "../../queries/workflow-queries.js";
 import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 const STATE_LABELS: Record<number, string> = {
   0: "Draft",
@@ -64,7 +65,24 @@ export async function listCloudFlows(
     solution?: string;
   },
 ): Promise<CloudFlowRecord[]> {
-  let flows = (
+  if (options?.solution) {
+    const solutionComponents = await fetchSolutionComponentSets(env, client, options.solution);
+    const records = await queryRecordsByIdsInChunks<Record<string, unknown>>(
+      env,
+      client,
+      "workflows",
+      [...solutionComponents.workflowIds],
+      "workflowid",
+      listWorkflowsByIdsQuery,
+    );
+
+    return records
+      .map(normalizeFlow)
+      .filter((flow) => flow.category === 5)
+      .filter((flow) => matchesFlowFilter(flow, options));
+  }
+
+  return (
     await client.query<Record<string, unknown>>(
       env,
       "workflows",
@@ -76,13 +94,6 @@ export async function listCloudFlows(
   )
     .map(normalizeFlow)
     .filter((flow) => flow.category === 5);
-
-  if (options?.solution) {
-    const solutionComponents = await fetchSolutionComponentSets(env, client, options.solution);
-    flows = flows.filter((flow) => solutionComponents.workflowIds.has(flow.workflowid));
-  }
-
-  return flows;
 }
 
 export async function resolveCloudFlow(
@@ -106,8 +117,7 @@ export async function resolveCloudFlow(
   const partialMatches = uniqueFlows(
     flows.filter(
       (flow) =>
-        flow.uniquename.toLowerCase().includes(needle) ||
-        flow.name.toLowerCase().includes(needle),
+        flow.uniquename.toLowerCase().includes(needle) || flow.name.toLowerCase().includes(needle),
     ),
   );
 
@@ -200,7 +210,9 @@ function summarizeFlowJson(clientdata: string, connectionreferences: string): Fl
     ...Object.keys(externalConnections || {}),
   ]);
 
-  const normalized = JSON.stringify(parsedClientData || parseJsonObject(connectionreferences) || {});
+  const normalized = JSON.stringify(
+    parsedClientData || parseJsonObject(connectionreferences) || {},
+  );
 
   return {
     hash: createHash("sha256").update(normalized).digest("hex").slice(0, 12),
@@ -246,4 +258,33 @@ function uniqueFlows(flows: CloudFlowRecord[]): CloudFlowRecord[] {
     seen.add(flow.workflowid);
     return true;
   });
+}
+
+function matchesFlowFilter(
+  flow: CloudFlowRecord,
+  options?: {
+    status?: WorkflowState;
+    nameFilter?: string;
+    solution?: string;
+  },
+): boolean {
+  if (options?.status) {
+    const stateByStatus: Record<WorkflowState, number> = {
+      draft: 0,
+      activated: 1,
+      suspended: 2,
+    };
+    if (flow.statecode !== stateByStatus[options.status]) {
+      return false;
+    }
+  }
+
+  if (options?.nameFilter) {
+    const needle = options.nameFilter.toLowerCase();
+    return (
+      flow.name.toLowerCase().includes(needle) || flow.uniquename.toLowerCase().includes(needle)
+    );
+  }
+
+  return true;
 }

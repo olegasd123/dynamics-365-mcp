@@ -56,4 +56,45 @@ describe("compare_forms", () => {
     expect(response.content[0].text).toContain("Account Main");
     expect(response.content[0].text).toContain("xmlSummary");
   });
+
+  it("warns when detailed form comparison is truncated", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["prod", "dev"]);
+    const forms = Array.from({ length: 55 }, (_, index) => ({
+      formid: `form-${index + 1}`,
+      name: `Account Main ${index + 1}`,
+      objecttypecode: "account",
+      type: 2,
+      uniquename: `contoso_account_main_${index + 1}`,
+      formactivationstate: 1,
+      isdefault: index === 0,
+      ismanaged: false,
+      formxml: "<form><tabs /></form>",
+    }));
+    const { client } = createRecordingClient({
+      prod: { systemforms: forms },
+      dev: { systemforms: forms },
+    });
+
+    registerCompareForms(server as never, config, client);
+    const response = await server.getHandler("compare_forms")({
+      sourceEnvironment: "prod",
+      targetEnvironment: "dev",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain(
+      "Warning: Detailed form comparison is limited to 50 items per environment.",
+    );
+    expect(response.structuredContent).toMatchObject({
+      data: {
+        truncated: true,
+        warnings: [
+          expect.stringContaining(
+            "Detailed form comparison is limited to 50 items per environment.",
+          ),
+        ],
+      },
+    });
+  });
 });

@@ -24,12 +24,13 @@ import {
   type SolutionInventory,
 } from "./solution-inventory.js";
 import { fetchPluginImagesByIds, fetchPluginStepsByIds } from "../plugins/plugin-inventory.js";
-import { listColumnsByMetadataIds, listTables } from "../tables/table-metadata.js";
+import { listColumnsByMetadataIds, listTablesByMetadataIds } from "../tables/table-metadata.js";
 import {
   dependencySelectQuery,
   retrieveDependentComponentsPath,
   retrieveRequiredComponentsPath,
 } from "../../queries/dependency-queries.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 const TOOL_COMPONENT_TYPES = {
   table: SOLUTION_COMPONENT_TYPE.table,
@@ -837,8 +838,7 @@ async function resolveTables(
     return [];
   }
 
-  const tables = await listTables(env, client);
-  return tables.filter((table) => ids.includes(table.metadataId));
+  return listTablesByMetadataIds(env, client, ids);
 }
 
 async function resolveColumns(
@@ -862,7 +862,14 @@ async function resolveSecurityRoles(
     return [];
   }
 
-  return client.query<Record<string, unknown>>(env, "roles", listSecurityRolesByIdsQuery(ids));
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "roles",
+    ids,
+    "roleid",
+    listSecurityRolesByIdsQuery,
+  );
 }
 
 async function resolveFormsAndDashboards(
@@ -876,10 +883,13 @@ async function resolveFormsAndDashboards(
     return { forms: [], dashboards: [] };
   }
 
-  const records = await client.query<Record<string, unknown>>(
+  const records = await queryRecordsByIdsInChunks<Record<string, unknown>>(
     env,
+    client,
     "systemforms",
-    listFormsByIdsQuery(ids),
+    ids,
+    "formid",
+    listFormsByIdsQuery,
   );
   return {
     forms: records.filter(
@@ -901,9 +911,14 @@ async function resolveViews(
     return [];
   }
 
-  return client
-    .query<Record<string, unknown>>(env, "savedqueries", listSavedViewsByIdsQuery(ids))
-    .then((records) => records.filter((record) => ids.includes(String(record.savedqueryid || ""))));
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "savedqueries",
+    ids,
+    "savedqueryid",
+    listSavedViewsByIdsQuery,
+  );
 }
 
 async function resolveWorkflows(
@@ -915,9 +930,14 @@ async function resolveWorkflows(
     return [];
   }
 
-  return client
-    .query<Record<string, unknown>>(env, "workflows", listWorkflowsByIdsQuery(ids))
-    .then((records) => records.filter((record) => ids.includes(String(record.workflowid || ""))));
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "workflows",
+    ids,
+    "workflowid",
+    listWorkflowsByIdsQuery,
+  );
 }
 
 async function resolveWebResources(
@@ -929,11 +949,14 @@ async function resolveWebResources(
     return [];
   }
 
-  return client
-    .query<Record<string, unknown>>(env, "webresourceset", listWebResourcesByIdsQuery(ids))
-    .then((records) =>
-      records.filter((record) => ids.includes(String(record.webresourceid || ""))),
-    );
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "webresourceset",
+    ids,
+    "webresourceid",
+    listWebResourcesByIdsQuery,
+  );
 }
 
 async function resolveAppModules(
@@ -945,9 +968,14 @@ async function resolveAppModules(
     return [];
   }
 
-  return client
-    .query<Record<string, unknown>>(env, "appmodules", listAppModulesByIdsQuery(ids))
-    .then((records) => records.filter((record) => ids.includes(String(record.appmoduleid || ""))));
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "appmodules",
+    ids,
+    "appmoduleid",
+    listAppModulesByIdsQuery,
+  );
 }
 
 async function resolvePluginAssemblies(
@@ -959,11 +987,14 @@ async function resolvePluginAssemblies(
     return [];
   }
 
-  return client
-    .query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesByIdsQuery(ids))
-    .then((records) =>
-      records.filter((record) => ids.includes(String(record.pluginassemblyid || ""))),
-    );
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "pluginassemblies",
+    ids,
+    "pluginassemblyid",
+    listPluginAssembliesByIdsQuery,
+  );
 }
 
 async function resolveConnectionReferences(
@@ -975,13 +1006,14 @@ async function resolveConnectionReferences(
     return [];
   }
 
-  return client
-    .query<
-      Record<string, unknown>
-    >(env, "connectionreferences", listConnectionReferencesByIdsQuery(ids))
-    .then((records) =>
-      records.filter((record) => ids.includes(String(record.connectionreferenceid || ""))),
-    );
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "connectionreferences",
+    ids,
+    "connectionreferenceid",
+    listConnectionReferencesByIdsQuery,
+  );
 }
 
 async function resolveEnvironmentVariableDefinitions(
@@ -993,15 +1025,14 @@ async function resolveEnvironmentVariableDefinitions(
     return [];
   }
 
-  return client
-    .query<
-      Record<string, unknown>
-    >(env, "environmentvariabledefinitions", listEnvironmentVariableDefinitionsByIdsQuery(ids))
-    .then((records) =>
-      records.filter((record) =>
-        ids.includes(String(record.environmentvariabledefinitionid || "")),
-      ),
-    );
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "environmentvariabledefinitions",
+    ids,
+    "environmentvariabledefinitionid",
+    listEnvironmentVariableDefinitionsByIdsQuery,
+  );
 }
 
 async function resolveEnvironmentVariableValues(
@@ -1013,13 +1044,14 @@ async function resolveEnvironmentVariableValues(
     return [];
   }
 
-  return client
-    .query<
-      Record<string, unknown>
-    >(env, "environmentvariablevalues", listEnvironmentVariableValuesByIdsQuery(ids))
-    .then((records) =>
-      records.filter((record) => ids.includes(String(record.environmentvariablevalueid || ""))),
-    );
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "environmentvariablevalues",
+    ids,
+    "environmentvariablevalueid",
+    listEnvironmentVariableValuesByIdsQuery,
+  );
 }
 
 function normalizeDependencyRecord(

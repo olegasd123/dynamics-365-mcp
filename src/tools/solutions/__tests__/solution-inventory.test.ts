@@ -17,7 +17,7 @@ describe("solution inventory", () => {
   };
 
   it("resolves a solution by unique name and collects supported component ids", async () => {
-    const { client } = createRecordingClient({
+    const { client, calls } = createRecordingClient({
       dev: {
         solutions: [
           {
@@ -311,6 +311,10 @@ describe("solution inventory", () => {
     expect(inventory.environmentVariableValues).toHaveLength(1);
     expect(inventory.pluginSteps).toHaveLength(1);
     expect(inventory.pluginImages).toHaveLength(1);
+    expect(calls.filter((call) => call.entitySet === "EntityDefinitions")).toHaveLength(1);
+    expect(calls.find((call) => call.entitySet === "EntityDefinitions")?.queryParams).toContain(
+      "MetadataId eq 'table-1'",
+    );
   });
 
   it("throws an ambiguous error when multiple solutions match the same display name", async () => {

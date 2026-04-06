@@ -67,11 +67,13 @@ Status: completed on 2026-04-06
 - Health reports include new risk checks where relevant
 - README documents supported solution component coverage
 
-## Milestone 3: Scale And Performance
+## Milestone 3: Scale And Performance [Done]
 
 ### Goal
 
 Keep the MCP fast on large Dataverse environments.
+
+Status: completed on 2026-04-06
 
 ### Scope
 

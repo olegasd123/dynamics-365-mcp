@@ -21,10 +21,12 @@ import {
 import {
   listColumnsByMetadataIds,
   listTables,
+  listTablesByMetadataIds,
   type TableColumnWithTableRecord,
   type TableRecord,
 } from "../tables/table-metadata.js";
 import { listSecurityRoles, type SecurityRoleRecord } from "../security/role-metadata.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 export const SOLUTION_COMPONENT_TYPE = {
   table: 1,
@@ -302,13 +304,16 @@ export async function fetchSolutionInventory(
   solutionRef: string,
 ): Promise<SolutionInventory> {
   const componentSets = await fetchSolutionComponentSets(env, client, solutionRef);
-  const allTables = await listTables(env, client);
-  const tables = allTables.filter((table) => componentSets.tableIds.has(table.metadataId));
+  const tables = await listTablesByMetadataIds(env, client, [...componentSets.tableIds]);
+  const fallbackTables =
+    componentSets.columnIds.size > 0 && tables.length === 0
+      ? await listTables(env, client)
+      : tables;
   const columns = await listColumnsByMetadataIds(
     env,
     client,
     [...componentSets.columnIds],
-    tables.length > 0 ? tables : allTables,
+    fallbackTables,
   );
 
   const [
@@ -328,42 +333,42 @@ export async function fetchSolutionInventory(
       env,
       client,
       "pluginassemblies",
-      listPluginAssembliesByIdsQuery([...componentSets.pluginAssemblyIds]),
       "pluginassemblyid",
-      componentSets.pluginAssemblyIds,
+      [...componentSets.pluginAssemblyIds],
+      listPluginAssembliesByIdsQuery,
     ),
     fetchSecurityRolesByIds(env, client, componentSets.securityRoleIds),
     fetchRecordsByIds(
       env,
       client,
       "systemforms",
-      listFormsByIdsQuery([...componentSets.formIds]),
       "formid",
-      componentSets.formIds,
+      [...componentSets.formIds],
+      listFormsByIdsQuery,
     ),
     fetchRecordsByIds(
       env,
       client,
       "savedqueries",
-      listSavedViewsByIdsQuery([...componentSets.viewIds]),
       "savedqueryid",
-      componentSets.viewIds,
+      [...componentSets.viewIds],
+      listSavedViewsByIdsQuery,
     ),
     fetchRecordsByIds(
       env,
       client,
       "workflows",
-      listWorkflowsByIdsQuery([...componentSets.workflowIds]),
       "workflowid",
-      componentSets.workflowIds,
+      [...componentSets.workflowIds],
+      listWorkflowsByIdsQuery,
     ),
     fetchRecordsByIds(
       env,
       client,
       "systemforms",
-      listFormsByIdsQuery([...componentSets.dashboardIds]),
       "formid",
-      componentSets.dashboardIds,
+      [...componentSets.dashboardIds],
+      listFormsByIdsQuery,
     ).then((records) =>
       records.filter((record) => Number(record.type || 0) === 0).map(normalizeDashboard),
     ),
@@ -371,43 +376,41 @@ export async function fetchSolutionInventory(
       env,
       client,
       "webresourceset",
-      listWebResourcesByIdsQuery([...componentSets.webResourceIds]),
       "webresourceid",
-      componentSets.webResourceIds,
+      [...componentSets.webResourceIds],
+      listWebResourcesByIdsQuery,
     ),
     fetchRecordsByIds(
       env,
       client,
       "appmodules",
-      listAppModulesByIdsQuery([...componentSets.appModuleIds]),
       "appmoduleid",
-      componentSets.appModuleIds,
+      [...componentSets.appModuleIds],
+      listAppModulesByIdsQuery,
     ).then((records) => records.map(normalizeAppModule)),
     fetchRecordsByIds(
       env,
       client,
       "connectionreferences",
-      listConnectionReferencesByIdsQuery([...componentSets.connectionReferenceIds]),
       "connectionreferenceid",
-      componentSets.connectionReferenceIds,
+      [...componentSets.connectionReferenceIds],
+      listConnectionReferencesByIdsQuery,
     ).then((records) => records.map(normalizeConnectionReference)),
     fetchRecordsByIds(
       env,
       client,
       "environmentvariabledefinitions",
-      listEnvironmentVariableDefinitionsByIdsQuery([
-        ...componentSets.environmentVariableDefinitionIds,
-      ]),
       "environmentvariabledefinitionid",
-      componentSets.environmentVariableDefinitionIds,
+      [...componentSets.environmentVariableDefinitionIds],
+      listEnvironmentVariableDefinitionsByIdsQuery,
     ).then((records) => records.map(normalizeEnvironmentVariableDefinition)),
     fetchRecordsByIds(
       env,
       client,
       "environmentvariablevalues",
-      listEnvironmentVariableValuesByIdsQuery([...componentSets.environmentVariableValueIds]),
       "environmentvariablevalueid",
-      componentSets.environmentVariableValueIds,
+      [...componentSets.environmentVariableValueIds],
+      listEnvironmentVariableValuesByIdsQuery,
     ).then((records) => records.map(normalizeEnvironmentVariableValue)),
   ]);
 
@@ -556,16 +559,18 @@ async function fetchRecordsByIds(
   env: EnvironmentConfig,
   client: DynamicsClient,
   entitySet: string,
-  queryParams: string,
   idField: string,
-  ids: Set<string>,
+  ids: string[],
+  buildQuery: (chunkIds: string[]) => string,
 ): Promise<Record<string, unknown>[]> {
-  if (ids.size === 0) {
-    return [];
-  }
-
-  const records = await client.query<Record<string, unknown>>(env, entitySet, queryParams);
-  return records.filter((record) => ids.has(String(record[idField] || "")));
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    entitySet,
+    ids,
+    idField,
+    buildQuery,
+  );
 }
 
 async function fetchSecurityRolesByIds(
@@ -578,10 +583,13 @@ async function fetchSecurityRolesByIds(
   }
 
   const requestedIds = [...ids];
-  const directMatches = await client.query<Record<string, unknown>>(
+  const directMatches = await queryRecordsByIdsInChunks<Record<string, unknown>>(
     env,
+    client,
     "roles",
-    listSecurityRolesByIdsQuery(requestedIds),
+    requestedIds,
+    "roleid",
+    listSecurityRolesByIdsQuery,
   );
   const filteredMatches = directMatches
     .filter((record) => ids.has(String(record.roleid || "")))

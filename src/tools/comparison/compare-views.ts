@@ -7,11 +7,7 @@ import { createToolErrorResponse, createToolSuccessResponse } from "../response.
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareViewsData } from "./comparison-data.js";
 
-export function registerCompareViews(
-  server: McpServer,
-  config: AppConfig,
-  client: DynamicsClient,
-) {
+export function registerCompareViews(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
     "compare_views",
     "Compare system or personal views between two environments using normalized XML summaries.",
@@ -24,9 +20,23 @@ export function registerCompareViews(
       solution: z.string().optional().describe("Optional source solution for system views"),
       targetSolution: z.string().optional().describe("Optional target solution for system views"),
     },
-    async ({ sourceEnvironment, targetEnvironment, table, scope, viewName, solution, targetSolution }) => {
+    async ({
+      sourceEnvironment,
+      targetEnvironment,
+      table,
+      scope,
+      viewName,
+      solution,
+      targetSolution,
+    }) => {
       try {
-        const { result } = await compareViewsData(config, client, sourceEnvironment, targetEnvironment, {
+        const {
+          result,
+          warnings = [],
+          sourceCandidateCount,
+          targetCandidateCount,
+          truncated,
+        } = await compareViewsData(config, client, sourceEnvironment, targetEnvironment, {
           table,
           scope: scope as ViewScope | undefined,
           viewName,
@@ -34,13 +44,35 @@ export function registerCompareViews(
           targetSolution,
         });
 
-        const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return createToolSuccessResponse("compare_views", text, `Compared views between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
-          sourceEnvironment,
-          targetEnvironment,
-          filters: { table: table || null, scope: scope || null, viewName: viewName || null, solution: solution || null, targetSolution: targetSolution || null },
-          comparison: result,
-        });
+        const lines: string[] = [];
+        if (warnings.length > 0) {
+          lines.push(...warnings.map((warning) => `Warning: ${warning}`), "");
+        }
+        lines.push(formatDiffResult(result, sourceEnvironment, targetEnvironment, "name"));
+        const text = lines.join("\n");
+        return createToolSuccessResponse(
+          "compare_views",
+          text,
+          `Compared views between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            filters: {
+              table: table || null,
+              scope: scope || null,
+              viewName: viewName || null,
+              solution: solution || null,
+              targetSolution: targetSolution || null,
+            },
+            warnings,
+            sourceCandidateCount:
+              sourceCandidateCount ?? result.onlyInSource.length + result.differences.length,
+            targetCandidateCount:
+              targetCandidateCount ?? result.onlyInTarget.length + result.differences.length,
+            truncated: truncated || false,
+            comparison: result,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("compare_views", error);
       }

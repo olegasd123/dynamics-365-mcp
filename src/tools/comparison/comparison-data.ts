@@ -29,6 +29,10 @@ export interface CollectionComparisonData<T extends Record<string, unknown>> {
   sourceItems: T[];
   targetItems: T[];
   result: DiffResult<T>;
+  warnings?: string[];
+  sourceCandidateCount?: number;
+  targetCandidateCount?: number;
+  truncated?: boolean;
 }
 
 export interface PluginComparisonData extends CollectionComparisonData<Record<string, unknown>> {
@@ -72,8 +76,7 @@ export interface ViewComparisonOptions {
   targetSolution?: string;
 }
 
-export interface CustomApiComparisonData
-  extends CollectionComparisonData<CustomApiRecord> {
+export interface CustomApiComparisonData extends CollectionComparisonData<CustomApiRecord> {
   requestParameterSourceItems: CustomApiParameterRecord[];
   requestParameterTargetItems: CustomApiParameterRecord[];
   requestParameterResult: DiffResult<CustomApiParameterRecord>;
@@ -86,6 +89,8 @@ export interface CustomApiComparisonOptions {
   apiName?: string;
 }
 
+const MAX_COMPARE_DETAIL_ITEMS = 50;
+
 export async function comparePluginsData(
   config: AppConfig,
   client: DynamicsClient,
@@ -97,8 +102,16 @@ export async function comparePluginsData(
   const targetEnv = getEnvironment(config, targetEnvironment);
 
   const [sourcePlugins, targetPlugins] = await Promise.all([
-    client.query<Record<string, unknown>>(sourceEnv, "pluginassemblies", listPluginAssembliesQuery()),
-    client.query<Record<string, unknown>>(targetEnv, "pluginassemblies", listPluginAssembliesQuery()),
+    client.query<Record<string, unknown>>(
+      sourceEnv,
+      "pluginassemblies",
+      listPluginAssembliesQuery(),
+    ),
+    client.query<Record<string, unknown>>(
+      targetEnv,
+      "pluginassemblies",
+      listPluginAssembliesQuery(),
+    ),
   ]);
 
   let sourceItems = sourcePlugins;
@@ -130,15 +143,20 @@ export async function comparePluginsData(
 
     stepSourceItems = sourceInventory.steps;
     stepTargetItems = targetInventory.steps;
-    stepResult = diffCollections(sourceInventory.steps, targetInventory.steps, (step) => String(step.key), [
-      "stage",
-      "mode",
-      "statecode",
-      "rank",
-      "filteringattributes",
-      "supporteddeployment",
-      "asyncautodelete",
-    ]);
+    stepResult = diffCollections(
+      sourceInventory.steps,
+      targetInventory.steps,
+      (step) => String(step.key),
+      [
+        "stage",
+        "mode",
+        "statecode",
+        "rank",
+        "filteringattributes",
+        "supporteddeployment",
+        "asyncautodelete",
+      ],
+    );
 
     imageSourceItems = sourceInventory.images;
     imageTargetItems = targetInventory.images;
@@ -291,6 +309,22 @@ export async function compareFormsData(
     filteredTarget = filteredTarget.filter((form) => form.name.toLowerCase().includes(needle));
   }
 
+  const warnings: string[] = [];
+  const sourceCandidateCount = filteredSource.length;
+  const targetCandidateCount = filteredTarget.length;
+  const truncated =
+    sourceCandidateCount > MAX_COMPARE_DETAIL_ITEMS ||
+    targetCandidateCount > MAX_COMPARE_DETAIL_ITEMS;
+
+  if (truncated) {
+    warnings.push(
+      `Detailed form comparison is limited to ${MAX_COMPARE_DETAIL_ITEMS} items per environment. Add table, type, formName, or solution filters for a smaller scope.`,
+    );
+  }
+
+  filteredSource = filteredSource.slice(0, MAX_COMPARE_DETAIL_ITEMS);
+  filteredTarget = filteredTarget.slice(0, MAX_COMPARE_DETAIL_ITEMS);
+
   const [sourceItems, targetItems] = await Promise.all([
     Promise.all(
       filteredSource.map((form) =>
@@ -314,14 +348,7 @@ export async function compareFormsData(
     sourceItems,
     targetItems,
     (form) => `${form.objecttypecode} | ${form.typeLabel} | ${form.name}`,
-    [
-      "objecttypecode",
-      "typeLabel",
-      "formactivationstate",
-      "isdefault",
-      "ismanaged",
-      "summaryHash",
-    ],
+    ["objecttypecode", "typeLabel", "formactivationstate", "isdefault", "ismanaged", "summaryHash"],
   );
 
   for (const diff of result.differences) {
@@ -350,7 +377,15 @@ export async function compareFormsData(
     diff.changedFields = changedFields;
   }
 
-  return { sourceItems, targetItems, result };
+  return {
+    sourceItems,
+    targetItems,
+    result,
+    warnings,
+    sourceCandidateCount,
+    targetCandidateCount,
+    truncated,
+  };
 }
 
 export async function compareViewsData(
@@ -384,6 +419,22 @@ export async function compareViewsData(
     filteredSource = filteredSource.filter((view) => view.name.toLowerCase().includes(needle));
     filteredTarget = filteredTarget.filter((view) => view.name.toLowerCase().includes(needle));
   }
+
+  const warnings: string[] = [];
+  const sourceCandidateCount = filteredSource.length;
+  const targetCandidateCount = filteredTarget.length;
+  const truncated =
+    sourceCandidateCount > MAX_COMPARE_DETAIL_ITEMS ||
+    targetCandidateCount > MAX_COMPARE_DETAIL_ITEMS;
+
+  if (truncated) {
+    warnings.push(
+      `Detailed view comparison is limited to ${MAX_COMPARE_DETAIL_ITEMS} items per environment. Add table, scope, viewName, or solution filters for a smaller scope.`,
+    );
+  }
+
+  filteredSource = filteredSource.slice(0, MAX_COMPARE_DETAIL_ITEMS);
+  filteredTarget = filteredTarget.slice(0, MAX_COMPARE_DETAIL_ITEMS);
 
   const [sourceItems, targetItems] = await Promise.all([
     Promise.all(
@@ -455,7 +506,15 @@ export async function compareViewsData(
     diff.changedFields = changedFields;
   }
 
-  return { sourceItems, targetItems, result };
+  return {
+    sourceItems,
+    targetItems,
+    result,
+    warnings,
+    sourceCandidateCount,
+    targetCandidateCount,
+    truncated,
+  };
 }
 
 export async function compareCustomApisData(

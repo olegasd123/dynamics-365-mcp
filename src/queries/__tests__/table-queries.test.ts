@@ -5,6 +5,7 @@ import {
   listTableKeysQuery,
   listTableManyToManyRelationshipsQuery,
   listTableManyToOneRelationshipsQuery,
+  listTablesByMetadataIdsQuery,
   listTablesQuery,
   tableChoiceColumnsPath,
   tableColumnsPath,
@@ -18,7 +19,9 @@ describe("table queries", () => {
   it("builds the tables query", () => {
     const query = listTablesQuery();
 
-    expect(query).toContain("$select=MetadataId,LogicalName,SchemaName,DisplayName,DisplayCollectionName,Description,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType,IsCustomEntity,IsManaged,IsActivity,IsAuditEnabled,IsValidForAdvancedFind,ChangeTrackingEnabled");
+    expect(query).toContain(
+      "$select=MetadataId,LogicalName,SchemaName,DisplayName,DisplayCollectionName,Description,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType,IsCustomEntity,IsManaged,IsActivity,IsAuditEnabled,IsValidForAdvancedFind,ChangeTrackingEnabled",
+    );
     expect(query).toContain("$orderby=LogicalName asc");
   });
 
@@ -28,6 +31,13 @@ describe("table queries", () => {
     expect(query).toContain("contains(LogicalName,'account')");
     expect(query).toContain("contains(SchemaName,'account')");
     expect(query).toContain("contains(EntitySetName,'account')");
+  });
+
+  it("builds a metadata id filter for targeted table queries", () => {
+    const query = listTablesByMetadataIdsQuery(["table-1", "table-2"]);
+
+    expect(query).toContain("MetadataId eq 'table-1'");
+    expect(query).toContain("MetadataId eq 'table-2'");
   });
 
   it("builds table metadata paths", () => {
@@ -42,9 +52,7 @@ describe("table queries", () => {
     expect(tableManyToManyRelationshipsPath("account")).toBe(
       "EntityDefinitions(LogicalName='account')/ManyToManyRelationships",
     );
-    expect(
-      tableChoiceColumnsPath("account", "PicklistAttributeMetadata"),
-    ).toBe(
+    expect(tableChoiceColumnsPath("account", "PicklistAttributeMetadata")).toBe(
       "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata",
     );
   });
@@ -60,7 +68,9 @@ describe("table queries", () => {
   it("builds the choice columns query", () => {
     const query = listTableChoiceColumnsQuery();
 
-    expect(query).toContain("$select=MetadataId,LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,OptionSet,GlobalOptionSet,TrueOption,FalseOption");
+    expect(query).toContain(
+      "$select=MetadataId,LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,OptionSet,GlobalOptionSet,TrueOption,FalseOption",
+    );
   });
 
   it("builds the keys and relationship queries", () => {

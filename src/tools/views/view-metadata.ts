@@ -4,12 +4,14 @@ import {
   getPersonalViewByIdentityQuery,
   getSavedViewByIdentityQuery,
   listPersonalViewsQuery,
+  listSavedViewsByIdsQuery,
   listSavedViewsQuery,
   type ViewScope,
 } from "../../queries/view-queries.js";
 import { listSolutionComponentsQuery } from "../../queries/solution-queries.js";
 import { resolveSolution } from "../solutions/solution-inventory.js";
 import { summarizeViewXml, type ViewXmlSummary } from "../../utils/xml-metadata.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 const SAVED_VIEW_COMPONENT_TYPE = 26;
 
@@ -58,9 +60,11 @@ export async function listViews(
   const systemPromise =
     scope === "personal"
       ? Promise.resolve<ViewRecord[]>([])
-      : client
-          .query<Record<string, unknown>>(env, "savedqueries", listSavedViewsQuery(options))
-          .then((records) => records.map((record) => normalizeView(record, "system")));
+      : options?.solution
+        ? fetchSolutionSystemViews(env, client, options)
+        : client
+            .query<Record<string, unknown>>(env, "savedqueries", listSavedViewsQuery(options))
+            .then((records) => records.map((record) => normalizeView(record, "system")));
 
   const personalPromise =
     scope === "system"
@@ -69,14 +73,7 @@ export async function listViews(
           .query<Record<string, unknown>>(env, "userqueries", listPersonalViewsQuery(options))
           .then((records) => records.map((record) => normalizeView(record, "personal")));
 
-  const [systemViewsResult, personalViews] = await Promise.all([systemPromise, personalPromise]);
-  let systemViews = systemViewsResult;
-
-  if (options?.solution) {
-    const viewIds = await fetchSolutionSavedViewIds(env, client, options.solution);
-    systemViews = systemViews.filter((view) => viewIds.has(view.viewid));
-  }
-
+  const [systemViews, personalViews] = await Promise.all([systemPromise, personalPromise]);
   return [...systemViews, ...personalViews].sort(compareViews);
 }
 
@@ -242,4 +239,49 @@ function compareViews(left: ViewRecord, right: ViewRecord): number {
 
 function formatViewMatch(view: ViewRecord): string {
   return `${view.returnedtypecode}/${view.scope}/${view.name}`;
+}
+
+async function fetchSolutionSystemViews(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  options?: {
+    table?: string;
+    scope?: ViewScope;
+    nameFilter?: string;
+    solution?: string;
+  },
+): Promise<ViewRecord[]> {
+  const viewIds = await fetchSolutionSavedViewIds(env, client, String(options?.solution || ""));
+  const records = await queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "savedqueries",
+    [...viewIds],
+    "savedqueryid",
+    listSavedViewsByIdsQuery,
+  );
+
+  return records
+    .map((record) => normalizeView(record, "system"))
+    .filter((view) => matchesViewFilter(view, options));
+}
+
+function matchesViewFilter(
+  view: ViewRecord,
+  options?: {
+    table?: string;
+    scope?: ViewScope;
+    nameFilter?: string;
+    solution?: string;
+  },
+): boolean {
+  if (options?.table && view.returnedtypecode !== options.table) {
+    return false;
+  }
+
+  if (options?.nameFilter) {
+    return view.name.toLowerCase().includes(options.nameFilter.toLowerCase());
+  }
+
+  return true;
 }

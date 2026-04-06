@@ -365,6 +365,15 @@ This tool uses Dataverse dependency functions instead of guessing links from nam
 
 `componentType` can now target both old and new groups like `table`, `column`, `security_role`, `dashboard`, `app_module`, `connection_reference`, `environment_variable_definition`, and `environment_variable_value`.
 
+### Performance Notes
+
+- Repeated metadata reads now use a short in-memory cache inside the Dynamics client.
+- Solution-scoped table, form, view, and cloud flow reads now use targeted id lookups where possible.
+- Large id-based metadata fetches are split into smaller chunks.
+- Expensive compare and usage tools now add warnings when detail scans are limited for safety.
+
+See [docs/performance-notes.md](docs/performance-notes.md) for the protected test fixtures behind these changes.
+
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
 `compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugins it shows drift on three levels:

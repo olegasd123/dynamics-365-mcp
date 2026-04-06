@@ -16,7 +16,9 @@ describe("form metadata", () => {
     const { client } = createRecordingClient({
       dev: {
         solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "core" }],
-        solutioncomponents: [{ solutioncomponentid: "sc-1", objectid: "form-1", componenttype: 24 }],
+        solutioncomponents: [
+          { solutioncomponentid: "sc-1", objectid: "form-1", componenttype: 24 },
+        ],
         systemforms: [
           {
             formid: "form-1",
@@ -37,7 +39,9 @@ describe("form metadata", () => {
     });
 
     const forms = await listForms(env, client, { solution: "Core" });
-    const details = await fetchFormDetails(env, client, "contoso_account_main", { solution: "Core" });
+    const details = await fetchFormDetails(env, client, "contoso_account_main", {
+      solution: "Core",
+    });
 
     expect(forms).toHaveLength(1);
     expect(forms[0]).toMatchObject({

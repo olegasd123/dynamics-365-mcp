@@ -28,6 +28,9 @@ export function registerFindTableUsage(
         lines.push(`## Table Usage: ${usage.tableLogicalName}`);
         lines.push(`- Environment: ${env.name}`);
         lines.push(`- Display Name: ${usage.tableDisplayName || "-"}`);
+        if (usage.warnings && usage.warnings.length > 0) {
+          lines.push(`- Warnings: ${usage.warnings.join(" | ")}`);
+        }
         lines.push(
           `- Summary: Plugin Steps ${usage.pluginSteps.length} | Workflows ${usage.workflows.length} | Forms ${usage.forms.length} | Views ${usage.views.length} | Custom APIs ${usage.customApis.length} | Cloud Flows ${usage.cloudFlows.length} | Relationships ${usage.relationships.length}`,
         );
@@ -118,10 +121,16 @@ export function registerFindTableUsage(
           );
         }
 
-        return createToolSuccessResponse("find_table_usage", lines.join("\n"), `Analyzed usage for table '${usage.tableLogicalName}' in '${env.name}'.`, {
-          environment: env.name,
-          usage,
-        });
+        return createToolSuccessResponse(
+          "find_table_usage",
+          lines.join("\n"),
+          `Analyzed usage for table '${usage.tableLogicalName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            warnings: usage.warnings || [],
+            usage,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("find_table_usage", error);
       }

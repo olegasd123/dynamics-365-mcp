@@ -18,7 +18,10 @@ export function registerFindColumnUsage(
     {
       environment: z.string().optional().describe("Environment name"),
       column: z.string().describe("Column logical name"),
-      table: z.string().optional().describe("Optional table logical name, schema name, or display name"),
+      table: z
+        .string()
+        .optional()
+        .describe("Optional table logical name, schema name, or display name"),
     },
     async ({ environment, column, table }) => {
       try {
@@ -29,6 +32,9 @@ export function registerFindColumnUsage(
         lines.push(`## Column Usage: ${usage.columnName}`);
         lines.push(`- Environment: ${env.name}`);
         lines.push(`- Table Filter: ${usage.tableLogicalName || "-"}`);
+        if (usage.warnings && usage.warnings.length > 0) {
+          lines.push(`- Warnings: ${usage.warnings.join(" | ")}`);
+        }
         lines.push(
           `- Summary: Plugin Steps ${usage.pluginSteps.length} | Plugin Images ${usage.pluginImages.length} | Workflows ${usage.workflows.length} | Forms ${usage.forms.length} | Views ${usage.views.length} | Relationships ${usage.relationships.length} | Cloud Flows ${usage.cloudFlows.length}`,
         );
@@ -123,10 +129,16 @@ export function registerFindColumnUsage(
           );
         }
 
-        return createToolSuccessResponse("find_column_usage", lines.join("\n"), `Analyzed usage for column '${usage.columnName}' in '${env.name}'.`, {
-          environment: env.name,
-          usage,
-        });
+        return createToolSuccessResponse(
+          "find_column_usage",
+          lines.join("\n"),
+          `Analyzed usage for column '${usage.columnName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            warnings: usage.warnings || [],
+            usage,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("find_column_usage", error);
       }

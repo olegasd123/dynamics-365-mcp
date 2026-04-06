@@ -27,6 +27,9 @@ export function registerFindWebResourceUsage(
 
         lines.push(`## Web Resource Usage: ${usage.resourceName}`);
         lines.push(`- Environment: ${env.name}`);
+        if (usage.warnings && usage.warnings.length > 0) {
+          lines.push(`- Warnings: ${usage.warnings.join(" | ")}`);
+        }
         lines.push(
           `- Summary: Forms ${usage.forms.length} | Other Web Resources ${usage.webResources.length}`,
         );
@@ -53,10 +56,16 @@ export function registerFindWebResourceUsage(
           );
         }
 
-        return createToolSuccessResponse("find_web_resource_usage", lines.join("\n"), `Analyzed usage for web resource '${usage.resourceName}' in '${env.name}'.`, {
-          environment: env.name,
-          usage,
-        });
+        return createToolSuccessResponse(
+          "find_web_resource_usage",
+          lines.join("\n"),
+          `Analyzed usage for web resource '${usage.resourceName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            warnings: usage.warnings || [],
+            usage,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("find_web_resource_usage", error);
       }
