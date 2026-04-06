@@ -30,6 +30,21 @@ describe("solution inventory", () => {
         ],
         solutioncomponents: [
           {
+            solutioncomponentid: "sc-table",
+            objectid: "table-1",
+            componenttype: 1,
+          },
+          {
+            solutioncomponentid: "sc-column",
+            objectid: "col-1",
+            componenttype: 2,
+          },
+          {
+            solutioncomponentid: "sc-role",
+            objectid: "role-1",
+            componenttype: 20,
+          },
+          {
             solutioncomponentid: "sc-1",
             objectid: "asm-1",
             componenttype: 91,
@@ -55,6 +70,31 @@ describe("solution inventory", () => {
             componenttype: 61,
           },
           {
+            solutioncomponentid: "sc-dashboard",
+            objectid: "dash-1",
+            componenttype: 60,
+          },
+          {
+            solutioncomponentid: "sc-app",
+            objectid: "app-1",
+            componenttype: 80,
+          },
+          {
+            solutioncomponentid: "sc-conn",
+            objectid: "conn-1",
+            componenttype: 371,
+          },
+          {
+            solutioncomponentid: "sc-env-def",
+            objectid: "env-def-1",
+            componenttype: 380,
+          },
+          {
+            solutioncomponentid: "sc-env-value",
+            objectid: "env-val-1",
+            componenttype: 381,
+          },
+          {
             solutioncomponentid: "sc-6",
             objectid: "step-1",
             componenttype: 92,
@@ -67,11 +107,71 @@ describe("solution inventory", () => {
             rootsolutioncomponentid: "sc-1",
           },
         ],
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: "Account",
+            DisplayCollectionName: "Accounts",
+            Description: "Account table",
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+            OwnershipType: "UserOwned",
+            IsCustomEntity: false,
+            IsManaged: false,
+            IsActivity: false,
+            IsAuditEnabled: true,
+            IsValidForAdvancedFind: true,
+            ChangeTrackingEnabled: false,
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "col-1",
+            LogicalName: "new_code",
+            SchemaName: "new_Code",
+            DisplayName: "Code",
+            Description: "Code",
+            AttributeType: "String",
+            AttributeTypeName: "StringType",
+            RequiredLevel: "None",
+            IsPrimaryId: false,
+            IsPrimaryName: false,
+            IsAuditEnabled: true,
+            IsValidForAdvancedFind: true,
+            IsValidForCreate: true,
+            IsValidForRead: true,
+            IsValidForUpdate: true,
+            IsCustomAttribute: true,
+            IsSecured: false,
+            Targets: [],
+            FormatName: "Text",
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.BooleanAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StateAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata":
+          [],
         systemforms: [
           {
             formid: "form-1",
             name: "Account Main",
             objecttypecode: "account",
+          },
+          {
+            formid: "dash-1",
+            name: "Sales Dashboard",
+            objecttypecode: "account",
+            type: 0,
+            ismanaged: false,
           },
         ],
         savedqueries: [
@@ -85,6 +185,61 @@ describe("solution inventory", () => {
           {
             pluginassemblyid: "asm-1",
             name: "Core.Plugins",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-1",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Main BU",
+            _parentrootroleid_value: "role-root-1",
+            _roletemplateid_value: "tmpl-1",
+            ismanaged: false,
+            modifiedon: "2026-03-04T12:00:00Z",
+          },
+        ],
+        appmodules: [
+          {
+            appmoduleid: "app-1",
+            name: "Sales Hub",
+            uniquename: "contoso_saleshub",
+            ismanaged: false,
+            modifiedon: "2026-03-04T12:00:00Z",
+            statecode: 0,
+          },
+        ],
+        connectionreferences: [
+          {
+            connectionreferenceid: "conn-1",
+            connectionreferencelogicalname: "contoso_sharedoffice365",
+            displayname: "Shared Office 365",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "connection-1",
+            ismanaged: false,
+            modifiedon: "2026-03-04T12:00:00Z",
+            statecode: 0,
+          },
+        ],
+        environmentvariabledefinitions: [
+          {
+            environmentvariabledefinitionid: "env-def-1",
+            schemaname: "contoso_BaseUrl",
+            displayname: "Base URL",
+            type: 100000000,
+            defaultvalue: "https://example.test",
+            valueschema: "",
+            ismanaged: false,
+            modifiedon: "2026-03-04T12:00:00Z",
+          },
+        ],
+        environmentvariablevalues: [
+          {
+            environmentvariablevalueid: "env-val-1",
+            _environmentvariabledefinitionid_value: "env-def-1",
+            value: "https://dev.example.test",
+            ismanaged: false,
+            modifiedon: "2026-03-04T12:00:00Z",
           },
         ],
         plugintypes: [
@@ -127,17 +282,33 @@ describe("solution inventory", () => {
     const inventory = await fetchSolutionInventory(env, client, "Core");
 
     expect(solution.friendlyname).toBe("Core");
+    expect(componentSets.tableIds).toEqual(new Set(["table-1"]));
+    expect(componentSets.columnIds).toEqual(new Set(["col-1"]));
+    expect(componentSets.securityRoleIds).toEqual(new Set(["role-1"]));
     expect(componentSets.pluginAssemblyIds).toEqual(new Set(["asm-1"]));
     expect(componentSets.formIds).toEqual(new Set(["form-1"]));
     expect(componentSets.viewIds).toEqual(new Set(["view-1"]));
     expect(componentSets.workflowIds).toEqual(new Set(["wf-1"]));
+    expect(componentSets.dashboardIds).toEqual(new Set(["dash-1"]));
     expect(componentSets.webResourceIds).toEqual(new Set(["wr-1"]));
+    expect(componentSets.appModuleIds).toEqual(new Set(["app-1"]));
     expect(componentSets.pluginStepIds).toEqual(new Set(["step-1"]));
     expect(componentSets.pluginImageIds).toEqual(new Set(["img-1"]));
+    expect(componentSets.connectionReferenceIds).toEqual(new Set(["conn-1"]));
+    expect(componentSets.environmentVariableDefinitionIds).toEqual(new Set(["env-def-1"]));
+    expect(componentSets.environmentVariableValueIds).toEqual(new Set(["env-val-1"]));
     expect(componentSets.unsupportedRootComponents).toHaveLength(0);
     expect(componentSets.childComponents).toHaveLength(2);
+    expect(inventory.tables).toHaveLength(1);
+    expect(inventory.columns).toHaveLength(1);
+    expect(inventory.securityRoles).toHaveLength(1);
     expect(inventory.forms).toHaveLength(1);
     expect(inventory.views).toHaveLength(1);
+    expect(inventory.dashboards).toHaveLength(1);
+    expect(inventory.appModules).toHaveLength(1);
+    expect(inventory.connectionReferences).toHaveLength(1);
+    expect(inventory.environmentVariableDefinitions).toHaveLength(1);
+    expect(inventory.environmentVariableValues).toHaveLength(1);
     expect(inventory.pluginSteps).toHaveLength(1);
     expect(inventory.pluginImages).toHaveLength(1);
   });

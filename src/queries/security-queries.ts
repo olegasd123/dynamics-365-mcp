@@ -1,8 +1,4 @@
-import {
-  buildQueryString,
-  odataContains,
-  odataEq,
-} from "../utils/odata-helpers.js";
+import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
 
 function buildOrFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");
@@ -43,6 +39,14 @@ export function listSecurityRolesQuery(nameFilter?: string): string {
   return buildQueryString({
     select: SECURITY_ROLE_SELECT,
     filter,
+    orderby: "name asc",
+  });
+}
+
+export function listSecurityRolesByIdsQuery(roleIds: string[]): string {
+  return buildQueryString({
+    select: SECURITY_ROLE_SELECT,
+    filter: buildOrFilter("roleid", roleIds),
     orderby: "name asc",
   });
 }

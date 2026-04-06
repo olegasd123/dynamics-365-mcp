@@ -16,17 +16,31 @@ describe("get_solution_dependencies tool", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
-        solutions: [
-          { solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
         solutioncomponents: [
           { solutioncomponentid: "sc-asm", objectid: "asm-1", componenttype: 91 },
-          { solutioncomponentid: "sc-step", objectid: "step-1", componenttype: 92, rootsolutioncomponentid: "sc-asm" },
-          { solutioncomponentid: "sc-img", objectid: "img-1", componenttype: 93, rootsolutioncomponentid: "sc-asm" },
+          {
+            solutioncomponentid: "sc-step",
+            objectid: "step-1",
+            componenttype: 92,
+            rootsolutioncomponentid: "sc-asm",
+          },
+          {
+            solutioncomponentid: "sc-img",
+            objectid: "img-1",
+            componenttype: 93,
+            rootsolutioncomponentid: "sc-asm",
+          },
           { solutioncomponentid: "sc-wr", objectid: "wr-1", componenttype: 61 },
         ],
         pluginassemblies: [
-          { pluginassemblyid: "asm-1", name: "Core.Plugins", version: "1.0.0", isolationmode: 2, ismanaged: false },
+          {
+            pluginassemblyid: "asm-1",
+            name: "Core.Plugins",
+            version: "1.0.0",
+            isolationmode: 2,
+            ismanaged: false,
+          },
         ],
         plugintypes: [
           {
@@ -61,8 +75,18 @@ describe("get_solution_dependencies tool", () => {
           },
         ],
         webresourceset: [
-          { webresourceid: "wr-1", name: "contoso_/scripts/app.js", webresourcetype: 3, ismanaged: false },
-          { webresourceid: "wr-2", name: "contoso_/scripts/shared.js", webresourcetype: 3, ismanaged: false },
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/app.js",
+            webresourcetype: 3,
+            ismanaged: false,
+          },
+          {
+            webresourceid: "wr-2",
+            name: "contoso_/scripts/shared.js",
+            webresourcetype: 3,
+            ismanaged: false,
+          },
         ],
         workflows: [
           {
@@ -124,16 +148,30 @@ describe("get_solution_dependencies tool", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
-        solutions: [
-          { solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
         solutioncomponents: [
-          { solutioncomponentid: "sc-step-1", objectid: "step-1", componenttype: 92, rootsolutioncomponentid: "sc-asm" },
-          { solutioncomponentid: "sc-step-2", objectid: "step-2", componenttype: 92, rootsolutioncomponentid: "sc-asm" },
+          {
+            solutioncomponentid: "sc-step-1",
+            objectid: "step-1",
+            componenttype: 92,
+            rootsolutioncomponentid: "sc-asm",
+          },
+          {
+            solutioncomponentid: "sc-step-2",
+            objectid: "step-2",
+            componenttype: 92,
+            rootsolutioncomponentid: "sc-asm",
+          },
           { solutioncomponentid: "sc-asm", objectid: "asm-1", componenttype: 91 },
         ],
         pluginassemblies: [
-          { pluginassemblyid: "asm-1", name: "Core.Plugins", version: "1.0.0", isolationmode: 2, ismanaged: false },
+          {
+            pluginassemblyid: "asm-1",
+            name: "Core.Plugins",
+            version: "1.0.0",
+            isolationmode: 2,
+            ismanaged: false,
+          },
         ],
         plugintypes: [
           {
@@ -181,5 +219,75 @@ describe("get_solution_dependencies tool", () => {
 
     expect(response.isError).toBe(true);
     expect(response.content[0].text).toContain("Component 'Account' is ambiguous.");
+  });
+
+  it("supports milestone 2 component groups in dependency lookups", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
+        solutioncomponents: [
+          { solutioncomponentid: "sc-env-def", objectid: "env-def-1", componenttype: 380 },
+          { solutioncomponentid: "sc-conn", objectid: "conn-1", componenttype: 371 },
+        ],
+        EntityDefinitions: [],
+        environmentvariabledefinitions: [
+          {
+            environmentvariabledefinitionid: "env-def-1",
+            schemaname: "contoso_BaseUrl",
+            displayname: "Base URL",
+            type: 100000000,
+            defaultvalue: "https://example.test",
+            ismanaged: false,
+          },
+        ],
+        environmentvariablevalues: [],
+        connectionreferences: [
+          {
+            connectionreferenceid: "conn-1",
+            connectionreferencelogicalname: "contoso_internal",
+            displayname: "Internal Connection",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "connection-1",
+            ismanaged: false,
+            statecode: 0,
+          },
+          {
+            connectionreferenceid: "conn-2",
+            connectionreferencelogicalname: "contoso_sharedoffice365",
+            displayname: "Shared Office 365",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "connection-2",
+            ismanaged: false,
+            statecode: 0,
+          },
+        ],
+        [retrieveRequiredComponentsPath("sc-env-def", 380)]: [
+          {
+            dependencyid: "dep-1",
+            dependencytype: 2,
+            requiredcomponentobjectid: "conn-2",
+            requiredcomponenttype: 371,
+            dependentcomponentobjectid: "env-def-1",
+            dependentcomponenttype: 380,
+          },
+        ],
+        [retrieveDependentComponentsPath("sc-env-def", 380)]: [],
+      },
+    });
+
+    registerGetSolutionDependencies(server as never, config, client);
+
+    const response = await server.getHandler("get_solution_dependencies")({
+      solution: "Core",
+      componentType: "environment_variable_definition",
+      componentName: "contoso_BaseUrl",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("contoso_BaseUrl");
+    expect(response.content[0].text).toContain("Shared Office 365");
+    expect(response.content[0].text).toContain("Connection Reference");
   });
 });

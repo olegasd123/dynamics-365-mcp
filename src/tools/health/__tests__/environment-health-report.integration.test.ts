@@ -17,7 +17,11 @@ describe("environment_health_report", () => {
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
           { solutioncomponentid: "sc-2", objectid: "form-1", componenttype: 24 },
           { solutioncomponentid: "sc-3", objectid: "wf-1", componenttype: 29 },
+          { solutioncomponentid: "sc-4", objectid: "app-1", componenttype: 80 },
+          { solutioncomponentid: "sc-5", objectid: "conn-1", componenttype: 371 },
+          { solutioncomponentid: "sc-6", objectid: "env-def-1", componenttype: 380 },
         ],
+        EntityDefinitions: [],
         pluginassemblies: [{ pluginassemblyid: "asm-1", name: "Core.Plugins", ismanaged: false }],
         plugintypes: [
           {
@@ -63,6 +67,37 @@ describe("environment_health_report", () => {
         systemforms: [],
         savedqueries: [],
         webresourceset: [],
+        appmodules: [
+          {
+            appmoduleid: "app-1",
+            name: "Sales Hub",
+            uniquename: "contoso_saleshub",
+            statecode: 1,
+            ismanaged: false,
+          },
+        ],
+        connectionreferences: [
+          {
+            connectionreferenceid: "conn-1",
+            connectionreferencelogicalname: "contoso_sharedoffice365",
+            displayname: "Shared Office 365",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "",
+            statecode: 0,
+            ismanaged: false,
+          },
+        ],
+        environmentvariabledefinitions: [
+          {
+            environmentvariabledefinitionid: "env-def-1",
+            schemaname: "contoso_BaseUrl",
+            displayname: "Base URL",
+            type: 100000000,
+            defaultvalue: "https://example.test",
+            ismanaged: false,
+          },
+        ],
+        environmentvariablevalues: [],
         customapis: [
           {
             customapiid: "api-1",
@@ -81,9 +116,12 @@ describe("environment_health_report", () => {
     });
 
     expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain("Risk Level: Warning");
+    expect(response.content[0].text).toContain("Risk Level: High Risk");
     expect(response.content[0].text).toContain("Disabled Plugin Steps");
     expect(response.content[0].text).toContain("Draft Workflow");
+    expect(response.content[0].text).toContain("Inactive App Modules");
+    expect(response.content[0].text).toContain("Risky Connection References");
+    expect(response.content[0].text).toContain("Missing Environment Variable Values");
     expect(response.content[0].text).toContain("Missing Components");
     expect(response.content[0].text).toContain("Forms");
   });

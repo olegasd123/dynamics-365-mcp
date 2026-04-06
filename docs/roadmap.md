@@ -33,16 +33,18 @@ Status: completed on 2026-04-06
 
 ### Exit Criteria
 
-- Core metadata tools support structured output
-- Core compare tools support structured output
+- All metadata tools support structured output
+- ALll compare tools support structured output
 - Tool responses are consistent across modules
 - Tests cover output shape for at least one tool in each main area
 
-## Milestone 2: Broader ALM Coverage
+## Milestone 2: Broader ALM Coverage [Done]
 
 ### Goal
 
 Cover more solution components that matter in real delivery and release work.
+
+Status: completed on 2026-04-06
 
 ### Scope
 

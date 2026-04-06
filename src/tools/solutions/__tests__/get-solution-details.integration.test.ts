@@ -23,11 +23,19 @@ describe("get_solution_details tool", () => {
           },
         ],
         solutioncomponents: [
+          { solutioncomponentid: "sc-table", objectid: "table-1", componenttype: 1 },
+          { solutioncomponentid: "sc-column", objectid: "col-1", componenttype: 2 },
+          { solutioncomponentid: "sc-role", objectid: "role-1", componenttype: 20 },
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
           { solutioncomponentid: "sc-2", objectid: "form-1", componenttype: 24 },
           { solutioncomponentid: "sc-3", objectid: "view-1", componenttype: 26 },
           { solutioncomponentid: "sc-4", objectid: "wf-1", componenttype: 29 },
           { solutioncomponentid: "sc-5", objectid: "wr-1", componenttype: 61 },
+          { solutioncomponentid: "sc-dashboard", objectid: "dash-1", componenttype: 60 },
+          { solutioncomponentid: "sc-app", objectid: "app-1", componenttype: 80 },
+          { solutioncomponentid: "sc-conn", objectid: "conn-1", componenttype: 371 },
+          { solutioncomponentid: "sc-env-def", objectid: "env-def-1", componenttype: 380 },
+          { solutioncomponentid: "sc-env-value", objectid: "env-val-1", componenttype: 381 },
           {
             solutioncomponentid: "sc-6",
             objectid: "step-1",
@@ -41,6 +49,59 @@ describe("get_solution_details tool", () => {
             rootsolutioncomponentid: "sc-1",
           },
         ],
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: "Account",
+            DisplayCollectionName: "Accounts",
+            Description: "Account table",
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+            OwnershipType: "UserOwned",
+            IsCustomEntity: false,
+            IsManaged: false,
+            IsActivity: false,
+            IsAuditEnabled: true,
+            IsValidForAdvancedFind: true,
+            ChangeTrackingEnabled: false,
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "col-1",
+            LogicalName: "new_code",
+            SchemaName: "new_Code",
+            DisplayName: "Code",
+            Description: "Code",
+            AttributeType: "String",
+            AttributeTypeName: "StringType",
+            RequiredLevel: "ApplicationRequired",
+            IsPrimaryId: false,
+            IsPrimaryName: false,
+            IsAuditEnabled: true,
+            IsValidForAdvancedFind: true,
+            IsValidForCreate: true,
+            IsValidForRead: true,
+            IsValidForUpdate: true,
+            IsCustomAttribute: true,
+            IsSecured: false,
+            Targets: [],
+            FormatName: "Text",
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.BooleanAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StateAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata":
+          [],
         systemforms: [
           {
             formid: "form-1",
@@ -48,6 +109,14 @@ describe("get_solution_details tool", () => {
             objecttypecode: "account",
             type: 2,
             isdefault: true,
+            ismanaged: false,
+            modifiedon: "2026-03-02T12:00:00Z",
+          },
+          {
+            formid: "dash-1",
+            name: "Sales Dashboard",
+            objecttypecode: "account",
+            type: 0,
             ismanaged: false,
             modifiedon: "2026-03-02T12:00:00Z",
           },
@@ -71,6 +140,61 @@ describe("get_solution_details tool", () => {
             isolationmode: 2,
             ismanaged: false,
             modifiedon: "2026-03-02T12:00:00Z",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-1",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Main BU",
+            _parentrootroleid_value: "role-root-1",
+            _roletemplateid_value: "tmpl-1",
+            ismanaged: false,
+            modifiedon: "2026-03-02T12:00:00Z",
+          },
+        ],
+        appmodules: [
+          {
+            appmoduleid: "app-1",
+            name: "Sales Hub",
+            uniquename: "contoso_saleshub",
+            ismanaged: false,
+            modifiedon: "2026-03-03T12:00:00Z",
+            statecode: 0,
+          },
+        ],
+        connectionreferences: [
+          {
+            connectionreferenceid: "conn-1",
+            connectionreferencelogicalname: "contoso_sharedoffice365",
+            displayname: "Shared Office 365",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "connection-1",
+            ismanaged: false,
+            modifiedon: "2026-03-03T12:00:00Z",
+            statecode: 0,
+          },
+        ],
+        environmentvariabledefinitions: [
+          {
+            environmentvariabledefinitionid: "env-def-1",
+            schemaname: "contoso_BaseUrl",
+            displayname: "Base URL",
+            type: 100000000,
+            defaultvalue: "https://example.test",
+            valueschema: "",
+            ismanaged: false,
+            modifiedon: "2026-03-03T12:00:00Z",
+          },
+        ],
+        environmentvariablevalues: [
+          {
+            environmentvariablevalueid: "env-val-1",
+            _environmentvariabledefinitionid_value: "env-def-1",
+            value: "https://dev.example.test",
+            ismanaged: false,
+            modifiedon: "2026-03-03T12:00:00Z",
           },
         ],
         plugintypes: [
@@ -140,12 +264,21 @@ describe("get_solution_details tool", () => {
     const text = response.content[0].text;
     expect(response.isError).toBeUndefined();
     expect(text).toContain("## Solution: Core");
-    expect(text).toContain(
-      "**Supported Root Components**: Plugins 1 | Forms 1 | Views 1 | Workflows 1 | Web Resources 1",
-    );
-    expect(text).toContain("**Supported Child Components**: Plugin Steps 1 | Plugin Images 1");
+    expect(text).toContain("### Supported Coverage");
+    expect(text).toContain("Tables");
+    expect(text).toContain("Columns");
+    expect(text).toContain("Security Roles");
+    expect(text).toContain("App Modules");
+    expect(text).toContain("Connection References");
+    expect(text).toContain("Environment Variable Definitions");
     expect(text).toContain("### Plugin Assemblies");
     expect(text).toContain("Core.Plugins");
+    expect(text).toContain("### Tables");
+    expect(text).toContain("Account");
+    expect(text).toContain("### Columns");
+    expect(text).toContain("new_code");
+    expect(text).toContain("### Security Roles");
+    expect(text).toContain("Salesperson");
     expect(text).toContain("### Forms");
     expect(text).toContain("Account Main");
     expect(text).toContain("### Views");
@@ -156,8 +289,18 @@ describe("get_solution_details tool", () => {
     expect(text).toContain("PreImage");
     expect(text).toContain("### Workflows");
     expect(text).toContain("Account Sync");
+    expect(text).toContain("### Dashboards");
+    expect(text).toContain("Sales Dashboard");
     expect(text).toContain("### Web Resources");
     expect(text).toContain("contoso_/scripts/app.js");
+    expect(text).toContain("### App Modules");
+    expect(text).toContain("Sales Hub");
+    expect(text).toContain("### Connection References");
+    expect(text).toContain("Shared Office 365");
+    expect(text).toContain("### Environment Variable Definitions");
+    expect(text).toContain("contoso_BaseUrl");
+    expect(text).toContain("### Environment Variable Values");
+    expect(text).toContain("https://dev.example.test");
     expect(text).not.toContain("### Other Root Components");
   });
 });

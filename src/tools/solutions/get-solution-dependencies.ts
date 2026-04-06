@@ -6,18 +6,25 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listPluginAssembliesByIdsQuery } from "../../queries/plugin-queries.js";
+import { listFormsByIdsQuery } from "../../queries/form-queries.js";
+import { listSecurityRolesByIdsQuery } from "../../queries/security-queries.js";
+import { listSavedViewsByIdsQuery } from "../../queries/view-queries.js";
 import { listWebResourcesByIdsQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsByIdsQuery } from "../../queries/workflow-queries.js";
+import {
+  listAppModulesByIdsQuery,
+  listConnectionReferencesByIdsQuery,
+  listEnvironmentVariableDefinitionsByIdsQuery,
+  listEnvironmentVariableValuesByIdsQuery,
+} from "../../queries/alm-queries.js";
 import {
   fetchSolutionInventory,
   getSolutionComponentTypeLabel,
   SOLUTION_COMPONENT_TYPE,
   type SolutionInventory,
 } from "./solution-inventory.js";
-import {
-  fetchPluginImagesByIds,
-  fetchPluginStepsByIds,
-} from "../plugins/plugin-inventory.js";
+import { fetchPluginImagesByIds, fetchPluginStepsByIds } from "../plugins/plugin-inventory.js";
+import { listColumnsByMetadataIds, listTables } from "../tables/table-metadata.js";
 import {
   dependencySelectQuery,
   retrieveDependentComponentsPath,
@@ -25,11 +32,21 @@ import {
 } from "../../queries/dependency-queries.js";
 
 const TOOL_COMPONENT_TYPES = {
+  table: SOLUTION_COMPONENT_TYPE.table,
+  column: SOLUTION_COMPONENT_TYPE.column,
+  security_role: SOLUTION_COMPONENT_TYPE.securityRole,
+  form: SOLUTION_COMPONENT_TYPE.form,
+  view: SOLUTION_COMPONENT_TYPE.view,
+  workflow: SOLUTION_COMPONENT_TYPE.workflow,
+  dashboard: SOLUTION_COMPONENT_TYPE.dashboard,
+  web_resource: SOLUTION_COMPONENT_TYPE.webResource,
+  app_module: SOLUTION_COMPONENT_TYPE.appModule,
   plugin_assembly: SOLUTION_COMPONENT_TYPE.pluginAssembly,
   plugin_step: SOLUTION_COMPONENT_TYPE.pluginStep,
   plugin_image: SOLUTION_COMPONENT_TYPE.pluginImage,
-  workflow: SOLUTION_COMPONENT_TYPE.workflow,
-  web_resource: SOLUTION_COMPONENT_TYPE.webResource,
+  connection_reference: SOLUTION_COMPONENT_TYPE.connectionReference,
+  environment_variable_definition: SOLUTION_COMPONENT_TYPE.environmentVariableDefinition,
+  environment_variable_value: SOLUTION_COMPONENT_TYPE.environmentVariableValue,
 } as const;
 
 const DEPENDENCY_TYPE_LABELS: Record<number, string> = {
@@ -76,7 +93,23 @@ export function registerGetSolutionDependencies(
         .optional()
         .describe("Show required components, dependents, or both. Default: both"),
       componentType: z
-        .enum(["plugin_assembly", "plugin_step", "plugin_image", "workflow", "web_resource"])
+        .enum([
+          "table",
+          "column",
+          "security_role",
+          "form",
+          "view",
+          "workflow",
+          "dashboard",
+          "web_resource",
+          "app_module",
+          "plugin_assembly",
+          "plugin_step",
+          "plugin_image",
+          "connection_reference",
+          "environment_variable_definition",
+          "environment_variable_value",
+        ])
         .optional()
         .describe("Optional component type filter"),
       componentName: z
@@ -121,7 +154,9 @@ export function registerGetSolutionDependencies(
         }
 
         const solutionComponentKeySet = new Set(
-          inventory.components.map((component) => createComponentKey(component.componenttype, component.objectid)),
+          inventory.components.map((component) =>
+            createComponentKey(component.componenttype, component.objectid),
+          ),
         );
         const namedComponentMap = new Map(
           allComponents.map((component) => [
@@ -146,16 +181,27 @@ export function registerGetSolutionDependencies(
             )
           ).flat(),
         );
-        await resolveExternalSupportedComponentNames(env, client, dependencyRecords, namedComponentMap);
+        await resolveExternalSupportedComponentNames(
+          env,
+          client,
+          dependencyRecords,
+          namedComponentMap,
+        );
 
-        const requiredCount = dependencyRecords.filter((record) => record.direction === "required").length;
-        const dependentCount = dependencyRecords.filter((record) => record.direction === "dependents").length;
+        const requiredCount = dependencyRecords.filter(
+          (record) => record.direction === "required",
+        ).length;
+        const dependentCount = dependencyRecords.filter(
+          (record) => record.direction === "dependents",
+        ).length;
         const externalCount = dependencyRecords.filter((record) => !record.otherInSolution).length;
 
         const lines: string[] = [];
         lines.push("## Solution Dependencies");
         lines.push(`- **Environment**: ${env.name}`);
-        lines.push(`- **Solution**: ${inventory.solution.friendlyname} (${inventory.solution.uniquename})`);
+        lines.push(
+          `- **Solution**: ${inventory.solution.friendlyname} (${inventory.solution.uniquename})`,
+        );
         lines.push(`- **Direction**: ${selectedDirection}`);
         lines.push(`- **Components Scanned**: ${selectedComponents.length}`);
         lines.push(`- **Dependency Rows**: ${dependencyRecords.length}`);
@@ -177,7 +223,11 @@ export function registerGetSolutionDependencies(
           formatTable(
             ["Direction", "Count", "External"],
             [
-              ["Required", String(requiredCount), String(countDirection(dependencyRecords, "required", false))],
+              [
+                "Required",
+                String(requiredCount),
+                String(countDirection(dependencyRecords, "required", false)),
+              ],
               [
                 "Dependents",
                 String(dependentCount),
@@ -190,7 +240,59 @@ export function registerGetSolutionDependencies(
         if (dependencyRecords.length === 0) {
           lines.push("");
           lines.push("No dependency rows found for the selected scope.");
-          return createToolSuccessResponse("get_solution_dependencies", lines.join("\n\n"), `No dependency rows found for solution '${solution}' in '${env.name}'.`, {
+          return createToolSuccessResponse(
+            "get_solution_dependencies",
+            lines.join("\n\n"),
+            `No dependency rows found for solution '${solution}' in '${env.name}'.`,
+            {
+              environment: env.name,
+              solution,
+              direction: selectedDirection,
+              filters: {
+                componentType: componentType || null,
+                componentName: componentName || null,
+                maxRows: rowLimit,
+              },
+              selectedComponents,
+              counts: {
+                required: requiredCount,
+                dependents: dependentCount,
+                external: externalCount,
+              },
+              dependencyRows: [],
+            },
+          );
+        }
+
+        const rows = dependencyRecords
+          .slice(0, rowLimit)
+          .map((record) => [
+            record.direction === "required" ? "Requires" : "Used By",
+            `${record.sourceComponent.displayName} (${getSolutionComponentTypeLabel(record.sourceComponent.componenttype)})`,
+            `${record.otherDisplayName} (${getSolutionComponentTypeLabel(record.otherComponentType)})`,
+            record.otherInSolution ? "Yes" : "No",
+            DEPENDENCY_TYPE_LABELS[record.dependencyType] || String(record.dependencyType),
+          ]);
+
+        lines.push("");
+        lines.push("### Dependency Rows");
+        lines.push(
+          formatTable(
+            ["Relation", "Component", "Other Component", "In Solution", "Dependency Type"],
+            rows,
+          ),
+        );
+
+        if (dependencyRecords.length > rowLimit) {
+          lines.push("");
+          lines.push(`Showing ${rowLimit} of ${dependencyRecords.length} rows.`);
+        }
+
+        return createToolSuccessResponse(
+          "get_solution_dependencies",
+          lines.join("\n\n"),
+          `Loaded dependency rows for solution '${solution}' in '${env.name}'.`,
+          {
             environment: env.name,
             solution,
             direction: selectedDirection,
@@ -204,46 +306,11 @@ export function registerGetSolutionDependencies(
               required: requiredCount,
               dependents: dependentCount,
               external: externalCount,
+              total: dependencyRecords.length,
             },
-            dependencyRows: [],
-          });
-        }
-
-        const rows = dependencyRecords.slice(0, rowLimit).map((record) => [
-          record.direction === "required" ? "Requires" : "Used By",
-          `${record.sourceComponent.displayName} (${getSolutionComponentTypeLabel(record.sourceComponent.componenttype)})`,
-          `${record.otherDisplayName} (${getSolutionComponentTypeLabel(record.otherComponentType)})`,
-          record.otherInSolution ? "Yes" : "No",
-          DEPENDENCY_TYPE_LABELS[record.dependencyType] || String(record.dependencyType),
-        ]);
-
-        lines.push("");
-        lines.push("### Dependency Rows");
-        lines.push(formatTable(["Relation", "Component", "Other Component", "In Solution", "Dependency Type"], rows));
-
-        if (dependencyRecords.length > rowLimit) {
-          lines.push("");
-          lines.push(`Showing ${rowLimit} of ${dependencyRecords.length} rows.`);
-        }
-
-        return createToolSuccessResponse("get_solution_dependencies", lines.join("\n\n"), `Loaded dependency rows for solution '${solution}' in '${env.name}'.`, {
-          environment: env.name,
-          solution,
-          direction: selectedDirection,
-          filters: {
-            componentType: componentType || null,
-            componentName: componentName || null,
-            maxRows: rowLimit,
+            dependencyRows: dependencyRecords,
           },
-          selectedComponents,
-          counts: {
-            required: requiredCount,
-            dependents: dependentCount,
-            external: externalCount,
-            total: dependencyRecords.length,
-          },
-          dependencyRows: dependencyRecords,
-        });
+        );
       } catch (error) {
         return createToolErrorResponse("get_solution_dependencies", error);
       }
@@ -252,83 +319,188 @@ export function registerGetSolutionDependencies(
 }
 
 function listSupportedComponents(inventory: SolutionInventory): NamedSolutionComponent[] {
-  const rootByKey = new Map(
-    inventory.rootComponents.map((component) => [
+  const componentByKey = new Map(
+    inventory.components.map((component) => [
       createComponentKey(component.componenttype, component.objectid),
       component,
     ]),
   );
-  const childByKey = new Map(
-    inventory.childComponents.map((component) => [
-      createComponentKey(component.componenttype, component.objectid),
-      component,
+  const definitionNameById = new Map(
+    inventory.environmentVariableDefinitions.map((definition) => [
+      definition.environmentvariabledefinitionid,
+      definition.schemaname,
     ]),
   );
 
   return [
-    ...inventory.pluginAssemblies.map((assembly) => {
-      const root = rootByKey.get(
-        createComponentKey(SOLUTION_COMPONENT_TYPE.pluginAssembly, String(assembly.pluginassemblyid || "")),
-      );
-      return {
-        solutioncomponentid: String(root?.solutioncomponentid || ""),
-        objectid: String(assembly.pluginassemblyid || ""),
-        componenttype: SOLUTION_COMPONENT_TYPE.pluginAssembly,
-        displayName: String(assembly.name || ""),
-        name: String(assembly.name || ""),
-      };
-    }),
-    ...inventory.workflows.map((workflow) => {
-      const root = rootByKey.get(
-        createComponentKey(SOLUTION_COMPONENT_TYPE.workflow, String(workflow.workflowid || "")),
-      );
-      return {
-        solutioncomponentid: String(root?.solutioncomponentid || ""),
-        objectid: String(workflow.workflowid || ""),
-        componenttype: SOLUTION_COMPONENT_TYPE.workflow,
-        displayName: String(workflow.name || workflow.uniquename || ""),
-        name: String(workflow.uniquename || workflow.name || ""),
-      };
-    }),
-    ...inventory.webResources.map((resource) => {
-      const root = rootByKey.get(
-        createComponentKey(SOLUTION_COMPONENT_TYPE.webResource, String(resource.webresourceid || "")),
-      );
-      return {
-        solutioncomponentid: String(root?.solutioncomponentid || ""),
-        objectid: String(resource.webresourceid || ""),
-        componenttype: SOLUTION_COMPONENT_TYPE.webResource,
-        displayName: String(resource.name || ""),
-        name: String(resource.name || ""),
-      };
-    }),
-    ...inventory.pluginSteps.map((step) => {
-      const child = childByKey.get(
-        createComponentKey(SOLUTION_COMPONENT_TYPE.pluginStep, step.sdkmessageprocessingstepid),
-      );
-      return {
-        solutioncomponentid: String(child?.solutioncomponentid || ""),
-        objectid: step.sdkmessageprocessingstepid,
-        componenttype: SOLUTION_COMPONENT_TYPE.pluginStep,
-        displayName: step.displayName,
-        name: step.name,
-        parentDisplayName: step.assemblyName,
-      };
-    }),
-    ...inventory.pluginImages.map((image) => {
-      const child = childByKey.get(
-        createComponentKey(SOLUTION_COMPONENT_TYPE.pluginImage, image.sdkmessageprocessingstepimageid),
-      );
-      return {
-        solutioncomponentid: String(child?.solutioncomponentid || ""),
-        objectid: image.sdkmessageprocessingstepimageid,
-        componenttype: SOLUTION_COMPONENT_TYPE.pluginImage,
-        displayName: image.displayName,
-        name: image.name,
-        parentDisplayName: image.stepName,
-      };
-    }),
-  ].filter((component) => Boolean(component.solutioncomponentid));
+    ...inventory.tables.map((table) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.table,
+        table.metadataId,
+        table.displayName ? `${table.displayName} (${table.logicalName})` : table.logicalName,
+        table.logicalName,
+      ),
+    ),
+    ...inventory.columns.map((column) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.column,
+        column.metadataId,
+        `${column.tableLogicalName}.${column.logicalName}`,
+        `${column.tableLogicalName}.${column.logicalName}`,
+        column.tableLogicalName,
+      ),
+    ),
+    ...inventory.securityRoles.map((role) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.securityRole,
+        role.roleid,
+        `${role.name} [${role.businessUnitName || "-"}]`,
+        role.name,
+        role.businessUnitName || undefined,
+      ),
+    ),
+    ...inventory.forms.map((form) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.form,
+        String(form.formid || ""),
+        `${String(form.objecttypecode || "")}/${String(form.name || "")}`,
+        String(form.name || ""),
+        String(form.objecttypecode || ""),
+      ),
+    ),
+    ...inventory.views.map((view) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.view,
+        String(view.savedqueryid || ""),
+        `${String(view.returnedtypecode || "")}/${String(view.name || "")}`,
+        String(view.name || ""),
+        String(view.returnedtypecode || ""),
+      ),
+    ),
+    ...inventory.workflows.map((workflow) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.workflow,
+        String(workflow.workflowid || ""),
+        String(workflow.name || workflow.uniquename || ""),
+        String(workflow.uniquename || workflow.name || ""),
+      ),
+    ),
+    ...inventory.dashboards.map((dashboard) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.dashboard,
+        dashboard.formid,
+        dashboard.name,
+        dashboard.name,
+        dashboard.objecttypecode || undefined,
+      ),
+    ),
+    ...inventory.webResources.map((resource) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.webResource,
+        String(resource.webresourceid || ""),
+        String(resource.name || ""),
+        String(resource.name || ""),
+      ),
+    ),
+    ...inventory.appModules.map((app) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.appModule,
+        app.appmoduleid,
+        app.name,
+        app.uniquename || app.name,
+      ),
+    ),
+    ...inventory.pluginAssemblies.map((assembly) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.pluginAssembly,
+        String(assembly.pluginassemblyid || ""),
+        String(assembly.name || ""),
+        String(assembly.name || ""),
+      ),
+    ),
+    ...inventory.pluginSteps.map((step) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.pluginStep,
+        step.sdkmessageprocessingstepid,
+        step.displayName,
+        step.name,
+        step.assemblyName,
+      ),
+    ),
+    ...inventory.pluginImages.map((image) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.pluginImage,
+        image.sdkmessageprocessingstepimageid,
+        image.displayName,
+        image.name,
+        image.stepName,
+      ),
+    ),
+    ...inventory.connectionReferences.map((reference) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.connectionReference,
+        reference.connectionreferenceid,
+        reference.displayname || reference.connectionreferencelogicalname,
+        reference.connectionreferencelogicalname || reference.displayname,
+      ),
+    ),
+    ...inventory.environmentVariableDefinitions.map((definition) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.environmentVariableDefinition,
+        definition.environmentvariabledefinitionid,
+        definition.schemaname,
+        definition.schemaname,
+      ),
+    ),
+    ...inventory.environmentVariableValues.map((value) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.environmentVariableValue,
+        value.environmentvariablevalueid,
+        `${definitionNameById.get(value.environmentvariabledefinitionid) || value.environmentvariabledefinitionid} value`,
+        definitionNameById.get(value.environmentvariabledefinitionid) ||
+          value.environmentvariabledefinitionid,
+        definitionNameById.get(value.environmentvariabledefinitionid),
+      ),
+    ),
+  ].filter((component): component is NamedSolutionComponent => Boolean(component));
+}
+
+function createNamedComponent(
+  componentByKey: Map<string, { solutioncomponentid: string }>,
+  componentType: number,
+  objectId: string,
+  displayName: string,
+  name: string,
+  parentDisplayName?: string,
+): NamedSolutionComponent | null {
+  const component = componentByKey.get(createComponentKey(componentType, objectId));
+  if (!component?.solutioncomponentid) {
+    return null;
+  }
+
+  return {
+    solutioncomponentid: component.solutioncomponentid,
+    objectid: objectId,
+    componenttype: componentType,
+    displayName,
+    name,
+    parentDisplayName,
+  };
 }
 
 function selectComponents(
@@ -442,44 +614,122 @@ async function resolveExternalSupportedComponentNames(
     return;
   }
 
-  const pluginAssemblyIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginAssembly);
-  const workflowIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.workflow);
-  const webResourceIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.webResource);
-  const pluginStepIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginStep);
-  const pluginImageIds = collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginImage);
-
-  const [pluginAssemblies, workflows, webResources, pluginSteps, pluginImages] = await Promise.all([
-    pluginAssemblyIds.length === 0
-      ? Promise.resolve([])
-      : client
-          .query<Record<string, unknown>>(
-            env,
-            "pluginassemblies",
-            listPluginAssembliesByIdsQuery(pluginAssemblyIds),
-          )
-          .then((records) =>
-            records.filter((record) => pluginAssemblyIds.includes(String(record.pluginassemblyid || ""))),
-          ),
-    workflowIds.length === 0
-      ? Promise.resolve([])
-      : client
-          .query<Record<string, unknown>>(env, "workflows", listWorkflowsByIdsQuery(workflowIds))
-          .then((records) => records.filter((record) => workflowIds.includes(String(record.workflowid || "")))),
-    webResourceIds.length === 0
-      ? Promise.resolve([])
-      : client
-          .query<Record<string, unknown>>(env, "webresourceset", listWebResourcesByIdsQuery(webResourceIds))
-          .then((records) =>
-            records.filter((record) => webResourceIds.includes(String(record.webresourceid || ""))),
-          ),
-    fetchPluginStepsByIds(env, client, pluginStepIds),
-    fetchPluginImagesByIds(env, client, pluginImageIds),
+  const [
+    tables,
+    columns,
+    securityRoles,
+    formsAndDashboards,
+    views,
+    workflows,
+    webResources,
+    appModules,
+    pluginAssemblies,
+    pluginSteps,
+    pluginImages,
+    connectionReferences,
+    environmentVariableDefinitions,
+    environmentVariableValues,
+  ] = await Promise.all([
+    resolveTables(env, client, collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.table)),
+    resolveColumns(env, client, collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.column)),
+    resolveSecurityRoles(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.securityRole),
+    ),
+    resolveFormsAndDashboards(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.form),
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.dashboard),
+    ),
+    resolveViews(env, client, collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.view)),
+    resolveWorkflows(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.workflow),
+    ),
+    resolveWebResources(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.webResource),
+    ),
+    resolveAppModules(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.appModule),
+    ),
+    resolvePluginAssemblies(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginAssembly),
+    ),
+    fetchPluginStepsByIds(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginStep),
+    ),
+    fetchPluginImagesByIds(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.pluginImage),
+    ),
+    resolveConnectionReferences(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.connectionReference),
+    ),
+    resolveEnvironmentVariableDefinitions(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.environmentVariableDefinition),
+    ),
+    resolveEnvironmentVariableValues(
+      env,
+      client,
+      collectDependencyIds(unresolved, SOLUTION_COMPONENT_TYPE.environmentVariableValue),
+    ),
   ]);
 
-  for (const assembly of pluginAssemblies) {
+  for (const table of tables) {
     namedComponentMap.set(
-      createComponentKey(SOLUTION_COMPONENT_TYPE.pluginAssembly, String(assembly.pluginassemblyid || "")),
-      String(assembly.name || ""),
+      createComponentKey(SOLUTION_COMPONENT_TYPE.table, table.metadataId),
+      table.displayName ? `${table.displayName} (${table.logicalName})` : table.logicalName,
+    );
+  }
+
+  for (const column of columns) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.column, column.metadataId),
+      `${column.tableLogicalName}.${column.logicalName}`,
+    );
+  }
+
+  for (const role of securityRoles) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.securityRole, String(role.roleid || "")),
+      `${String(role.name || "")} [${String(role.businessUnitName || "-")}]`,
+    );
+  }
+
+  for (const form of formsAndDashboards.forms) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.form, String(form.formid || "")),
+      `${String(form.objecttypecode || "")}/${String(form.name || "")}`,
+    );
+  }
+
+  for (const dashboard of formsAndDashboards.dashboards) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.dashboard, String(dashboard.formid || "")),
+      String(dashboard.name || ""),
+    );
+  }
+
+  for (const view of views) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.view, String(view.savedqueryid || "")),
+      `${String(view.returnedtypecode || "")}/${String(view.name || "")}`,
     );
   }
 
@@ -497,6 +747,23 @@ async function resolveExternalSupportedComponentNames(
     );
   }
 
+  for (const app of appModules) {
+    namedComponentMap.set(
+      createComponentKey(SOLUTION_COMPONENT_TYPE.appModule, String(app.appmoduleid || "")),
+      String(app.name || app.uniquename || ""),
+    );
+  }
+
+  for (const assembly of pluginAssemblies) {
+    namedComponentMap.set(
+      createComponentKey(
+        SOLUTION_COMPONENT_TYPE.pluginAssembly,
+        String(assembly.pluginassemblyid || ""),
+      ),
+      String(assembly.name || ""),
+    );
+  }
+
   for (const step of pluginSteps) {
     namedComponentMap.set(
       createComponentKey(SOLUTION_COMPONENT_TYPE.pluginStep, step.sdkmessageprocessingstepid),
@@ -506,8 +773,48 @@ async function resolveExternalSupportedComponentNames(
 
   for (const image of pluginImages) {
     namedComponentMap.set(
-      createComponentKey(SOLUTION_COMPONENT_TYPE.pluginImage, image.sdkmessageprocessingstepimageid),
+      createComponentKey(
+        SOLUTION_COMPONENT_TYPE.pluginImage,
+        image.sdkmessageprocessingstepimageid,
+      ),
       image.displayName,
+    );
+  }
+
+  for (const reference of connectionReferences) {
+    namedComponentMap.set(
+      createComponentKey(
+        SOLUTION_COMPONENT_TYPE.connectionReference,
+        String(reference.connectionreferenceid || ""),
+      ),
+      String(reference.displayname || reference.connectionreferencelogicalname || ""),
+    );
+  }
+
+  for (const definition of environmentVariableDefinitions) {
+    namedComponentMap.set(
+      createComponentKey(
+        SOLUTION_COMPONENT_TYPE.environmentVariableDefinition,
+        String(definition.environmentvariabledefinitionid || ""),
+      ),
+      String(definition.schemaname || ""),
+    );
+  }
+
+  const definitionNameById = new Map(
+    environmentVariableDefinitions.map((definition) => [
+      String(definition.environmentvariabledefinitionid || ""),
+      String(definition.schemaname || ""),
+    ]),
+  );
+
+  for (const value of environmentVariableValues) {
+    namedComponentMap.set(
+      createComponentKey(
+        SOLUTION_COMPONENT_TYPE.environmentVariableValue,
+        String(value.environmentvariablevalueid || ""),
+      ),
+      `${definitionNameById.get(String(value._environmentvariabledefinitionid_value || "")) || String(value._environmentvariabledefinitionid_value || "")} value`,
     );
   }
 
@@ -521,6 +828,200 @@ async function resolveExternalSupportedComponentNames(
   }
 }
 
+async function resolveTables(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const tables = await listTables(env, client);
+  return tables.filter((table) => ids.includes(table.metadataId));
+}
+
+async function resolveColumns(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return listColumnsByMetadataIds(env, client, ids);
+}
+
+async function resolveSecurityRoles(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client.query<Record<string, unknown>>(env, "roles", listSecurityRolesByIdsQuery(ids));
+}
+
+async function resolveFormsAndDashboards(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  formIds: string[],
+  dashboardIds: string[],
+) {
+  const ids = [...new Set([...formIds, ...dashboardIds])];
+  if (ids.length === 0) {
+    return { forms: [], dashboards: [] };
+  }
+
+  const records = await client.query<Record<string, unknown>>(
+    env,
+    "systemforms",
+    listFormsByIdsQuery(ids),
+  );
+  return {
+    forms: records.filter(
+      (record) => formIds.includes(String(record.formid || "")) && Number(record.type || 0) !== 0,
+    ),
+    dashboards: records.filter(
+      (record) =>
+        dashboardIds.includes(String(record.formid || "")) && Number(record.type || 0) === 0,
+    ),
+  };
+}
+
+async function resolveViews(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<Record<string, unknown>>(env, "savedqueries", listSavedViewsByIdsQuery(ids))
+    .then((records) => records.filter((record) => ids.includes(String(record.savedqueryid || ""))));
+}
+
+async function resolveWorkflows(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<Record<string, unknown>>(env, "workflows", listWorkflowsByIdsQuery(ids))
+    .then((records) => records.filter((record) => ids.includes(String(record.workflowid || ""))));
+}
+
+async function resolveWebResources(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<Record<string, unknown>>(env, "webresourceset", listWebResourcesByIdsQuery(ids))
+    .then((records) =>
+      records.filter((record) => ids.includes(String(record.webresourceid || ""))),
+    );
+}
+
+async function resolveAppModules(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<Record<string, unknown>>(env, "appmodules", listAppModulesByIdsQuery(ids))
+    .then((records) => records.filter((record) => ids.includes(String(record.appmoduleid || ""))));
+}
+
+async function resolvePluginAssemblies(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesByIdsQuery(ids))
+    .then((records) =>
+      records.filter((record) => ids.includes(String(record.pluginassemblyid || ""))),
+    );
+}
+
+async function resolveConnectionReferences(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<
+      Record<string, unknown>
+    >(env, "connectionreferences", listConnectionReferencesByIdsQuery(ids))
+    .then((records) =>
+      records.filter((record) => ids.includes(String(record.connectionreferenceid || ""))),
+    );
+}
+
+async function resolveEnvironmentVariableDefinitions(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<
+      Record<string, unknown>
+    >(env, "environmentvariabledefinitions", listEnvironmentVariableDefinitionsByIdsQuery(ids))
+    .then((records) =>
+      records.filter((record) =>
+        ids.includes(String(record.environmentvariabledefinitionid || "")),
+      ),
+    );
+}
+
+async function resolveEnvironmentVariableValues(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  ids: string[],
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return client
+    .query<
+      Record<string, unknown>
+    >(env, "environmentvariablevalues", listEnvironmentVariableValuesByIdsQuery(ids))
+    .then((records) =>
+      records.filter((record) => ids.includes(String(record.environmentvariablevalueid || ""))),
+    );
+}
+
 function normalizeDependencyRecord(
   direction: "required" | "dependents",
   sourceComponent: NamedSolutionComponent,
@@ -532,11 +1033,10 @@ function normalizeDependencyRecord(
     direction === "required"
       ? Number(dependency.requiredcomponenttype || 0)
       : Number(dependency.dependentcomponenttype || 0);
-  const otherObjectId = String(
+  const otherObjectId =
     direction === "required"
-      ? dependency.requiredcomponentobjectid || ""
-      : dependency.dependentcomponentobjectid || "",
-  );
+      ? String(dependency.requiredcomponentobjectid || "")
+      : String(dependency.dependentcomponentobjectid || "");
   const otherKey = createComponentKey(otherComponentType, otherObjectId);
 
   return {
@@ -544,9 +1044,7 @@ function normalizeDependencyRecord(
     sourceComponent,
     otherComponentType,
     otherObjectId,
-    otherDisplayName:
-      namedComponentMap.get(otherKey) ||
-      `${getSolutionComponentTypeLabel(otherComponentType)} ${otherObjectId}`,
+    otherDisplayName: namedComponentMap.get(otherKey) || otherObjectId,
     otherInSolution: solutionComponentKeySet.has(otherKey),
     dependencyType: Number(dependency.dependencytype || 0),
   };
@@ -556,26 +1054,28 @@ function deduplicateDependencyRecords(
   records: NormalizedDependencyRecord[],
 ): NormalizedDependencyRecord[] {
   const seen = new Set<string>();
-  const deduped: NormalizedDependencyRecord[] = [];
 
-  for (const record of records) {
+  return records.filter((record) => {
     const key = [
       record.direction,
-      record.sourceComponent.solutioncomponentid,
-      record.otherComponentType,
+      record.sourceComponent.objectid,
+      record.sourceComponent.componenttype,
       record.otherObjectId,
+      record.otherComponentType,
       record.dependencyType,
     ].join("|");
 
     if (seen.has(key)) {
-      continue;
+      return false;
     }
 
     seen.add(key);
-    deduped.push(record);
-  }
+    return true;
+  });
+}
 
-  return deduped;
+function createComponentKey(componentType: number, objectId: string): string {
+  return `${componentType}:${objectId}`;
 }
 
 function collectDependencyIds(
@@ -592,6 +1092,10 @@ function collectDependencyIds(
   ];
 }
 
+function isSupportedComponentType(componentType: number): boolean {
+  return (Object.values(TOOL_COMPONENT_TYPES) as number[]).includes(componentType);
+}
+
 function countDirection(
   records: NormalizedDependencyRecord[],
   direction: "required" | "dependents",
@@ -600,18 +1104,4 @@ function countDirection(
   return records.filter(
     (record) => record.direction === direction && record.otherInSolution === inSolution,
   ).length;
-}
-
-function createComponentKey(componentType: number, objectId: string): string {
-  return `${componentType}:${objectId}`;
-}
-
-function isSupportedComponentType(componentType: number): boolean {
-  return (
-    componentType === SOLUTION_COMPONENT_TYPE.pluginAssembly ||
-    componentType === SOLUTION_COMPONENT_TYPE.pluginStep ||
-    componentType === SOLUTION_COMPONENT_TYPE.pluginImage ||
-    componentType === SOLUTION_COMPONENT_TYPE.workflow ||
-    componentType === SOLUTION_COMPONENT_TYPE.webResource
-  );
 }
