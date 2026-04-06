@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
-import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig } from "./config/environments.js";
+import { loadEnvFiles } from "./config/runtime-env.js";
 import { TokenManager } from "./auth/token-manager.js";
 import { DynamicsClient } from "./client/dynamics-client.js";
 import { instrumentServerToolLogging, requestLogger } from "./logging/request-logger.js";
@@ -254,6 +256,7 @@ async function startHttpServer(
 }
 
 export async function main() {
+  loadRuntimeEnv(process.env, process.cwd());
   requestLogger.configureFromEnv(process.env, process.cwd());
   const config = loadConfig();
   const options = parseRuntimeOptions(process.argv.slice(2), process.env);
@@ -269,6 +272,12 @@ export async function main() {
   const server = buildServer(config, client);
   const transport = new StdioServerTransport();
   await server.connect(transport);
+}
+
+export function loadRuntimeEnv(env: NodeJS.ProcessEnv, cwd: string): string[] {
+  const repoEnvPath = fileURLToPath(new URL("../.env", import.meta.url));
+  const cwdEnvPath = resolve(cwd, ".env");
+  return loadEnvFiles(env, [cwdEnvPath, repoEnvPath]);
 }
 
 function isEntrypoint(): boolean {

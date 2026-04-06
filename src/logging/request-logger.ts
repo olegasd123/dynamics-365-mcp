@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { Notification, Request } from "@modelcontextprotocol/sdk/types.js";
@@ -57,7 +57,7 @@ export class RequestLogger {
 
   configureFromEnv(env: NodeJS.ProcessEnv, cwd = process.cwd()): void {
     const logsDir = env.D365_MCP_LOG_DIR
-      ? resolve(cwd, env.D365_MCP_LOG_DIR)
+      ? resolvePathFromEnv(env.D365_MCP_LOG_DIR, cwd)
       : DEFAULT_LOG_DIR;
     this.config = {
       enabled: parseBoolean(env.D365_MCP_LOG_ENABLED),
@@ -294,6 +294,11 @@ function padMilliseconds(value: number): string {
 
 function parseBoolean(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true" || value?.toLowerCase() === "yes";
+}
+
+function resolvePathFromEnv(inputPath: string, cwd: string): string {
+  const expandedPath = inputPath.replace(/^~(?=$|\/|\\)/, homedir());
+  return isAbsolute(expandedPath) ? expandedPath : resolve(cwd, expandedPath);
 }
 
 function parseNumber(value: string | undefined, fallback: number): number {

@@ -1,5 +1,5 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createToolErrorResponse, createToolSuccessResponse } from "../../tools/response.js";
@@ -93,5 +93,23 @@ describe("request logger", () => {
     expect(text).toContain("TOOL RESPONSE demo_error");
     expect(text).toContain("ERROR tool-response:demo_error");
     expect(text).toContain("Something failed");
+  });
+
+  it("expands ~ in the log directory path", () => {
+    requestLogger.configureFromEnv(
+      {
+        D365_MCP_LOG_ENABLED: "true",
+        D365_MCP_LOG_DIR: "~/.dynamics-365-mcp/logs",
+      },
+      "/tmp/not-used",
+    );
+
+    const loggerState = requestLogger as never as {
+      config: {
+        logsDir: string;
+      };
+    };
+
+    expect(loggerState.config.logsDir).toBe(join(homedir(), ".dynamics-365-mcp", "logs"));
   });
 });
