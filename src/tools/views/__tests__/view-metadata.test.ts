@@ -16,7 +16,9 @@ describe("view metadata", () => {
     const { client } = createRecordingClient({
       dev: {
         solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "core" }],
-        solutioncomponents: [{ solutioncomponentid: "sc-1", objectid: "view-1", componenttype: 26 }],
+        solutioncomponents: [
+          { solutioncomponentid: "sc-1", objectid: "view-1", componenttype: 26 },
+        ],
         savedqueries: [
           {
             savedqueryid: "view-1",

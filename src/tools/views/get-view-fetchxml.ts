@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { ViewScope } from "../../queries/view-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { normalizeXml } from "../../utils/xml-metadata.js";
 import { fetchViewDetails } from "./view-metadata.js";
 
@@ -34,21 +35,20 @@ export function registerGetViewFetchXml(
           solution,
         });
 
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `## View FetchXML: ${view.name}\n\n\`\`\`xml\n${normalizeXml(view.fetchxml)}\n\`\`\``,
-            },
-          ],
-        };
+        const normalizedFetchXml = normalizeXml(view.fetchxml);
+        const text = `## View FetchXML: ${view.name}\n\n\`\`\`xml\n${normalizedFetchXml}\n\`\`\``;
+        return createToolSuccessResponse("get_view_fetchxml", text, `Loaded FetchXML for view '${view.name}' in '${env.name}'.`, {
+          environment: env.name,
+          filters: { table: table || null, scope: scope || null, solution: solution || null },
+          view: {
+            name: view.name,
+            scope: view.scope,
+            table: view.returnedtypecode,
+            fetchXml: normalizedFetchXml,
+          },
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_view_fetchxml", error);
       }
     },
   );

@@ -8,6 +8,7 @@ import {
   listTableManyToManyRelationshipsQuery,
   listTableManyToOneRelationshipsQuery,
   listTableOneToManyRelationshipsQuery,
+  listTablesByMetadataIdsQuery,
   listTablesQuery,
   tableChoiceColumnsPath,
   tableColumnsPath,
@@ -18,6 +19,7 @@ import {
   type ChoiceAttributeMetadataType,
 } from "../../queries/table-queries.js";
 import { resolveSolution } from "../solutions/solution-inventory.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 const TABLE_COMPONENT_TYPE = 1;
 
@@ -114,6 +116,11 @@ export interface TableSchema {
   relationships: TableRelationshipRecord[];
 }
 
+export interface TableColumnWithTableRecord extends TableColumnRecord {
+  tableLogicalName: string;
+  tableDisplayName: string;
+}
+
 interface ChoiceColumnDetails {
   logicalName: string;
   choiceKind: string;
@@ -130,19 +137,32 @@ export async function listTables(
     solution?: string;
   },
 ): Promise<TableRecord[]> {
+  if (options?.solution) {
+    const solutionTableIds = await fetchSolutionTableIds(env, client, options.solution);
+    let tables = await listTablesByMetadataIds(env, client, [...solutionTableIds]);
+
+    if (options?.nameFilter) {
+      const needle = options.nameFilter.toLowerCase();
+      tables = tables.filter(
+        (table) =>
+          table.logicalName.toLowerCase().includes(needle) ||
+          table.schemaName.toLowerCase().includes(needle) ||
+          table.entitySetName.toLowerCase().includes(needle),
+      );
+    }
+
+    return tables.sort((left, right) => left.logicalName.localeCompare(right.logicalName));
+  }
+
   const rawTables = await client.query<Record<string, unknown>>(
     env,
     "EntityDefinitions",
     listTablesQuery(options?.nameFilter),
   );
-  let tables = rawTables.map(normalizeTable);
 
-  if (options?.solution) {
-    const solutionTableIds = await fetchSolutionTableIds(env, client, options.solution);
-    tables = tables.filter((table) => solutionTableIds.has(table.metadataId));
-  }
-
-  return tables.sort((left, right) => left.logicalName.localeCompare(right.logicalName));
+  return rawTables
+    .map(normalizeTable)
+    .sort((left, right) => left.logicalName.localeCompare(right.logicalName));
 }
 
 export async function resolveTable(
@@ -279,7 +299,7 @@ export function buildRelationshipComparisonKey(relationship: TableRelationshipRe
   }
 }
 
-async function fetchColumnsByLogicalName(
+export async function fetchColumnsByLogicalName(
   env: EnvironmentConfig,
   client: DynamicsClient,
   logicalName: string,
@@ -308,8 +328,65 @@ async function fetchColumnsByLogicalName(
   }
 
   return baseColumns
-    .map((column) => normalizeColumn(column, choiceByLogicalName.get(String(column.LogicalName || ""))))
+    .map((column) =>
+      normalizeColumn(column, choiceByLogicalName.get(String(column.LogicalName || ""))),
+    )
     .sort((left, right) => left.logicalName.localeCompare(right.logicalName));
+}
+
+export async function listColumnsByMetadataIds(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  metadataIds: string[],
+  tables?: TableRecord[],
+): Promise<TableColumnWithTableRecord[]> {
+  const uniqueIds = [...new Set(metadataIds.filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const scopedTables = tables || (await listTables(env, client));
+  const columnGroups = await Promise.all(
+    scopedTables.map(async (table) => ({
+      table,
+      columns: await fetchColumnsByLogicalName(env, client, table.logicalName),
+    })),
+  );
+
+  return columnGroups
+    .flatMap(({ table, columns }) =>
+      columns
+        .filter((column) => uniqueIds.includes(column.metadataId))
+        .map((column) => ({
+          ...column,
+          tableLogicalName: table.logicalName,
+          tableDisplayName: table.displayName,
+        })),
+    )
+    .sort(
+      (left, right) =>
+        left.tableLogicalName.localeCompare(right.tableLogicalName) ||
+        left.logicalName.localeCompare(right.logicalName),
+    );
+}
+
+export async function listTablesByMetadataIds(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  metadataIds: string[],
+): Promise<TableRecord[]> {
+  return queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "EntityDefinitions",
+    metadataIds,
+    "MetadataId",
+    listTablesByMetadataIdsQuery,
+  ).then((records) =>
+    records
+      .map(normalizeTable)
+      .sort((left, right) => left.logicalName.localeCompare(right.logicalName)),
+  );
 }
 
 async function fetchKeysByLogicalName(
@@ -444,8 +521,9 @@ function normalizeChoiceColumn(column: Record<string, unknown>): ChoiceColumnDet
   return {
     logicalName: String(column.LogicalName || ""),
     choiceKind: normalizeAttributeType(column.AttributeTypeName || column.AttributeType),
-    optionSetName:
-      String(optionSource?.Name || optionSource?.name || optionSet?.Name || optionSet?.name || ""),
+    optionSetName: String(
+      optionSource?.Name || optionSource?.name || optionSet?.Name || optionSet?.name || "",
+    ),
     isGlobalChoice: getBooleanValue(optionSource?.IsGlobal),
     optionCount,
   };
@@ -620,7 +698,10 @@ function getStringArray(value: unknown): string[] {
   return [];
 }
 
-function getOptionCount(column: Record<string, unknown>, optionSet?: Record<string, unknown>): number | undefined {
+function getOptionCount(
+  column: Record<string, unknown>,
+  optionSet?: Record<string, unknown>,
+): number | undefined {
   const options = Array.isArray(optionSet?.Options) ? optionSet.Options : undefined;
   if (options?.length) {
     return options.length;

@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareWebResourcesData } from "./comparison-data.js";
 
@@ -35,17 +36,14 @@ export function registerCompareWebResources(
           compareContent,
         });
         const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("compare_web_resources", text, `Compared web resources between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+          sourceEnvironment,
+          targetEnvironment,
+          filters: { type: type || null, nameFilter: nameFilter || null, compareContent: compareContent || false },
+          comparison: result,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_web_resources", error);
       }
     },
   );

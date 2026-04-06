@@ -167,6 +167,8 @@ Use this when the user can sign in in a browser and does not have a client secre
 
 `clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
 
+Device-code tokens are stored in `~/.dynamics365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
+
 ### Connection String (single env)
 
 Via `D365_CONNECTION_STRING` env var:
@@ -252,6 +254,8 @@ The scripts store PID files in `run/` and logs in `logs/`.
 
 The scripts also auto-load the repo `.env` file if it exists. This is useful for values like `D365_MCP_CONFIG`, `MCP_PORT`, `MCP_HOST`, `MCP_PATH`, and `NODE_BIN`.
 
+In HTTP mode, `/health` returns a JSON summary with service info, config info, request counters, auth cache state, and client cache state.
+
 Priority order:
 
 - CLI arguments
@@ -262,54 +266,55 @@ Priority order:
 
 ### Metadata Query Tools
 
-| Tool                       | Description                                                   | Key Parameters                               |
-| -------------------------- | ------------------------------------------------------------- | -------------------------------------------- |
-| `list_tables`              | List Dataverse tables with main schema flags                  | `environment`, `nameFilter`, `solution`      |
-| `get_table_schema`         | Show columns, alternate keys, and relationships for one table | `environment`, `table`, `solution`           |
-| `list_table_columns`       | List table columns and choice details                         | `environment`, `table`, `solution`           |
-| `list_table_relationships` | List table relationships                                      | `environment`, `table`, `solution`           |
-| `list_forms`               | List model-driven forms                                       | `environment`, `table`, `type`, `solution`   |
-| `get_form_details`         | Show one form with normalized XML summary                     | `environment`, `formName`, `table`, `solution` |
-| `list_views`               | List system or personal views                                 | `environment`, `table`, `scope`, `solution`  |
-| `get_view_details`         | Show one view with normalized query summary                   | `environment`, `viewName`, `table`, `scope`  |
-| `get_view_fetchxml`        | Return normalized FetchXML for one view                       | `environment`, `viewName`, `table`, `scope`  |
-| `list_custom_apis`         | List Dataverse Custom APIs                                    | `environment`, `nameFilter`                  |
-| `get_custom_api_details`   | Show Custom API request and response metadata                 | `environment`, `apiName`                     |
-| `list_cloud_flows`         | List cloud flows from workflow metadata                       | `environment`, `status`, `solution`          |
-| `get_flow_details`         | Show one cloud flow with parsed trigger/action summary        | `environment`, `flowName`, `solution`        |
-| `list_security_roles`      | List security roles                                           | `environment`, `nameFilter`                  |
-| `get_role_privileges`      | Show privileges for one role                                  | `environment`, `roleName`, `businessUnit`    |
-| `find_table_usage`         | Find where one table is used                                  | `environment`, `table`                       |
-| `find_column_usage`        | Find where one column is used                                 | `environment`, `column`, `table`             |
-| `find_web_resource_usage`  | Find where one web resource is used                           | `environment`, `name`                        |
-| `environment_health_report`| Build a release-health summary                                | `environment`, `solution`                    |
-| `list_plugins`             | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                      |
-| `list_plugin_steps`        | List registered steps for a plugin                            | `environment`, `pluginName`                  |
-| `list_plugin_images`       | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`      |
-| `get_plugin_details`       | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                  |
-| `list_solutions`           | List solutions by display name and unique name                | `environment`, `nameFilter`                  |
-| `get_solution_details`     | Show solution summary and supported components                | `environment`, `solution`                    |
-| `get_solution_dependencies` | Show dependency links for supported solution components      | `environment`, `solution`, `direction`       |
-| `list_workflows`           | List workflows/processes with status                          | `environment`, `category`, `status`          |
-| `list_actions`             | List workflow-based custom actions                            | `environment`                                |
-| `get_workflow_details`     | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName` |
-| `list_web_resources`       | List web resources by type                                    | `environment`, `type`, `nameFilter`          |
-| `get_web_resource_content` | Fetch decoded web resource content                            | `environment`, `name`                        |
+| Tool                        | Description                                                   | Key Parameters                                          |
+| --------------------------- | ------------------------------------------------------------- | ------------------------------------------------------- |
+| `list_tables`               | List Dataverse tables with main schema flags                  | `environment`, `nameFilter`, `solution`                 |
+| `get_table_schema`          | Show columns, alternate keys, and relationships for one table | `environment`, `table`, `solution`                      |
+| `list_table_columns`        | List table columns and choice details                         | `environment`, `table`, `solution`                      |
+| `list_table_relationships`  | List table relationships                                      | `environment`, `table`, `solution`                      |
+| `list_forms`                | List model-driven forms                                       | `environment`, `table`, `type`, `solution`              |
+| `get_form_details`          | Show one form with normalized XML summary                     | `environment`, `formName`, `table`, `solution`          |
+| `list_views`                | List system or personal views                                 | `environment`, `table`, `scope`, `solution`             |
+| `get_view_details`          | Show one view with normalized query summary                   | `environment`, `viewName`, `table`, `scope`             |
+| `get_view_fetchxml`         | Return normalized FetchXML for one view                       | `environment`, `viewName`, `table`, `scope`             |
+| `list_custom_apis`          | List Dataverse Custom APIs                                    | `environment`, `nameFilter`                             |
+| `get_custom_api_details`    | Show Custom API request and response metadata                 | `environment`, `apiName`                                |
+| `list_cloud_flows`          | List cloud flows from workflow metadata                       | `environment`, `status`, `solution`                     |
+| `get_flow_details`          | Show one cloud flow with parsed trigger/action summary        | `environment`, `flowName`, `solution`                   |
+| `list_security_roles`       | List security roles                                           | `environment`, `nameFilter`                             |
+| `get_role_privileges`       | Show privileges for one role                                  | `environment`, `roleName`, `businessUnit`               |
+| `find_table_usage`          | Find where one table is used                                  | `environment`, `table`                                  |
+| `find_column_usage`         | Find where one column is used                                 | `environment`, `column`, `table`                        |
+| `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
+| `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
+| `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
+| `list_plugins`              | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                                 |
+| `list_plugin_steps`         | List registered steps for a plugin                            | `environment`, `pluginName`                             |
+| `list_plugin_images`        | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`                 |
+| `get_plugin_details`        | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                             |
+| `list_solutions`            | List solutions by display name and unique name                | `environment`, `nameFilter`                             |
+| `get_solution_details`      | Show solution summary and supported ALM component groups      | `environment`, `solution`                               |
+| `get_solution_dependencies` | Show dependency links for supported solution components       | `environment`, `solution`, `direction`, `componentType` |
+| `list_workflows`            | List workflows/processes with status                          | `environment`, `category`, `status`                     |
+| `list_actions`              | List workflow-based custom actions                            | `environment`                                           |
+| `get_workflow_details`      | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName`            |
+| `list_web_resources`        | List web resources by type                                    | `environment`, `type`, `nameFilter`                     |
+| `get_web_resource_content`  | Fetch decoded web resource content                            | `environment`, `name`                                   |
 
 ### Cross-Environment Comparison Tools
 
-| Tool                    | Description                              | Key Parameters                                                       |
-| ----------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
-| `compare_table_schema`  | Compare one table schema across envs     | `sourceEnvironment`, `targetEnvironment`, `table`, `targetTable`     |
-| `compare_forms`         | Compare forms across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `type`, `solution` |
-| `compare_views`         | Compare views across envs                | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
-| `compare_custom_apis`   | Compare Custom APIs across envs          | `sourceEnvironment`, `targetEnvironment`, `apiName`                  |
-| `compare_security_roles`| Compare security roles across envs       | `sourceEnvironment`, `targetEnvironment`, `roleName`                 |
-| `compare_plugins`       | Compare plugin registrations across envs | `sourceEnvironment`, `targetEnvironment`, `pluginName`               |
-| `compare_solutions`     | Compare supported solution components    | `sourceEnvironment`, `targetEnvironment`, `solution`                 |
-| `compare_workflows`     | Compare workflow state/definitions       | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName` |
-| `compare_web_resources` | Compare web resource content             | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`       |
-| `compare_environment_matrix` | Compare one baseline against many environments | `baselineEnvironment`, `targetEnvironments`, `componentType` |
+| Tool                         | Description                                    | Key Parameters                                                         |
+| ---------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `compare_table_schema`       | Compare one table schema across envs           | `sourceEnvironment`, `targetEnvironment`, `table`, `targetTable`       |
+| `compare_forms`              | Compare forms across envs                      | `sourceEnvironment`, `targetEnvironment`, `table`, `type`, `solution`  |
+| `compare_views`              | Compare views across envs                      | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
+| `compare_custom_apis`        | Compare Custom APIs across envs                | `sourceEnvironment`, `targetEnvironment`, `apiName`                    |
+| `compare_security_roles`     | Compare security roles across envs             | `sourceEnvironment`, `targetEnvironment`, `roleName`                   |
+| `compare_plugins`            | Compare plugin registrations across envs       | `sourceEnvironment`, `targetEnvironment`, `pluginName`                 |
+| `compare_solutions`          | Compare supported solution components          | `sourceEnvironment`, `targetEnvironment`, `solution`                   |
+| `compare_workflows`          | Compare workflow state/definitions             | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName`   |
+| `compare_web_resources`      | Compare web resource content                   | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`         |
+| `compare_environment_matrix` | Compare one baseline against many environments | `baselineEnvironment`, `targetEnvironments`, `componentType`           |
 
 ### Solution-Aware Filtering
 
@@ -331,7 +336,27 @@ Users can now work with a solution by display name or unique name.
 - `list_cloud_flows` supports `solution`
 - `get_flow_details` supports `solution`
 
-The server resolves the solution first, then filters supported root components from that solution.
+The server resolves the solution first, then filters supported solution components from that solution.
+
+### Supported Solution Coverage
+
+`get_solution_details`, `get_solution_dependencies`, and solution-scoped health checks now understand these solution component groups:
+
+- tables
+- columns
+- security roles
+- forms
+- views
+- workflows
+- dashboards
+- web resources
+- app modules
+- connection references
+- environment variable definitions
+- environment variable values
+- plugin assemblies
+- plugin steps
+- plugin images
 
 ### Dependency View
 
@@ -342,6 +367,26 @@ Use `get_solution_dependencies` when you want to see which supported solution co
 - point outside the current solution
 
 This tool uses Dataverse dependency functions instead of guessing links from names.
+
+`componentType` can now target both old and new groups like `table`, `column`, `security_role`, `dashboard`, `app_module`, `connection_reference`, `environment_variable_definition`, and `environment_variable_value`.
+
+### Impact Analysis
+
+Use `analyze_impact` when you want one report for likely change impact.
+
+- Supported targets: table, column, plugin, workflow, flow, web resource, and solution
+- The report reuses current usage and dependency logic where possible
+- The summary shows risk level, total references, dependency count, and likely affected areas
+- Detailed sections are added only when data exists, like forms, views, plugin steps, cloud flows, or dependencies
+
+### Performance Notes
+
+- Repeated metadata reads now use a short in-memory cache inside the Dynamics client.
+- Solution-scoped table, form, view, and cloud flow reads now use targeted id lookups where possible.
+- Large id-based metadata fetches are split into smaller chunks.
+- Expensive compare and usage tools now add warnings when detail scans are limited for safety.
+
+See [docs/performance-notes.md](docs/performance-notes.md) for the protected test fixtures behind these changes.
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
@@ -364,6 +409,48 @@ Matrix status values:
 - `diff`: item exists in both, but fields are different
 - `missing`: item exists in baseline, but not in target
 - `extra`: item exists in target, but not in baseline
+
+## Structured Output
+
+All tools now return two result forms at the same time:
+
+- `content`: readable text for users
+- `structuredContent`: stable JSON for agents and follow-up tool logic
+
+The top-level JSON shape is the same for every tool:
+
+```json
+{
+  "version": "1",
+  "tool": "tool_name",
+  "ok": true,
+  "summary": "Short summary",
+  "data": {}
+}
+```
+
+Error shape:
+
+```json
+{
+  "version": "1",
+  "tool": "tool_name",
+  "ok": false,
+  "error": {
+    "name": "Error",
+    "message": "Error text"
+  }
+}
+```
+
+The `data` payload depends on the tool, but it follows the same idea:
+
+- list tools usually return fields like `environment`, `filters`, `count`, and `items`
+- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin`, or `solution`
+- compare tools usually return environment names, filters, and one or more diff objects
+- error results always use the shared `error.name` and `error.message` fields
+
+This means an MCP client or another agent can read the text for people, or use `structuredContent` for stable follow-up logic without parsing markdown tables.
 
 ## Examples
 
@@ -444,18 +531,35 @@ Use `uniqueName` when possible. It is safer than display name.
 }
 ```
 
+### Analyze Impact For One Plugin
+
+Use this when you want one report that combines direct usage and dependency risk.
+
+```json
+{
+  "tool": "analyze_impact",
+  "arguments": {
+    "environment": "dev",
+    "componentType": "plugin",
+    "name": "Contoso.Plugins"
+  }
+}
+```
+
 ## Authentication Flow
 
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
-3. If token is valid (not within 5 min of expiry), return cached token
-4. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
+3. For `deviceCode` auth, check the persisted token cache on disk
+4. If a valid access token exists, return it
+5. If a stored refresh token exists, try silent refresh before asking the user to sign in again
+6. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
    - `grant_type=client_credentials`
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-5. For `deviceCode` auth, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
-6. Cache new token with `expiresAt = now + expires_in - 300s`
+7. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+8. Cache the new access token in memory and save device-code tokens to disk when possible
 
 ## Cross-Environment Comparison Design
 
@@ -468,8 +572,10 @@ Use `uniqueName` when possible. It is safer than display name.
 - **Auth failures**: `AuthenticationError` with environment name; tool returns `isError: true`
 - **API errors**: Parse OData `{ error: { code, message } }` → `DynamicsApiError`
 - **Config errors**: Fail fast at startup if no valid environments configured
-- **Rate limits**: Respect `Retry-After` on 429 responses with automatic retry
-- **Timeouts**: 30s default per request, clear error message with environment + URL
+- **Unauthorized responses**: On the first `401`, clear the cached token, refresh it once, and retry once
+- **Transient failures**: Retry `408`, `429`, `500`, `502`, `503`, `504`, plus selected timeout and network errors with backoff
+- **Rate limits**: Respect `Retry-After` when Dataverse returns it
+- **Timeouts and network errors**: Use `DynamicsRequestError` with clear environment and request URL details
 
 ## Notes
 
@@ -488,4 +594,24 @@ Use `uniqueName` when possible. It is safer than display name.
     }
   }
 }
+```
+
+## Testing
+
+Run the full suite:
+
+```bash
+npm test
+```
+
+Run only the runtime transport smoke tests:
+
+```bash
+npm run test:transport
+```
+
+Run only the MCP tool contract tests:
+
+```bash
+npm run test:contracts
 ```

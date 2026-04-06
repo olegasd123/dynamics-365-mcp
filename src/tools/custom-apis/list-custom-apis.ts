@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listCustomApis } from "./custom-api-metadata.js";
 
@@ -24,11 +25,13 @@ export function registerListCustomApis(
         const apis = await listCustomApis(env, client, nameFilter);
 
         if (apis.length === 0) {
-          return {
-            content: [
-              { type: "text" as const, text: `No custom APIs found in '${env.name}'.` },
-            ],
-          };
+          const text = `No custom APIs found in '${env.name}'.`;
+          return createToolSuccessResponse("list_custom_apis", text, text, {
+            environment: env.name,
+            nameFilter: nameFilter || null,
+            count: 0,
+            items: [],
+          });
         }
 
         const rows = apis.map((api) => [
@@ -56,14 +59,14 @@ export function registerListCustomApis(
           rows,
         )}`;
 
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_custom_apis", text, `Found ${apis.length} custom API(s) in '${env.name}'.`, {
+          environment: env.name,
+          nameFilter: nameFilter || null,
+          count: apis.length,
+          items: apis,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_custom_apis", error);
       }
     },
   );

@@ -20,7 +20,9 @@ describe("usage tools", () => {
         },
       },
     });
-    const htmlContent = Buffer.from("<script src='contoso_/scripts/app.js'></script>").toString("base64");
+    const htmlContent = Buffer.from("<script src='contoso_/scripts/app.js'></script>").toString(
+      "base64",
+    );
 
     const { client } = createRecordingClient({
       dev: {
@@ -179,5 +181,46 @@ describe("usage tools", () => {
     expect(columnResponse.content[0].text).toContain("Active Accounts");
     expect(webResourceResponse.content[0].text).toContain("Account Main");
     expect(webResourceResponse.content[0].text).toContain("contoso_/pages/page.html");
+  });
+
+  it("warns when web resource usage needs a broad form scan", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const forms = Array.from({ length: 55 }, (_, index) => ({
+      formid: `form-${index + 1}`,
+      name: `Account Main ${index + 1}`,
+      objecttypecode: "account",
+      type: 2,
+      uniquename: `contoso_account_main_${index + 1}`,
+      formxml: "<form />",
+    }));
+    const { client } = createRecordingClient({
+      dev: {
+        systemforms: forms,
+        webresourceset: [
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/app.js",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('app');").toString("base64"),
+          },
+        ],
+      },
+    });
+
+    registerFindWebResourceUsage(server as never, config, client);
+    const response = await server.getHandler("find_web_resource_usage")({
+      name: "contoso_/scripts/app.js",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain(
+      "Warnings: Form detail scan is limited to 50 forms per request while checking web resource usage.",
+    );
+    expect(response.structuredContent).toMatchObject({
+      data: {
+        warnings: [expect.stringContaining("Form detail scan is limited to 50 forms per request")],
+      },
+    });
   });
 });

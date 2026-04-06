@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { formatNamedDiffSection } from "./diff-section.js";
 import { compareCustomApisData } from "./comparison-data.js";
@@ -56,14 +57,16 @@ export function registerCompareCustomApis(
           }),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("compare_custom_apis", lines.join("\n"), `Compared custom APIs between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+          sourceEnvironment,
+          targetEnvironment,
+          apiName: apiName || null,
+          apiComparison: comparison.result,
+          requestParameterComparison: comparison.requestParameterResult,
+          responsePropertyComparison: comparison.responsePropertyResult,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_custom_apis", error);
       }
     },
   );

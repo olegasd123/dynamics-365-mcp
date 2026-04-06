@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { buildColumnDetails, formatYesNo } from "./table-display.js";
 import { fetchTableColumns } from "./table-metadata.js";
@@ -31,14 +32,14 @@ export function registerListTableColumns(
         const result = await fetchTableColumns(env, client, table, solution);
 
         if (result.columns.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No columns found for table '${result.table.logicalName}' in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `No columns found for table '${result.table.logicalName}' in '${env.name}'.`;
+          return createToolSuccessResponse("list_table_columns", text, text, {
+            environment: env.name,
+            solution: solution || null,
+            table: result.table,
+            count: 0,
+            items: [],
+          });
         }
 
         const rows = result.columns.map((column) => [
@@ -66,17 +67,19 @@ export function registerListTableColumns(
           rows,
         )}`;
 
-        return { content: [{ type: "text" as const, text }] };
+        const items = result.columns.map((column) => ({
+          ...column,
+          details: buildColumnDetails(column) || null,
+        }));
+        return createToolSuccessResponse("list_table_columns", text, `Found ${result.columns.length} column(s) for table '${result.table.logicalName}' in '${env.name}'.`, {
+          environment: env.name,
+          solution: solution || null,
+          table: result.table,
+          count: result.columns.length,
+          items,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_table_columns", error);
       }
     },
   );

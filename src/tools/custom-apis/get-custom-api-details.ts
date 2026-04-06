@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchCustomApiDetails } from "./custom-api-metadata.js";
 
@@ -85,14 +86,14 @@ export function registerGetCustomApiDetails(
           );
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("get_custom_api_details", lines.join("\n"), `Loaded custom API '${details.api.name}' in '${env.name}'.`, {
+          environment: env.name,
+          api: details.api,
+          requestParameters: details.requestParameters,
+          responseProperties: details.responseProperties,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_custom_api_details", error);
       }
     },
   );

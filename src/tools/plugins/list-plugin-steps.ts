@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { getPluginAssemblyByNameQuery } from "../../queries/plugin-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchPluginSteps } from "./plugin-inventory.js";
 
@@ -40,27 +41,25 @@ export function registerListPluginSteps(
         );
 
         if (assemblies.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Plugin assembly '${pluginName}' not found in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `Plugin assembly '${pluginName}' not found in '${env.name}'.`;
+          return createToolSuccessResponse("list_plugin_steps", text, text, {
+            environment: env.name,
+            found: false,
+            pluginName,
+          });
         }
 
         const steps = await fetchPluginSteps(env, client, assemblies);
 
         if (steps.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No steps found for plugin '${pluginName}' in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `No steps found for plugin '${pluginName}' in '${env.name}'.`;
+          return createToolSuccessResponse("list_plugin_steps", text, text, {
+            environment: env.name,
+            found: true,
+            pluginName,
+            count: 0,
+            items: [],
+          });
         }
 
         const headers = ["Step Name", "Message", "Entity", "Stage", "Mode", "Status", "Rank"];
@@ -76,18 +75,22 @@ export function registerListPluginSteps(
           ];
         });
 
+        const items = steps.map((step) => ({
+          ...step,
+          stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
+          modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
+          statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
+        }));
         const text = `## Plugin Steps for '${pluginName}' in '${env.name}'\n\nFound ${steps.length} step(s).\n\n${formatTable(headers, rows)}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_plugin_steps", text, `Found ${steps.length} plugin step(s) for '${pluginName}' in '${env.name}'.`, {
+          environment: env.name,
+          found: true,
+          pluginName,
+          count: steps.length,
+          items,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_plugin_steps", error);
       }
     },
   );

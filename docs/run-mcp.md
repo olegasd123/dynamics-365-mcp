@@ -89,6 +89,8 @@ Optional:
 
 - Add `clientId` if your team has its own public client app.
 - If `clientId` is missing, the server uses a Microsoft public client ID.
+- Device-code tokens are stored in `~/.dynamics365-mcp/token-cache.json` by default.
+- Set `D365_MCP_TOKEN_CACHE` if you want another token-cache path.
 
 ## 6. Where To Get Tenant ID And Client ID
 
@@ -151,6 +153,8 @@ The server uses `stdio`, so it waits for MCP client input. This is normal.
 
 If you use `deviceCode` auth, the server prints sign-in instructions when a tool needs a token. Open the URL shown in the terminal, enter the code, and finish sign-in.
 
+After the first sign-in, the server stores device-code tokens on disk when the auth response allows it. This means a restart often does not need a new browser sign-in.
+
 Example MCP client config:
 
 ```json
@@ -177,9 +181,18 @@ If you want a long-running process on a fixed port, use HTTP mode:
 - Default host: `127.0.0.1`
 - Default port: `3003`
 
+The `/health` endpoint returns JSON with:
+
+- service info like version, PID, uptime, host, port, and path
+- config info like default environment and environment count
+- request counters like total, active, and failed requests
+- auth cache info from the token manager
+- client cache info from the Dataverse client
+
 The scripts auto-load the repo `.env` file if it exists. This is useful for:
 
 - `D365_MCP_CONFIG`
+- `D365_MCP_TOKEN_CACHE`
 - `MCP_PORT`
 - `MCP_HOST`
 - `MCP_PATH`
@@ -195,6 +208,7 @@ Example `.env`:
 
 ```bash
 D365_MCP_CONFIG=~/.dynamics365-mcp/config.json
+D365_MCP_TOKEN_CACHE=~/.dynamics365-mcp/token-cache.json
 MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp
@@ -258,6 +272,18 @@ Run tests:
 
 ```bash
 npm test
+```
+
+Run the transport smoke tests only:
+
+```bash
+npm run test:transport
+```
+
+Run the MCP contract tests only:
+
+```bash
+npm run test:contracts
 ```
 
 Run lint:

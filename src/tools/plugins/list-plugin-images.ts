@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { getPluginAssemblyByNameQuery } from "../../queries/plugin-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchPluginInventory } from "./plugin-inventory.js";
 
@@ -39,14 +40,12 @@ export function registerListPluginImages(
         );
 
         if (assemblies.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Plugin assembly '${pluginName}' not found in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `Plugin assembly '${pluginName}' not found in '${env.name}'.`;
+          return createToolSuccessResponse("list_plugin_images", text, text, {
+            environment: env.name,
+            found: false,
+            pluginName,
+          });
         }
 
         const inventory = await fetchPluginInventory(env, client, assemblies);
@@ -64,14 +63,15 @@ export function registerListPluginImages(
           let filterDesc = `plugin '${pluginName}'`;
           if (message) filterDesc += ` (message: ${message})`;
           if (stepName) filterDesc += ` (step: ${stepName})`;
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No images found for ${filterDesc} in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `No images found for ${filterDesc} in '${env.name}'.`;
+          return createToolSuccessResponse("list_plugin_images", text, text, {
+            environment: env.name,
+            found: true,
+            pluginName,
+            filters: { stepName: stepName || null, message: message || null },
+            count: 0,
+            items: [],
+          });
         }
 
         const headers = ["Step", "Message", "Image Name", "Alias", "Type", "Attributes"];
@@ -84,18 +84,21 @@ export function registerListPluginImages(
           String(image.attributes || "(all)"),
         ]);
 
+        const items = allImages.map((image) => ({
+          ...image,
+          imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
+        }));
         const text = `## Plugin Images for '${pluginName}' in '${env.name}'\n\nFound ${allImages.length} image(s).\n\n${formatTable(headers, rows)}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_plugin_images", text, `Found ${allImages.length} plugin image(s) for '${pluginName}' in '${env.name}'.`, {
+          environment: env.name,
+          found: true,
+          pluginName,
+          filters: { stepName: stepName || null, message: message || null },
+          count: allImages.length,
+          items,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_plugin_images", error);
       }
     },
   );

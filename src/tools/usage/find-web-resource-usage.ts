@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { findWebResourceUsageData } from "./usage-analysis.js";
 
@@ -26,6 +27,9 @@ export function registerFindWebResourceUsage(
 
         lines.push(`## Web Resource Usage: ${usage.resourceName}`);
         lines.push(`- Environment: ${env.name}`);
+        if (usage.warnings && usage.warnings.length > 0) {
+          lines.push(`- Warnings: ${usage.warnings.join(" | ")}`);
+        }
         lines.push(
           `- Summary: Forms ${usage.forms.length} | Other Web Resources ${usage.webResources.length}`,
         );
@@ -52,14 +56,18 @@ export function registerFindWebResourceUsage(
           );
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse(
+          "find_web_resource_usage",
+          lines.join("\n"),
+          `Analyzed usage for web resource '${usage.resourceName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            warnings: usage.warnings || [],
+            usage,
+          },
+        );
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("find_web_resource_usage", error);
       }
     },
   );

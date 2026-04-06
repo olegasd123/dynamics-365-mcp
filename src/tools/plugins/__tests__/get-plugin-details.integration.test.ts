@@ -78,6 +78,31 @@ describe("get_plugin_details tool", () => {
     expect(text).toContain("Message: Create | Entity: account | Stage: Pre-Operation | Mode: Synchronous | Status: Enabled");
     expect(text).toContain("Filtering: name");
     expect(text).toContain("PreImage (PreImage, alias: pre, attributes: name)");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_plugin_details",
+      ok: true,
+      data: {
+        environment: "dev",
+        found: true,
+        counts: {
+          types: 1,
+          steps: 1,
+          images: 1,
+        },
+      },
+    });
+
+    const payload = response.structuredContent as {
+      data: {
+        types: Array<{
+          name: string;
+          steps: Array<{ stageLabel: string; images: Array<{ imageTypeLabel: string }> }>;
+        }>;
+      };
+    };
+    expect(payload.data.types[0].name).toBe("AccountPlugin");
+    expect(payload.data.types[0].steps[0].stageLabel).toBe("Pre-Operation");
+    expect(payload.data.types[0].steps[0].images[0].imageTypeLabel).toBe("PreImage");
   });
 
   it("returns a not found message when the plugin assembly does not exist", async () => {
@@ -97,6 +122,15 @@ describe("get_plugin_details tool", () => {
 
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_plugin_details",
+      ok: true,
+      data: {
+        environment: "dev",
+        found: false,
+        pluginName: "Missing.Plugin",
+      },
+    });
   });
 
   it("returns an error when the client query fails", async () => {
@@ -118,5 +152,12 @@ describe("get_plugin_details tool", () => {
     expect(response.content[0].text).toContain(
       "Dynamics API error [dev] (500): Plugin details failed",
     );
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_plugin_details",
+      ok: false,
+      error: {
+        message: "Dynamics API error [dev] (500): Plugin details failed",
+      },
+    });
   });
 });

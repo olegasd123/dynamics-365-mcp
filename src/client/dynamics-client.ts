@@ -13,6 +13,17 @@ export class DynamicsApiError extends Error {
   }
 }
 
+export class DynamicsRequestError extends Error {
+  constructor(
+    public readonly environment: string,
+    public readonly kind: "timeout" | "network",
+    message: string,
+  ) {
+    super(`Dynamics request ${kind} [${environment}]: ${message}`);
+    this.name = "DynamicsRequestError";
+  }
+}
+
 interface ODataResponse<T> {
   value: T[];
   "@odata.nextLink"?: string;
@@ -22,24 +33,38 @@ interface ODataResponse<T> {
 interface RequestOptions {
   timeout?: number;
   maxPages?: number;
+  cacheTtlMs?: number;
+  bypassCache?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_MAX_PAGES = 10;
+const DEFAULT_CACHE_TTL = 15_000;
+const MAX_CACHE_ENTRIES = 500;
 const MAX_RETRIES = 3;
+const TRANSIENT_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 
 export class DynamicsClient {
   private tokenManager: TokenManager;
+  private readonly responseCache = new Map<string, { expiresAt: number; value: unknown }>();
+  private readonly pendingRequests = new Map<string, Promise<unknown>>();
 
   constructor(tokenManager: TokenManager) {
     this.tokenManager = tokenManager;
   }
 
-  private buildUrl(
-    env: EnvironmentConfig,
-    resourcePath: string,
-    queryParams?: string,
-  ): string {
+  getHealthSnapshot(): {
+    responseCacheEntries: number;
+    pendingRequestCount: number;
+  } {
+    this.deleteExpiredEntries();
+    return {
+      responseCacheEntries: this.responseCache.size,
+      pendingRequestCount: this.pendingRequests.size,
+    };
+  }
+
+  private buildUrl(env: EnvironmentConfig, resourcePath: string, queryParams?: string): string {
     const baseUrl = `${env.url}/api/data/v9.2/${resourcePath}`;
     return queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
   }
@@ -48,14 +73,17 @@ export class DynamicsClient {
     env: EnvironmentConfig,
     url: string,
     timeout: number,
+    options?: { forceRefreshToken?: boolean },
   ): Promise<Response> {
-    const token = await this.tokenManager.getToken(env);
+    const token = await this.tokenManager.getToken(env, {
+      forceRefresh: options?.forceRefreshToken,
+    });
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const response = await fetch(url, {
+      return await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
@@ -65,8 +93,20 @@ export class DynamicsClient {
         },
         signal: controller.signal,
       });
+    } catch (error) {
+      if (isAbortError(error)) {
+        throw new DynamicsRequestError(
+          env.name,
+          "timeout",
+          `Request timed out after ${timeout} ms for ${url}`,
+        );
+      }
 
-      return response;
+      throw new DynamicsRequestError(
+        env.name,
+        "network",
+        `Network failure for ${url}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       clearTimeout(timeoutId);
     }
@@ -77,20 +117,55 @@ export class DynamicsClient {
     url: string,
     timeout: number,
   ): Promise<Response> {
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      const response = await this.makeRequest(env, url, timeout);
+    let attempt = 0;
+    let refreshedAfterUnauthorized = false;
+    let forceRefreshToken = false;
+    let lastResponse: Response | undefined;
 
-      if (response.status === 429) {
-        const retryAfter = response.headers.get("Retry-After");
-        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000 * (attempt + 1);
-        await new Promise((resolve) => setTimeout(resolve, waitMs));
-        continue;
+    while (attempt < MAX_RETRIES) {
+      try {
+        const response = await this.makeRequest(env, url, timeout, {
+          forceRefreshToken,
+        });
+        forceRefreshToken = false;
+
+        if (response.status === 401 && !refreshedAfterUnauthorized) {
+          this.tokenManager.clearCache(env.name);
+          refreshedAfterUnauthorized = true;
+          forceRefreshToken = true;
+          continue;
+        }
+
+        if (TRANSIENT_STATUS_CODES.has(response.status)) {
+          lastResponse = response;
+          if (attempt < MAX_RETRIES - 1) {
+            await delay(getRetryDelayMs(attempt, response.headers.get("Retry-After")));
+            attempt += 1;
+            continue;
+          }
+        }
+
+        return response;
+      } catch (error) {
+        if (isRetriableRequestError(error) && attempt < MAX_RETRIES - 1) {
+          await delay(getRetryDelayMs(attempt));
+          attempt += 1;
+          continue;
+        }
+
+        throw error;
       }
-
-      return response;
     }
 
-    throw new DynamicsApiError(env.name, 429, undefined, "Rate limit exceeded after retries");
+    if (lastResponse) {
+      return lastResponse;
+    }
+
+    throw new DynamicsRequestError(
+      env.name,
+      "network",
+      `Request failed after ${MAX_RETRIES} attempts for ${url}`,
+    );
   }
 
   async query<T = Record<string, unknown>>(
@@ -110,40 +185,35 @@ export class DynamicsClient {
   ): Promise<T[]> {
     const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
     const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
-    let url = this.buildUrl(env, resourcePath, queryParams);
+    const cacheKey = this.buildCacheKey(env, resourcePath, queryParams, `pages=${maxPages}`);
 
-    const allResults: T[] = [];
-    let pageCount = 0;
+    return this.loadCached(
+      cacheKey,
+      options,
+      async () => {
+        let url = this.buildUrl(env, resourcePath, queryParams);
 
-    while (url && pageCount < maxPages) {
-      const response = await this.requestWithRetry(env, url, timeout);
+        const allResults: T[] = [];
+        let pageCount = 0;
 
-      if (!response.ok) {
-        const body = await response.text();
-        let odataCode: string | undefined;
-        let message = body;
+        while (url && pageCount < maxPages) {
+          const response = await this.requestWithRetry(env, url, timeout);
 
-        try {
-          const parsed = JSON.parse(body);
-          if (parsed.error) {
-            odataCode = parsed.error.code;
-            message = parsed.error.message;
+          if (!response.ok) {
+            await this.throwApiError(env, response);
           }
-        } catch {
-          // Use raw body as message
+
+          const data = (await response.json()) as ODataResponse<T>;
+          allResults.push(...data.value);
+
+          url = data["@odata.nextLink"] ?? "";
+          pageCount += 1;
         }
 
-        throw new DynamicsApiError(env.name, response.status, odataCode, message);
-      }
-
-      const data = (await response.json()) as ODataResponse<T>;
-      allResults.push(...data.value);
-
-      url = data["@odata.nextLink"] ?? "";
-      pageCount++;
-    }
-
-    return allResults;
+        return allResults;
+      },
+      options?.cacheTtlMs ?? DEFAULT_CACHE_TTL,
+    );
   }
 
   async querySingle<T = Record<string, unknown>>(
@@ -161,31 +231,186 @@ export class DynamicsClient {
     queryParams?: string,
   ): Promise<T | null> {
     const timeout = DEFAULT_TIMEOUT;
-    const url = this.buildUrl(env, resourcePath, queryParams);
-    const response = await this.requestWithRetry(env, url, timeout);
+    const cacheKey = this.buildCacheKey(env, resourcePath, queryParams, "single");
 
-    if (response.status === 404) {
-      return null;
-    }
+    return this.loadCached(
+      cacheKey,
+      undefined,
+      async () => {
+        const url = this.buildUrl(env, resourcePath, queryParams);
+        const response = await this.requestWithRetry(env, url, timeout);
 
-    if (!response.ok) {
-      const body = await response.text();
-      let odataCode: string | undefined;
-      let message = body;
-
-      try {
-        const parsed = JSON.parse(body);
-        if (parsed.error) {
-          odataCode = parsed.error.code;
-          message = parsed.error.message;
+        if (response.status === 404) {
+          return null;
         }
-      } catch {
-        // Use raw body as message
-      }
 
-      throw new DynamicsApiError(env.name, response.status, odataCode, message);
+        if (!response.ok) {
+          await this.throwApiError(env, response);
+        }
+
+        return (await response.json()) as T;
+      },
+      DEFAULT_CACHE_TTL,
+    );
+  }
+
+  clearCache(environmentName?: string): void {
+    if (!environmentName) {
+      this.responseCache.clear();
+      this.pendingRequests.clear();
+      return;
     }
 
-    return (await response.json()) as T;
+    for (const key of this.responseCache.keys()) {
+      if (key.startsWith(`${environmentName}|`)) {
+        this.responseCache.delete(key);
+      }
+    }
+
+    for (const key of this.pendingRequests.keys()) {
+      if (key.startsWith(`${environmentName}|`)) {
+        this.pendingRequests.delete(key);
+      }
+    }
   }
+
+  private async throwApiError(env: EnvironmentConfig, response: Response): Promise<never> {
+    const body = await response.text();
+    let odataCode: string | undefined;
+    let message = body;
+
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed.error) {
+        odataCode = parsed.error.code;
+        message = parsed.error.message;
+      }
+    } catch {
+      // Use raw body as message
+    }
+
+    throw new DynamicsApiError(env.name, response.status, odataCode, message);
+  }
+
+  private async loadCached<T>(
+    cacheKey: string,
+    options: RequestOptions | undefined,
+    loader: () => Promise<T>,
+    cacheTtlMs: number,
+  ): Promise<T> {
+    if (options?.bypassCache || cacheTtlMs <= 0) {
+      return loader();
+    }
+
+    this.deleteExpiredEntries();
+
+    const cached = this.responseCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return this.cloneValue(cached.value as T);
+    }
+
+    const pending = this.pendingRequests.get(cacheKey);
+    if (pending) {
+      return this.cloneValue((await pending) as T);
+    }
+
+    const request = loader()
+      .then((result) => {
+        this.responseCache.set(cacheKey, {
+          expiresAt: Date.now() + cacheTtlMs,
+          value: this.cloneValue(result),
+        });
+        this.enforceCacheLimit();
+        return result;
+      })
+      .finally(() => {
+        this.pendingRequests.delete(cacheKey);
+      });
+
+    this.pendingRequests.set(cacheKey, request);
+    return this.cloneValue(await request);
+  }
+
+  private buildCacheKey(
+    env: EnvironmentConfig,
+    resourcePath: string,
+    queryParams?: string,
+    extraKey?: string,
+  ): string {
+    return [env.name, resourcePath, queryParams || "", extraKey || ""].join("|");
+  }
+
+  private deleteExpiredEntries(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.responseCache.entries()) {
+      if (entry.expiresAt <= now) {
+        this.responseCache.delete(key);
+      }
+    }
+  }
+
+  private enforceCacheLimit(): void {
+    if (this.responseCache.size <= MAX_CACHE_ENTRIES) {
+      return;
+    }
+
+    const entries = [...this.responseCache.entries()].sort(
+      (left, right) => left[1].expiresAt - right[1].expiresAt,
+    );
+
+    for (const [key] of entries.slice(0, this.responseCache.size - MAX_CACHE_ENTRIES)) {
+      this.responseCache.delete(key);
+    }
+  }
+
+  private cloneValue<T>(value: T): T {
+    if (typeof structuredClone === "function") {
+      return structuredClone(value);
+    }
+
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function getRetryDelayMs(attempt: number, retryAfterHeader?: string | null): number {
+  const retryAfterDelay = parseRetryAfterMs(retryAfterHeader);
+  if (retryAfterDelay !== undefined) {
+    return retryAfterDelay;
+  }
+
+  return Math.min(1000 * 2 ** attempt, 8000);
+}
+
+function parseRetryAfterMs(header?: string | null): number | undefined {
+  if (!header) {
+    return undefined;
+  }
+
+  const seconds = Number.parseInt(header, 10);
+  if (Number.isFinite(seconds)) {
+    return seconds * 1000;
+  }
+
+  const retryDate = Date.parse(header);
+  if (Number.isNaN(retryDate)) {
+    return undefined;
+  }
+
+  return Math.max(retryDate - Date.now(), 0);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
+}
+
+function isRetriableRequestError(error: unknown): boolean {
+  return error instanceof DynamicsRequestError;
 }

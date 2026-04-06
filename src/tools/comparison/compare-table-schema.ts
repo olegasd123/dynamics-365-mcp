@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { diffCollections } from "../../utils/diff.js";
 import { formatNamedDiffSection } from "./diff-section.js";
 import {
@@ -169,17 +170,23 @@ export function registerCompareTableSchema(
           }),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse(
+          "compare_table_schema",
+          lines.join("\n"),
+          `Compared table schema '${sourceSchema.table.logicalName}' between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            sourceTable: sourceSchema.table,
+            targetTable: targetSchema.table,
+            tableComparison: tableDiff,
+            columnComparison: columnDiff,
+            keyComparison: keyDiff,
+            relationshipComparison: relationshipDiff,
+          },
+        );
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_table_schema", error);
       }
     },
   );

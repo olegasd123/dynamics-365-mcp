@@ -1,3 +1,6 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, resolve } from "node:path";
 import type { EnvironmentConfig } from "../config/types.js";
 
 interface CachedToken {
@@ -8,6 +11,7 @@ interface CachedToken {
 interface TokenResponse {
   access_token: string;
   expires_in: number;
+  refresh_token?: string;
 }
 
 interface DeviceCodeResponse {
@@ -19,13 +23,34 @@ interface DeviceCodeResponse {
   verification_uri?: string;
 }
 
+interface PersistedDeviceCodeToken {
+  environmentName: string;
+  tenantId: string;
+  url: string;
+  clientId: string;
+  accessToken?: string;
+  accessTokenExpiresAt?: number;
+  refreshToken?: string;
+  updatedAt: number;
+}
+
+interface PersistedTokenStore {
+  deviceCodeTokens?: PersistedDeviceCodeToken[];
+}
+
+interface TokenRequestOptions {
+  forceRefresh?: boolean;
+}
+
 const DEFAULT_DEVICE_CODE_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 const EXPIRY_BUFFER_SECONDS = 300;
+const DEFAULT_TOKEN_CACHE_PATH = resolve(homedir(), ".dynamics365-mcp", "token-cache.json");
 
 export class AuthenticationError extends Error {
   constructor(
     public readonly environment: string,
     message: string,
+    public readonly errorCode?: string,
   ) {
     super(`Authentication failed for '${environment}': ${message}`);
     this.name = "AuthenticationError";
@@ -35,22 +60,28 @@ export class AuthenticationError extends Error {
 export class TokenManager {
   private cache = new Map<string, CachedToken>();
   private pendingRequests = new Map<string, Promise<string>>();
+  private persistedDeviceCodeTokens = new Map<string, PersistedDeviceCodeToken>();
+  private persistedTokensLoaded = false;
+  private readonly tokenCachePath: string;
 
-  async getToken(env: EnvironmentConfig): Promise<string> {
+  constructor(tokenCachePath?: string) {
+    this.tokenCachePath = resolveTokenCachePath(tokenCachePath);
+  }
+
+  async getToken(env: EnvironmentConfig, options?: TokenRequestOptions): Promise<string> {
     const cached = this.cache.get(env.name);
     const now = Date.now();
 
-    if (cached && now < cached.expiresAt) {
+    if (!options?.forceRefresh && cached && now < cached.expiresAt) {
       return cached.accessToken;
     }
 
-    // Deduplicate concurrent token requests for the same environment
     const pending = this.pendingRequests.get(env.name);
-    if (pending) {
+    if (pending && !options?.forceRefresh) {
       return pending;
     }
 
-    const request = this.requestToken(env);
+    const request = this.requestToken(env, options);
     this.pendingRequests.set(env.name, request);
 
     try {
@@ -60,9 +91,37 @@ export class TokenManager {
     }
   }
 
-  private async requestToken(env: EnvironmentConfig): Promise<string> {
+  getHealthSnapshot(): {
+    cachePath: string;
+    inMemoryEnvironments: string[];
+    persistedDeviceCodeEnvironments: string[];
+    pendingEnvironmentCount: number;
+  } {
+    this.ensurePersistedTokensLoaded();
+
+    return {
+      cachePath: this.tokenCachePath,
+      inMemoryEnvironments: [...this.cache.keys()].sort(),
+      persistedDeviceCodeEnvironments: [...this.persistedDeviceCodeTokens.keys()].sort(),
+      pendingEnvironmentCount: this.pendingRequests.size,
+    };
+  }
+
+  clearCache(environmentName?: string): void {
+    if (environmentName) {
+      this.cache.delete(environmentName);
+      return;
+    }
+
+    this.cache.clear();
+  }
+
+  private async requestToken(
+    env: EnvironmentConfig,
+    options?: TokenRequestOptions,
+  ): Promise<string> {
     if (env.authType === "deviceCode") {
-      return this.requestDeviceCodeToken(env);
+      return this.requestDeviceCodeFlow(env, options);
     }
 
     return this.requestClientSecretToken(env);
@@ -70,41 +129,87 @@ export class TokenManager {
 
   private async requestClientSecretToken(env: EnvironmentConfig): Promise<string> {
     if (!env.clientId || !env.clientSecret) {
-      throw new AuthenticationError(env.name, "clientSecret auth requires clientId and clientSecret");
+      throw new AuthenticationError(
+        env.name,
+        "clientSecret auth requires clientId and clientSecret",
+      );
     }
 
     const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
     const scope = `${env.url}/.default`;
 
-    const body = new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: env.clientId,
-      client_secret: env.clientSecret,
-      scope,
-    });
+    const data = await this.requestTokenEndpoint(
+      env,
+      tokenUrl,
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: env.clientId,
+        client_secret: env.clientSecret,
+        scope,
+      }),
+    );
 
-    let response: Response;
-    try {
-      response = await fetch(tokenUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
+    return this.storeToken(env, data);
+  }
+
+  private async requestDeviceCodeFlow(
+    env: EnvironmentConfig,
+    options?: TokenRequestOptions,
+  ): Promise<string> {
+    const persisted = this.getPersistedDeviceCodeToken(env);
+    const now = Date.now();
+
+    if (
+      !options?.forceRefresh &&
+      persisted?.accessToken &&
+      persisted.accessTokenExpiresAt &&
+      now < persisted.accessTokenExpiresAt
+    ) {
+      this.cache.set(env.name, {
+        accessToken: persisted.accessToken,
+        expiresAt: persisted.accessTokenExpiresAt,
       });
-    } catch (error) {
-      throw new AuthenticationError(
-        env.name,
-        `Network error: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      return persisted.accessToken;
     }
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new AuthenticationError(env.name, `HTTP ${response.status}: ${text}`);
+    if (persisted?.refreshToken) {
+      try {
+        const refreshed = await this.requestRefreshToken(env, persisted.refreshToken);
+        return this.storeToken(env, refreshed);
+      } catch (error) {
+        if (error instanceof AuthenticationError && isRecoverableRefreshFailure(error.errorCode)) {
+          this.updatePersistedDeviceCodeToken(env, {
+            accessToken: undefined,
+            accessTokenExpiresAt: undefined,
+            refreshToken: undefined,
+          });
+        } else {
+          throw error;
+        }
+      }
     }
 
-    const data = (await response.json()) as TokenResponse;
+    return this.requestDeviceCodeToken(env);
+  }
 
-    return this.storeToken(env.name, data);
+  private async requestRefreshToken(
+    env: EnvironmentConfig,
+    refreshToken: string,
+  ): Promise<TokenResponse> {
+    const clientId = env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID;
+    const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
+    const scope = `${env.url}/user_impersonation offline_access openid profile`;
+
+    return this.requestTokenEndpoint(
+      env,
+      tokenUrl,
+      new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: clientId,
+        refresh_token: refreshToken,
+        scope,
+      }),
+    );
   }
 
   private async requestDeviceCodeToken(env: EnvironmentConfig): Promise<string> {
@@ -121,9 +226,14 @@ export class TokenManager {
 
     while (Date.now() < deadline) {
       await this.delay(intervalSeconds * 1000);
-      const pollResult = await this.pollDeviceCodeToken(env, tenantBaseUrl, clientId, deviceCodeData.device_code);
+      const pollResult = await this.pollDeviceCodeToken(
+        env,
+        tenantBaseUrl,
+        clientId,
+        deviceCodeData.device_code,
+      );
       if (pollResult.status === "success") {
-        return this.storeToken(env.name, pollResult.data);
+        return this.storeToken(env, pollResult.data);
       }
 
       if (pollResult.status === "pending") {
@@ -135,7 +245,7 @@ export class TokenManager {
         continue;
       }
 
-      throw new AuthenticationError(env.name, pollResult.message);
+      throw new AuthenticationError(env.name, pollResult.message, pollResult.errorCode);
     }
 
     throw new AuthenticationError(env.name, "Device code expired before sign-in completed");
@@ -147,17 +257,15 @@ export class TokenManager {
     clientId: string,
     scope: string,
   ): Promise<DeviceCodeResponse> {
-    const body = new URLSearchParams({
-      client_id: clientId,
-      scope,
-    });
-
     let response: Response;
     try {
       response = await fetch(`${tenantBaseUrl}/devicecode`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
+        body: new URLSearchParams({
+          client_id: clientId,
+          scope,
+        }).toString(),
       });
     } catch (error) {
       throw new AuthenticationError(
@@ -167,8 +275,7 @@ export class TokenManager {
     }
 
     if (!response.ok) {
-      const text = await response.text();
-      throw new AuthenticationError(env.name, `HTTP ${response.status}: ${text}`);
+      throw await this.createAuthenticationError(env.name, response);
     }
 
     return (await response.json()) as DeviceCodeResponse;
@@ -179,25 +286,22 @@ export class TokenManager {
     tenantBaseUrl: string,
     clientId: string,
     deviceCode: string,
-  ):
-    Promise<
-      | { status: "success"; data: TokenResponse }
-      | { status: "pending" }
-      | { status: "slowDown" }
-      | { status: "error"; message: string }
-    > {
-    const body = new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-      client_id: clientId,
-      device_code: deviceCode,
-    });
-
+  ): Promise<
+    | { status: "success"; data: TokenResponse }
+    | { status: "pending" }
+    | { status: "slowDown" }
+    | { status: "error"; message: string; errorCode?: string }
+  > {
     let response: Response;
     try {
       response = await fetch(`${tenantBaseUrl}/token`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
+        body: new URLSearchParams({
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          client_id: clientId,
+          device_code: deviceCode,
+        }).toString(),
       });
     } catch (error) {
       throw new AuthenticationError(
@@ -213,11 +317,7 @@ export class TokenManager {
       };
     }
 
-    const errorText = await response.text();
-    const errorBody = this.parseDeviceCodeError(errorText) as {
-      error?: string;
-      error_description?: string;
-    };
+    const errorBody = this.parseAuthErrorBody(await response.text());
 
     if (errorBody.error === "authorization_pending") {
       return { status: "pending" };
@@ -230,10 +330,53 @@ export class TokenManager {
     return {
       status: "error",
       message: errorBody.error_description || errorBody.error || `HTTP ${response.status}`,
+      errorCode: errorBody.error,
     };
   }
 
-  private buildDeviceCodeMessage(environmentName: string, deviceCodeData: DeviceCodeResponse): string {
+  private async requestTokenEndpoint(
+    env: EnvironmentConfig,
+    url: string,
+    body: URLSearchParams,
+  ): Promise<TokenResponse> {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+    } catch (error) {
+      throw new AuthenticationError(
+        env.name,
+        `Network error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    if (!response.ok) {
+      throw await this.createAuthenticationError(env.name, response);
+    }
+
+    return (await response.json()) as TokenResponse;
+  }
+
+  private async createAuthenticationError(
+    environmentName: string,
+    response: Response,
+  ): Promise<AuthenticationError> {
+    const body = await response.text();
+    const parsed = this.parseAuthErrorBody(body);
+    return new AuthenticationError(
+      environmentName,
+      parsed.error_description || parsed.error || `HTTP ${response.status}: ${body}`,
+      parsed.error,
+    );
+  }
+
+  private buildDeviceCodeMessage(
+    environmentName: string,
+    deviceCodeData: DeviceCodeResponse,
+  ): string {
     if (deviceCodeData.message) {
       return `\n[${environmentName}] ${deviceCodeData.message}\n\n`;
     }
@@ -243,7 +386,10 @@ export class TokenManager {
     return `\n[${environmentName}] Sign in at ${verificationUrl} with code ${userCode}\n\n`;
   }
 
-  private parseDeviceCodeError(body: string): { error?: string; error_description?: string } {
+  private parseAuthErrorBody(body: string): {
+    error?: string;
+    error_description?: string;
+  } {
     try {
       return JSON.parse(body) as { error?: string; error_description?: string };
     } catch {
@@ -251,14 +397,115 @@ export class TokenManager {
     }
   }
 
-  private storeToken(environmentName: string, data: TokenResponse): string {
-    const expiresInSeconds = Math.max(data.expires_in - EXPIRY_BUFFER_SECONDS, 60);
-    this.cache.set(environmentName, {
+  private storeToken(env: EnvironmentConfig, data: TokenResponse): string {
+    const expiresAt = Date.now() + computeExpiresInMs(data.expires_in);
+    this.cache.set(env.name, {
       accessToken: data.access_token,
-      expiresAt: Date.now() + expiresInSeconds * 1000,
+      expiresAt,
     });
 
+    if (env.authType === "deviceCode") {
+      this.updatePersistedDeviceCodeToken(env, {
+        accessToken: data.access_token,
+        accessTokenExpiresAt: expiresAt,
+        refreshToken: data.refresh_token || this.getPersistedDeviceCodeToken(env)?.refreshToken,
+      });
+    }
+
     return data.access_token;
+  }
+
+  private getPersistedDeviceCodeToken(
+    env: EnvironmentConfig,
+  ): PersistedDeviceCodeToken | undefined {
+    this.ensurePersistedTokensLoaded();
+    const persisted = this.persistedDeviceCodeTokens.get(env.name);
+    if (!persisted) {
+      return undefined;
+    }
+
+    const expectedClientId = env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID;
+    if (
+      persisted.tenantId !== env.tenantId ||
+      persisted.url !== env.url ||
+      persisted.clientId !== expectedClientId
+    ) {
+      return undefined;
+    }
+
+    return persisted;
+  }
+
+  private updatePersistedDeviceCodeToken(
+    env: EnvironmentConfig,
+    update: {
+      accessToken?: string;
+      accessTokenExpiresAt?: number;
+      refreshToken?: string;
+    },
+  ): void {
+    this.ensurePersistedTokensLoaded();
+    const existing = this.getPersistedDeviceCodeToken(env);
+    const persisted: PersistedDeviceCodeToken = {
+      environmentName: env.name,
+      tenantId: env.tenantId,
+      url: env.url,
+      clientId: env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID,
+      accessToken: update.accessToken,
+      accessTokenExpiresAt: update.accessTokenExpiresAt,
+      refreshToken: update.refreshToken,
+      updatedAt: Date.now(),
+    };
+
+    if (!persisted.accessToken && !persisted.refreshToken && !existing?.refreshToken) {
+      this.persistedDeviceCodeTokens.delete(env.name);
+      this.writePersistedTokens();
+      return;
+    }
+
+    if (!persisted.refreshToken && existing?.refreshToken) {
+      persisted.refreshToken = existing.refreshToken;
+    }
+
+    this.persistedDeviceCodeTokens.set(env.name, persisted);
+    this.writePersistedTokens();
+  }
+
+  private ensurePersistedTokensLoaded(): void {
+    if (this.persistedTokensLoaded) {
+      return;
+    }
+
+    this.persistedTokensLoaded = true;
+    if (!existsSync(this.tokenCachePath)) {
+      return;
+    }
+
+    try {
+      const raw = readFileSync(this.tokenCachePath, "utf-8");
+      const parsed = JSON.parse(raw) as PersistedTokenStore;
+      for (const token of parsed.deviceCodeTokens || []) {
+        if (token.environmentName) {
+          this.persistedDeviceCodeTokens.set(token.environmentName, token);
+        }
+      }
+    } catch {
+      this.persistedDeviceCodeTokens.clear();
+    }
+  }
+
+  private writePersistedTokens(): void {
+    try {
+      mkdirSync(dirname(this.tokenCachePath), { recursive: true });
+      const payload: PersistedTokenStore = {
+        deviceCodeTokens: [...this.persistedDeviceCodeTokens.values()].sort((left, right) =>
+          left.environmentName.localeCompare(right.environmentName),
+        ),
+      };
+      writeFileSync(this.tokenCachePath, JSON.stringify(payload, null, 2));
+    } catch {
+      // Persistence is best-effort. The token should still be usable in memory.
+    }
   }
 
   private delay(ms: number): Promise<void> {
@@ -266,12 +513,22 @@ export class TokenManager {
       setTimeout(resolve, ms);
     });
   }
+}
 
-  clearCache(environmentName?: string): void {
-    if (environmentName) {
-      this.cache.delete(environmentName);
-    } else {
-      this.cache.clear();
-    }
-  }
+function computeExpiresInMs(expiresInSeconds: number): number {
+  const bufferedSeconds = Math.max(expiresInSeconds - EXPIRY_BUFFER_SECONDS, 60);
+  return bufferedSeconds * 1000;
+}
+
+function resolveTokenCachePath(tokenCachePath?: string): string {
+  const configuredPath = tokenCachePath || process.env.D365_MCP_TOKEN_CACHE;
+  return resolve((configuredPath || DEFAULT_TOKEN_CACHE_PATH).replace(/^~/, homedir()));
+}
+
+function isRecoverableRefreshFailure(errorCode?: string): boolean {
+  return (
+    errorCode === "invalid_grant" ||
+    errorCode === "invalid_request" ||
+    errorCode === "interaction_required"
+  );
 }

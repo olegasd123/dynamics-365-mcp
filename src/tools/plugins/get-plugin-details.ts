@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import {
   getPluginAssemblyByNameQuery,
   listPluginTypesForAssembliesQuery,
@@ -40,14 +41,12 @@ export function registerGetPluginDetails(
         );
 
         if (assemblies.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Plugin assembly '${pluginName}' not found in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `Plugin assembly '${pluginName}' not found in '${env.name}'.`;
+          return createToolSuccessResponse("get_plugin_details", text, text, {
+            environment: env.name,
+            found: false,
+            pluginName,
+          });
         }
 
         const assembly = assemblies[0];
@@ -127,17 +126,54 @@ export function registerGetPluginDetails(
           }
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        const structuredTypes = types.map((type) => {
+          const steps = (stepsByPluginTypeId.get(String(type.plugintypeid || "")) || []).map((step) => ({
+            ...step,
+            stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
+            modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
+            statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
+            images: (imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || []).map((image) => ({
+              ...image,
+              imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
+            })),
+          }));
+
+          return {
+            plugintypeid: String(type.plugintypeid || ""),
+            name: String(type.name || ""),
+            fullName: String(type.typename || ""),
+            isWorkflowActivity: Boolean(type.isworkflowactivity),
+            steps,
+          };
+        });
+
+        return createToolSuccessResponse(
+          "get_plugin_details",
+          lines.join("\n"),
+          `Loaded plugin '${String(assembly.name || pluginName)}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            found: true,
+            plugin: {
+              pluginassemblyid: String(assembly.pluginassemblyid || ""),
+              name: String(assembly.name || ""),
+              version: String(assembly.version || ""),
+              isolation: assembly.isolationmode === 2 ? "Sandbox" : "None",
+              managed: Boolean(assembly.ismanaged),
+              publicKeyToken: String(assembly.publickeytoken || ""),
+              createdOn: String(assembly.createdon || "").slice(0, 10),
+              modifiedOn: String(assembly.modifiedon || "").slice(0, 10),
             },
-          ],
-          isError: true,
-        };
+            counts: {
+              types: structuredTypes.length,
+              steps: inventory.steps.length,
+              images: inventory.images.length,
+            },
+            types: structuredTypes,
+          },
+        );
+      } catch (error) {
+        return createToolErrorResponse("get_plugin_details", error);
       }
     },
   );

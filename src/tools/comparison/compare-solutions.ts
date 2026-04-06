@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { diffCollections } from "../../utils/diff.js";
 import { fetchSolutionInventory } from "../solutions/solution-inventory.js";
 import { formatNamedDiffSection } from "./diff-section.js";
@@ -162,17 +163,21 @@ export function registerCompareSolutions(
           }),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("compare_solutions", lines.join("\n"), `Compared solution '${solution}' between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+          sourceEnvironment,
+          targetEnvironment,
+          solution,
+          targetSolution: targetSolution || null,
+          pluginComparison: pluginDiff,
+          formComparison: formDiff,
+          viewComparison: viewDiff,
+          pluginStepComparison: pluginStepDiff,
+          pluginImageComparison: pluginImageDiff,
+          workflowComparison: workflowDiff,
+          webResourceComparison: webResourceDiff,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("compare_solutions", error);
       }
     },
   );

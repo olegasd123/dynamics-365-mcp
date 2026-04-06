@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { getWorkflowDetailsByIdentityQuery } from "../../queries/workflow-queries.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
@@ -38,12 +39,10 @@ export function registerGetWorkflowDetails(
     async ({ environment, workflowName, uniqueName }) => {
       try {
         if (!workflowName && !uniqueName) {
-          return {
-            content: [
-              { type: "text" as const, text: "Please provide either workflowName or uniqueName." },
-            ],
-            isError: true,
-          };
+          return createToolErrorResponse(
+            "get_workflow_details",
+            "Please provide either workflowName or uniqueName.",
+          );
         }
 
         const env = getEnvironment(config, environment);
@@ -55,18 +54,24 @@ export function registerGetWorkflowDetails(
         );
 
         if (workflows.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Workflow '${workflowName || uniqueName}' not found in '${env.name}'.`,
-              },
-            ],
-          };
+          const text = `Workflow '${workflowName || uniqueName}' not found in '${env.name}'.`;
+          return createToolSuccessResponse("get_workflow_details", text, text, {
+            environment: env.name,
+            found: false,
+            workflowName: workflowName || null,
+            uniqueName: uniqueName || null,
+          });
         }
 
         const w = workflows[0];
         const lines: string[] = [];
+        const triggers: string[] = [];
+        if (w.triggeroncreate) triggers.push("Create");
+        if (w.triggerondelete) triggers.push("Delete");
+        if (w.triggeronupdateattributelist)
+          triggers.push(`Update (${w.triggeronupdateattributelist})`);
+        const parsedInputParameters = parseJsonValue(w.inputparameters);
+        const parsedClientData = parseJsonValue(w.clientdata);
 
         lines.push(`## Workflow: ${w.name}`);
         lines.push(`- **Unique Name**: ${w.uniquename || "(none)"}`);
@@ -85,11 +90,6 @@ export function registerGetWorkflowDetails(
 
         lines.push("");
         lines.push("### Triggers");
-        const triggers: string[] = [];
-        if (w.triggeroncreate) triggers.push("Create");
-        if (w.triggerondelete) triggers.push("Delete");
-        if (w.triggeronupdateattributelist)
-          triggers.push(`Update (${w.triggeronupdateattributelist})`);
         lines.push(triggers.length > 0 ? triggers.join(", ") : "None / Manual");
 
         if (w.inputparameters) {
@@ -109,18 +109,54 @@ export function registerGetWorkflowDetails(
           }
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        return createToolSuccessResponse(
+          "get_workflow_details",
+          lines.join("\n"),
+          `Loaded workflow '${String(w.name || workflowName || uniqueName)}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            found: true,
+            workflow: {
+              workflowid: String(w.workflowid || ""),
+              name: String(w.name || ""),
+              uniqueName: String(w.uniquename || ""),
+              category: Number(w.category || 0),
+              categoryLabel: CATEGORY_LABELS[w.category as number] || String(w.category),
+              state: Number(w.statecode || 0),
+              stateLabel: STATE_LABELS[w.statecode as number] || String(w.statecode),
+              mode: Number(w.mode || 0),
+              modeLabel: MODE_LABELS[w.mode as number] || String(w.mode),
+              scope: Number(w.scope || 0),
+              scopeLabel: SCOPE_LABELS[w.scope as number] || String(w.scope),
+              primaryEntity: String(w.primaryentity || "none"),
+              isManaged: Boolean(w.ismanaged),
+              description: String(w.description || ""),
+              createdOn: String(w.createdon || "").slice(0, 10),
+              modifiedOn: String(w.modifiedon || "").slice(0, 10),
+              triggers,
+              triggerOnUpdateAttributes: String(w.triggeronupdateattributelist || ""),
+              inputParameters: parsedInputParameters,
+              inputParametersRaw: String(w.inputparameters || ""),
+              clientData: parsedClientData,
+              clientDataRaw: String(w.clientdata || ""),
             },
-          ],
-          isError: true,
-        };
+          },
+        );
+      } catch (error) {
+        return createToolErrorResponse("get_workflow_details", error);
       }
     },
   );
+}
+
+function parseJsonValue(value: unknown): unknown {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }

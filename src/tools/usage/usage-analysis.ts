@@ -4,7 +4,11 @@ import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
 import { listWebResourcesWithContentQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
-import { fetchTableRelationships, resolveTable, type TableRelationshipRecord } from "../tables/table-metadata.js";
+import {
+  fetchTableRelationships,
+  resolveTable,
+  type TableRelationshipRecord,
+} from "../tables/table-metadata.js";
 import { fetchFormDetails, listForms, type FormDetails } from "../forms/form-metadata.js";
 import { fetchViewDetails, listViews, type ViewDetails } from "../views/view-metadata.js";
 import { fetchCustomApiInventory, listCustomApis } from "../custom-apis/custom-api-metadata.js";
@@ -12,10 +16,13 @@ import { fetchFlowDetails, listCloudFlows, type CloudFlowDetails } from "../flow
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
 
 const TEXT_WEB_RESOURCE_TYPES = new Set([1, 2, 3, 4, 9, 12]);
+const MAX_USAGE_DETAIL_ITEMS = 50;
+const MAX_WEB_RESOURCE_CONTENT_SCAN = 200;
 
 export interface TableUsageData {
   tableLogicalName: string;
   tableDisplayName: string;
+  warnings?: string[];
   pluginSteps: Array<{ name: string; assemblyName: string; messageName: string }>;
   workflows: Array<{ name: string; uniqueName: string; category: number }>;
   forms: Array<{ name: string; typeLabel: string }>;
@@ -28,6 +35,7 @@ export interface TableUsageData {
 export interface ColumnUsageData {
   columnName: string;
   tableLogicalName?: string;
+  warnings?: string[];
   pluginSteps: Array<{ name: string; assemblyName: string; attributes: string }>;
   pluginImages: Array<{ name: string; stepName: string; assemblyName: string; attributes: string }>;
   workflows: Array<{ name: string; uniqueName: string; triggerAttributes: string }>;
@@ -39,6 +47,7 @@ export interface ColumnUsageData {
 
 export interface WebResourceUsageData {
   resourceName: string;
+  warnings?: string[];
   forms: Array<{ name: string; table: string; typeLabel: string; usage: string }>;
   webResources: Array<{ name: string; type: number }>;
 }
@@ -49,6 +58,7 @@ export async function findTableUsageData(
   tableRef: string,
 ): Promise<TableUsageData> {
   const table = await resolveTable(env, client, tableRef);
+  const warnings: string[] = [];
   const [pluginAssemblies, workflows, forms, views, customApis, cloudFlows, relationships] =
     await Promise.all([
       client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
@@ -60,17 +70,25 @@ export async function findTableUsageData(
       fetchTableRelationships(env, client, table.logicalName),
     ]);
 
+  const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
+  if (cloudFlows.length > MAX_USAGE_DETAIL_ITEMS) {
+    warnings.push(
+      `Cloud flow detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} flows per request. Use a narrower environment when you need a full search.`,
+    );
+  }
+
   const [pluginInventory, customApiInventory, flowDetails] = await Promise.all([
     fetchPluginInventory(env, client, pluginAssemblies),
     fetchCustomApiInventory(env, client, customApis),
     Promise.all(
-      cloudFlows.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name)),
+      flowCandidates.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name)),
     ),
   ]);
 
   return {
     tableLogicalName: table.logicalName,
     tableDisplayName: table.displayName,
+    warnings,
     pluginSteps: pluginInventory.steps
       .filter((step) => step.primaryEntity === table.logicalName)
       .map((step) => ({
@@ -105,7 +123,9 @@ export async function findTableUsageData(
       ...customApiInventory.requestParameters
         .filter((parameter) => parameter.logicalentityname === table.logicalName)
         .map((parameter) => ({
-          name: customApis.find((api) => api.customapiid === parameter.customapiid)?.name || parameter.customapiid,
+          name:
+            customApis.find((api) => api.customapiid === parameter.customapiid)?.name ||
+            parameter.customapiid,
           uniqueName:
             customApis.find((api) => api.customapiid === parameter.customapiid)?.uniquename ||
             parameter.customapiid,
@@ -114,7 +134,9 @@ export async function findTableUsageData(
       ...customApiInventory.responseProperties
         .filter((property) => property.logicalentityname === table.logicalName)
         .map((property) => ({
-          name: customApis.find((api) => api.customapiid === property.customapiid)?.name || property.customapiid,
+          name:
+            customApis.find((api) => api.customapiid === property.customapiid)?.name ||
+            property.customapiid,
           uniqueName:
             customApis.find((api) => api.customapiid === property.customapiid)?.uniquename ||
             property.customapiid,
@@ -138,26 +160,65 @@ export async function findColumnUsageData(
   tableRef?: string,
 ): Promise<ColumnUsageData> {
   const table = tableRef ? await resolveTable(env, client, tableRef) : null;
+  const warnings: string[] = [];
   const [pluginAssemblies, workflows, forms, views, cloudFlows, relationships] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
     client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery()),
     listForms(env, client, table ? { table: table.logicalName } : undefined),
-    listViews(env, client, table ? { table: table.logicalName, scope: "system" } : { scope: "system" }),
+    listViews(
+      env,
+      client,
+      table ? { table: table.logicalName, scope: "system" } : { scope: "system" },
+    ),
     listCloudFlows(env, client),
-    table ? fetchTableRelationships(env, client, table.logicalName) : Promise.resolve({ table: undefined as never, relationships: [] }),
+    table
+      ? fetchTableRelationships(env, client, table.logicalName)
+      : Promise.resolve({ table: undefined as never, relationships: [] }),
   ]);
+
+  const formCandidates = forms.slice(0, MAX_USAGE_DETAIL_ITEMS);
+  const viewCandidates = views.slice(0, MAX_USAGE_DETAIL_ITEMS);
+  const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
+
+  if (forms.length > MAX_USAGE_DETAIL_ITEMS) {
+    warnings.push(
+      `Form detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} forms per request. Add a table filter for a smaller scope.`,
+    );
+  }
+  if (views.length > MAX_USAGE_DETAIL_ITEMS) {
+    warnings.push(
+      `View detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} views per request. Add a table filter for a smaller scope.`,
+    );
+  }
+  if (cloudFlows.length > MAX_USAGE_DETAIL_ITEMS) {
+    warnings.push(
+      `Cloud flow detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} flows per request. Add a table filter for a smaller scope.`,
+    );
+  }
 
   const [pluginInventory, formDetails, viewDetails, flowDetails] = await Promise.all([
     fetchPluginInventory(env, client, pluginAssemblies),
-    Promise.all(forms.map((form) => fetchFormDetails(env, client, form.uniquename || form.name))),
-    Promise.all(views.map((view) => fetchViewDetails(env, client, view.name, { table: view.returnedtypecode, scope: view.scope }))),
-    Promise.all(cloudFlows.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name))),
+    Promise.all(
+      formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.name)),
+    ),
+    Promise.all(
+      viewCandidates.map((view) =>
+        fetchViewDetails(env, client, view.name, {
+          table: view.returnedtypecode,
+          scope: view.scope,
+        }),
+      ),
+    ),
+    Promise.all(
+      flowCandidates.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name)),
+    ),
   ]);
   const normalizedColumn = columnName.toLowerCase();
 
   return {
     columnName,
     tableLogicalName: table?.logicalName,
+    warnings,
     pluginSteps: pluginInventory.steps
       .filter(
         (step) =>
@@ -170,9 +231,7 @@ export async function findColumnUsageData(
         attributes: String(step.filteringattributes || ""),
       })),
     pluginImages: pluginInventory.images
-      .filter((image) =>
-        splitCsv(String(image.attributes || "")).includes(normalizedColumn),
-      )
+      .filter((image) => splitCsv(String(image.attributes || "")).includes(normalizedColumn))
       .map((image) => ({
         name: image.name,
         stepName: image.stepName,
@@ -225,6 +284,7 @@ export async function findWebResourceUsageData(
   client: DynamicsClient,
   resourceName: string,
 ): Promise<WebResourceUsageData> {
+  const warnings: string[] = [];
   const [resourceRecords, forms, allResources] = await Promise.all([
     client.query<Record<string, unknown>>(
       env,
@@ -243,12 +303,26 @@ export async function findWebResourceUsageData(
     throw new Error(`Web resource '${resourceName}' not found in '${env.name}'.`);
   }
 
+  const formCandidates = forms.slice(0, MAX_USAGE_DETAIL_ITEMS);
+  const resourceCandidates = allResources.slice(0, MAX_WEB_RESOURCE_CONTENT_SCAN);
+  if (forms.length > MAX_USAGE_DETAIL_ITEMS) {
+    warnings.push(
+      `Form detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} forms per request while checking web resource usage.`,
+    );
+  }
+  if (allResources.length > MAX_WEB_RESOURCE_CONTENT_SCAN) {
+    warnings.push(
+      `Referenced web resource content scan is limited to ${MAX_WEB_RESOURCE_CONTENT_SCAN} resources per request.`,
+    );
+  }
+
   const formDetails = await Promise.all(
-    forms.map((form) => fetchFormDetails(env, client, form.uniquename || form.name)),
+    formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.name)),
   );
 
   return {
     resourceName,
+    warnings,
     forms: formDetails
       .filter((form) => formReferencesWebResource(form, resourceName))
       .map((form) => ({
@@ -257,7 +331,7 @@ export async function findWebResourceUsageData(
         typeLabel: form.typeLabel,
         usage: form.summary.libraries.includes(resourceName) ? "library" : "form xml",
       })),
-    webResources: allResources
+    webResources: resourceCandidates
       .filter((resource) => String(resource.name || "") !== resourceName)
       .filter((resource) => webResourceContainsReference(resource, resourceName))
       .map((resource) => ({
@@ -290,10 +364,7 @@ function viewReferencesColumn(view: ViewDetails, columnName: string): boolean {
 }
 
 function formReferencesWebResource(form: FormDetails, resourceName: string): boolean {
-  return (
-    form.summary.libraries.includes(resourceName) ||
-    form.formxml.includes(resourceName)
-  );
+  return form.summary.libraries.includes(resourceName) || form.formxml.includes(resourceName);
 }
 
 function webResourceContainsReference(

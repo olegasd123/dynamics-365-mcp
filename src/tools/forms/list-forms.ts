@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { FormType } from "../../queries/form-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listForms } from "./form-metadata.js";
 
@@ -38,11 +39,13 @@ export function registerListForms(
         });
 
         if (forms.length === 0) {
-          return {
-            content: [
-              { type: "text" as const, text: `No forms found in '${env.name}' with the specified filters.` },
-            ],
-          };
+          const text = `No forms found in '${env.name}' with the specified filters.`;
+          return createToolSuccessResponse("list_forms", text, text, {
+            environment: env.name,
+            filters: { table: table || null, type: type || null, nameFilter: nameFilter || null, solution: solution || null },
+            count: 0,
+            items: [],
+          });
         }
 
         const rows = forms.map((form) => [
@@ -69,14 +72,14 @@ export function registerListForms(
           ["Table", "Type", "Name", "Unique Name", "Default", "State", "Managed", "Modified"],
           rows,
         )}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_forms", text, `Found ${forms.length} form(s) in '${env.name}'.`, {
+          environment: env.name,
+          filters: { table: table || null, type: type || null, nameFilter: nameFilter || null, solution: solution || null },
+          count: forms.length,
+          items: forms,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_forms", error);
       }
     },
   );

@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listSolutions } from "./solution-inventory.js";
 
@@ -27,14 +28,13 @@ export function registerListSolutions(
         const solutions = await listSolutions(env, client, nameFilter);
 
         if (solutions.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No solutions found in '${env.name}'${nameFilter ? ` for '${nameFilter}'.` : "."}`,
-              },
-            ],
-          };
+          const text = `No solutions found in '${env.name}'${nameFilter ? ` for '${nameFilter}'.` : "."}`;
+          return createToolSuccessResponse("list_solutions", text, text, {
+            environment: env.name,
+            nameFilter: nameFilter || null,
+            count: 0,
+            items: [],
+          });
         }
 
         const headers = ["Display Name", "Unique Name", "Version", "Managed", "Modified"];
@@ -47,17 +47,14 @@ export function registerListSolutions(
         ]);
 
         const text = `## Solutions in '${env.name}'${nameFilter ? ` (filter='${nameFilter}')` : ""}\n\nFound ${solutions.length} solution(s).\n\n${formatTable(headers, rows)}`;
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_solutions", text, `Found ${solutions.length} solution(s) in '${env.name}'.`, {
+          environment: env.name,
+          nameFilter: nameFilter || null,
+          count: solutions.length,
+          items: solutions,
+        });
       } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_solutions", error);
       }
     },
   );

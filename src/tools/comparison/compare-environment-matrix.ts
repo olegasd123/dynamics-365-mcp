@@ -5,6 +5,7 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
   comparePluginsData,
@@ -25,6 +26,18 @@ const COMPONENT_TYPE_LABELS = {
 } as const;
 
 type ComponentType = keyof typeof COMPONENT_TYPE_LABELS;
+
+interface MatrixSectionData {
+  title: string;
+  report: MatrixReport;
+}
+
+interface ComponentSection {
+  componentType: ComponentType;
+  title: string;
+  text: string;
+  reports: MatrixSectionData[];
+}
 
 interface MatrixFilters {
   pluginName?: string;
@@ -102,15 +115,10 @@ export function registerCompareEnvironmentMatrix(
         );
 
         if (resolvedTargetNames.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No target environments found for baseline '${baselineName}'.`,
-              },
-            ],
-            isError: true,
-          };
+          return createToolErrorResponse(
+            "compare_environment_matrix",
+            `No target environments found for baseline '${baselineName}'.`,
+          );
         }
 
         const selectedComponents = resolveComponentTypes(componentType);
@@ -155,20 +163,35 @@ export function registerCompareEnvironmentMatrix(
 
         for (const section of sections) {
           lines.push("");
-          lines.push(section);
+          lines.push(section.text);
         }
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        return createToolSuccessResponse(
+          "compare_environment_matrix",
+          lines.join("\n"),
+          `Compared baseline '${baselineName}' against ${resolvedTargetNames.length} environment(s).`,
+          {
+            baselineEnvironment: baselineName,
+            targetEnvironments: resolvedTargetNames,
+            componentTypes: selectedComponents,
+            filters: {
+              pluginName: pluginName || null,
+              workflowName: workflowName || null,
+              category: category || null,
+              type: type || null,
+              nameFilter: nameFilter || null,
+              compareContent: compareContent || false,
             },
-          ],
-          isError: true,
-        };
+            maxRows: rowLimit,
+            sections: sections.map((section) => ({
+              componentType: section.componentType,
+              title: section.title,
+              reports: section.reports,
+            })),
+          },
+        );
+      } catch (error) {
+        return createToolErrorResponse("compare_environment_matrix", error);
       }
     },
   );
@@ -182,7 +205,7 @@ async function buildComponentSection(
   targetNames: string[],
   filters: MatrixFilters,
   maxRows: number,
-): Promise<string> {
+): Promise<ComponentSection> {
   switch (componentType) {
     case "plugins":
       return renderPluginMatrixSections(
@@ -200,7 +223,8 @@ async function buildComponentSection(
         maxRows,
       );
     case "workflows":
-      return renderMatrixSection(
+      return renderSingleMatrixComponent(
+        "workflows",
         COMPONENT_TYPE_LABELS.workflows,
         baselineName,
         targetNames,
@@ -219,7 +243,8 @@ async function buildComponentSection(
         ),
       );
     case "web_resources":
-      return renderMatrixSection(
+      return renderSingleMatrixComponent(
+        "web_resources",
         COMPONENT_TYPE_LABELS.web_resources,
         baselineName,
         targetNames,
@@ -310,12 +335,27 @@ function renderMatrixSection(
   return lines.join("\n");
 }
 
+function renderSingleMatrixComponent(
+  componentType: ComponentType,
+  title: string,
+  baselineName: string,
+  targetNames: string[],
+  report: MatrixReport,
+): ComponentSection {
+  return {
+    componentType,
+    title,
+    text: renderMatrixSection(title, baselineName, targetNames, report),
+    reports: [{ title, report }],
+  };
+}
+
 function renderPluginMatrixSections(
   baselineName: string,
   targetNames: string[],
   snapshots: Array<{ environment: string } & PluginComparisonData>,
   maxRows: number,
-): string {
+): ComponentSection {
   const assemblyReport = buildMatrixReport(
     snapshots.map((snapshot) => ({
       environment: snapshot.environment,
@@ -361,15 +401,24 @@ function renderPluginMatrixSections(
     maxRows,
   );
 
-  return [
-    "### Plugins",
-    "",
-    renderMatrixSection("Plugin Assemblies", baselineName, targetNames, assemblyReport),
-    "",
-    renderMatrixSection("Plugin Steps", baselineName, targetNames, stepReport),
-    "",
-    renderMatrixSection("Plugin Images", baselineName, targetNames, imageReport),
-  ].join("\n");
+  return {
+    componentType: "plugins",
+    title: COMPONENT_TYPE_LABELS.plugins,
+    text: [
+      "### Plugins",
+      "",
+      renderMatrixSection("Plugin Assemblies", baselineName, targetNames, assemblyReport),
+      "",
+      renderMatrixSection("Plugin Steps", baselineName, targetNames, stepReport),
+      "",
+      renderMatrixSection("Plugin Images", baselineName, targetNames, imageReport),
+    ].join("\n"),
+    reports: [
+      { title: "Plugin Assemblies", report: assemblyReport },
+      { title: "Plugin Steps", report: stepReport },
+      { title: "Plugin Images", report: imageReport },
+    ],
+  };
 }
 
 function resolveTargetEnvironments(

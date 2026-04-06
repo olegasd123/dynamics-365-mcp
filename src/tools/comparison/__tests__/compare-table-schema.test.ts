@@ -133,5 +133,23 @@ describe("compare_table_schema", () => {
     expect(response.content[0].text).toContain("## Table Schema Comparison");
     expect(response.content[0].text).toContain("### Columns");
     expect(response.content[0].text).toContain("maxLength");
+    expect(response.structuredContent).toMatchObject({
+      tool: "compare_table_schema",
+      ok: true,
+      data: {
+        sourceEnvironment: "prod",
+        targetEnvironment: "dev",
+      },
+    });
+
+    const payload = response.structuredContent as {
+      data: {
+        columnComparison: {
+          differences: Array<{ key: string; changedFields: Array<{ field: string }> }>;
+        };
+      };
+    };
+    expect(payload.data.columnComparison.differences[0].key).toBe("name");
+    expect(payload.data.columnComparison.differences[0].changedFields[0].field).toBe("maxLength");
   });
 });

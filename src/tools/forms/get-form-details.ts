@@ -4,6 +4,7 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { FormType } from "../../queries/form-queries.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchFormDetails } from "./form-metadata.js";
 
@@ -69,14 +70,13 @@ export function registerGetFormDetails(
           ),
         );
 
-        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+        return createToolSuccessResponse("get_form_details", lines.join("\n"), `Loaded form '${form.name}' in '${env.name}'.`, {
+          environment: env.name,
+          filters: { table: table || null, type: type || null, solution: solution || null },
+          form,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("get_form_details", error);
       }
     },
   );

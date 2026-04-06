@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listSecurityRoles } from "./role-metadata.js";
 
@@ -24,9 +25,13 @@ export function registerListSecurityRoles(
         const roles = await listSecurityRoles(env, client, nameFilter);
 
         if (roles.length === 0) {
-          return {
-            content: [{ type: "text" as const, text: `No security roles found in '${env.name}'.` }],
-          };
+          const text = `No security roles found in '${env.name}'.`;
+          return createToolSuccessResponse("list_security_roles", text, text, {
+            environment: env.name,
+            nameFilter: nameFilter || null,
+            count: 0,
+            items: [],
+          });
         }
 
         const text = `## Security Roles in '${env.name}'${nameFilter ? ` (filter='${nameFilter}')` : ""}\n\nFound ${roles.length} role(s).\n\n${formatTable(
@@ -39,14 +44,14 @@ export function registerListSecurityRoles(
           ]),
         )}`;
 
-        return { content: [{ type: "text" as const, text }] };
+        return createToolSuccessResponse("list_security_roles", text, `Found ${roles.length} security role(s) in '${env.name}'.`, {
+          environment: env.name,
+          nameFilter: nameFilter || null,
+          count: roles.length,
+          items: roles,
+        });
       } catch (error) {
-        return {
-          content: [
-            { type: "text" as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` },
-          ],
-          isError: true,
-        };
+        return createToolErrorResponse("list_security_roles", error);
       }
     },
   );
