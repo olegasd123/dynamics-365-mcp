@@ -193,6 +193,9 @@ The scripts auto-load the repo `.env` file if it exists. This is useful for:
 
 - `D365_MCP_CONFIG`
 - `D365_MCP_TOKEN_CACHE`
+- `D365_MCP_LOG_ENABLED`
+- `D365_MCP_LOG_DIR`
+- `D365_MCP_LOG_MAX_BODY_CHARS`
 - `MCP_PORT`
 - `MCP_HOST`
 - `MCP_PATH`
@@ -212,7 +215,22 @@ D365_MCP_TOKEN_CACHE=~/.dynamics365-mcp/token-cache.json
 MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp
+D365_MCP_LOG_ENABLED=false
+D365_MCP_LOG_DIR=logs
+D365_MCP_LOG_MAX_BODY_CHARS=0
 ```
+
+If request logs are enabled, the server writes one file per MCP tool call:
+
+- folder: `logs/DDMMYYYY`
+- file: `HHMMSSmmm-tool-name-...-req-<id>.txt`
+
+Each file can include:
+
+- tool input
+- Dataverse request and response data
+- formatted tool success or error response
+- runtime errors seen during that tool call
 
 macOS / Linux:
 

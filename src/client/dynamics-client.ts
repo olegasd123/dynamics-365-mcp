@@ -1,5 +1,6 @@
 import type { EnvironmentConfig } from "../config/types.js";
 import type { TokenManager } from "../auth/token-manager.js";
+import { requestLogger } from "../logging/request-logger.js";
 
 export class DynamicsApiError extends Error {
   constructor(
@@ -74,16 +75,30 @@ export class DynamicsClient {
     url: string,
     timeout: number,
     options?: { forceRefreshToken?: boolean },
-  ): Promise<Response> {
+  ): Promise<{ response: Response; durationMs: number; callId?: number }> {
     const token = await this.tokenManager.getToken(env, {
       forceRefresh: options?.forceRefreshToken,
     });
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const startedAt = Date.now();
+    const callId = requestLogger.beginHttpCall({
+      type: "crm",
+      method: "GET",
+      url,
+      timeoutMs: timeout,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "OData-MaxVersion": "4.0",
+        "OData-Version": "4.0",
+        Prefer: 'odata.include-annotations="*"',
+      },
+    });
 
     try {
-      return await fetch(url, {
+      const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
@@ -93,8 +108,22 @@ export class DynamicsClient {
         },
         signal: controller.signal,
       });
+      const durationMs = Date.now() - startedAt;
+      requestLogger.logHttpResponse(callId, {
+        status: response.status,
+        statusText: response.statusText,
+        durationMs,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+      return { response, durationMs, callId };
     } catch (error) {
       if (isAbortError(error)) {
+        requestLogger.logError("crm-timeout", error, {
+          environment: env.name,
+          timeoutMs: timeout,
+          url,
+          callId: callId || null,
+        });
         throw new DynamicsRequestError(
           env.name,
           "timeout",
@@ -102,6 +131,11 @@ export class DynamicsClient {
         );
       }
 
+      requestLogger.logError("crm-network", error, {
+        environment: env.name,
+        url,
+        callId: callId || null,
+      });
       throw new DynamicsRequestError(
         env.name,
         "network",
@@ -116,18 +150,19 @@ export class DynamicsClient {
     env: EnvironmentConfig,
     url: string,
     timeout: number,
-  ): Promise<Response> {
+  ): Promise<{ response: Response; callId?: number }> {
     let attempt = 0;
     let refreshedAfterUnauthorized = false;
     let forceRefreshToken = false;
-    let lastResponse: Response | undefined;
+    let lastResponse: { response: Response; callId?: number } | undefined;
 
     while (attempt < MAX_RETRIES) {
       try {
-        const response = await this.makeRequest(env, url, timeout, {
+        const result = await this.makeRequest(env, url, timeout, {
           forceRefreshToken,
         });
         forceRefreshToken = false;
+        const { response } = result;
 
         if (response.status === 401 && !refreshedAfterUnauthorized) {
           this.tokenManager.clearCache(env.name);
@@ -137,7 +172,7 @@ export class DynamicsClient {
         }
 
         if (TRANSIENT_STATUS_CODES.has(response.status)) {
-          lastResponse = response;
+          lastResponse = result;
           if (attempt < MAX_RETRIES - 1) {
             await delay(getRetryDelayMs(attempt, response.headers.get("Retry-After")));
             attempt += 1;
@@ -145,7 +180,7 @@ export class DynamicsClient {
           }
         }
 
-        return response;
+        return result;
       } catch (error) {
         if (isRetriableRequestError(error) && attempt < MAX_RETRIES - 1) {
           await delay(getRetryDelayMs(attempt));
@@ -197,13 +232,21 @@ export class DynamicsClient {
         let pageCount = 0;
 
         while (url && pageCount < maxPages) {
-          const response = await this.requestWithRetry(env, url, timeout);
+          const { response, callId } = await this.requestWithRetry(env, url, timeout);
 
           if (!response.ok) {
-            await this.throwApiError(env, response);
+            await this.throwApiError(env, response, callId);
           }
 
           const data = (await response.json()) as ODataResponse<T>;
+          requestLogger.logHttpResponse(callId, {
+            status: response.status,
+            body: {
+              "@odata.count": data["@odata.count"] ?? null,
+              "@odata.nextLink": data["@odata.nextLink"] ?? null,
+              value: data.value,
+            },
+          });
           allResults.push(...data.value);
 
           url = data["@odata.nextLink"] ?? "";
@@ -238,17 +281,22 @@ export class DynamicsClient {
       undefined,
       async () => {
         const url = this.buildUrl(env, resourcePath, queryParams);
-        const response = await this.requestWithRetry(env, url, timeout);
+        const { response, callId } = await this.requestWithRetry(env, url, timeout);
 
         if (response.status === 404) {
           return null;
         }
 
         if (!response.ok) {
-          await this.throwApiError(env, response);
+          await this.throwApiError(env, response, callId);
         }
 
-        return (await response.json()) as T;
+        const data = (await response.json()) as T;
+        requestLogger.logHttpResponse(callId, {
+          status: response.status,
+          body: data,
+        });
+        return data;
       },
       DEFAULT_CACHE_TTL,
     );
@@ -274,7 +322,11 @@ export class DynamicsClient {
     }
   }
 
-  private async throwApiError(env: EnvironmentConfig, response: Response): Promise<never> {
+  private async throwApiError(
+    env: EnvironmentConfig,
+    response: Response,
+    callId?: number,
+  ): Promise<never> {
     const body = await response.text();
     let odataCode: string | undefined;
     let message = body;
@@ -289,6 +341,17 @@ export class DynamicsClient {
       // Use raw body as message
     }
 
+    requestLogger.logHttpResponse(callId, {
+      status: response.status,
+      statusText: response.statusText,
+      body,
+    });
+    requestLogger.logError("crm-api", {
+      environment: env.name,
+      statusCode: response.status,
+      odataCode: odataCode || null,
+      message,
+    });
     throw new DynamicsApiError(env.name, response.status, odataCode, message);
   }
 

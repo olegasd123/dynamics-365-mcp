@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { loadConfig } from "./config/environments.js";
 import { TokenManager } from "./auth/token-manager.js";
 import { DynamicsClient } from "./client/dynamics-client.js";
+import { instrumentServerToolLogging, requestLogger } from "./logging/request-logger.js";
 import { registerAllTools } from "./tools/index.js";
 
 type TransportMode = "stdio" | "http";
@@ -44,6 +45,7 @@ function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClie
     version: "0.1.0",
   });
 
+  instrumentServerToolLogging(server);
   registerAllTools(server, config, client);
   return server;
 }
@@ -197,6 +199,7 @@ async function startHttpServer(
       healthState.errorCount += 1;
       healthState.lastErrorMessage = error instanceof Error ? error.message : String(error);
       healthState.lastErrorAt = new Date().toISOString();
+      requestLogger.logError("http-request", error, { requestBody: req.body });
 
       console.error("Error handling MCP HTTP request:", error);
 
@@ -251,6 +254,7 @@ async function startHttpServer(
 }
 
 export async function main() {
+  requestLogger.configureFromEnv(process.env, process.cwd());
   const config = loadConfig();
   const options = parseRuntimeOptions(process.argv.slice(2), process.env);
 
@@ -273,6 +277,7 @@ function isEntrypoint(): boolean {
 
 if (isEntrypoint()) {
   main().catch((error) => {
+    requestLogger.logError("startup", error);
     console.error("Failed to start Dynamics 365 MCP server:", error);
     process.exit(1);
   });

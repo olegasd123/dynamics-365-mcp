@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import type { EnvironmentConfig } from "../config/types.js";
+import { requestLogger } from "../logging/request-logger.js";
 
 interface CachedToken {
   accessToken: string;
@@ -258,6 +259,16 @@ export class TokenManager {
     scope: string,
   ): Promise<DeviceCodeResponse> {
     let response: Response;
+    const callId = requestLogger.beginHttpCall({
+      type: "auth",
+      method: "POST",
+      url: `${tenantBaseUrl}/devicecode`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: {
+        client_id: clientId,
+        scope,
+      },
+    });
     try {
       response = await fetch(`${tenantBaseUrl}/devicecode`, {
         method: "POST",
@@ -267,7 +278,16 @@ export class TokenManager {
           scope,
         }).toString(),
       });
+      requestLogger.logHttpResponse(callId, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
     } catch (error) {
+      requestLogger.logError("auth-device-code-request", error, {
+        environment: env.name,
+        url: `${tenantBaseUrl}/devicecode`,
+      });
       throw new AuthenticationError(
         env.name,
         `Network error: ${error instanceof Error ? error.message : String(error)}`,
@@ -293,6 +313,17 @@ export class TokenManager {
     | { status: "error"; message: string; errorCode?: string }
   > {
     let response: Response;
+    const callId = requestLogger.beginHttpCall({
+      type: "auth",
+      method: "POST",
+      url: `${tenantBaseUrl}/token`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: {
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        client_id: clientId,
+        device_code: deviceCode,
+      },
+    });
     try {
       response = await fetch(`${tenantBaseUrl}/token`, {
         method: "POST",
@@ -303,7 +334,16 @@ export class TokenManager {
           device_code: deviceCode,
         }).toString(),
       });
+      requestLogger.logHttpResponse(callId, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
     } catch (error) {
+      requestLogger.logError("auth-device-code-poll", error, {
+        environment: env.name,
+        url: `${tenantBaseUrl}/token`,
+      });
       throw new AuthenticationError(
         env.name,
         `Network error: ${error instanceof Error ? error.message : String(error)}`,
@@ -340,13 +380,29 @@ export class TokenManager {
     body: URLSearchParams,
   ): Promise<TokenResponse> {
     let response: Response;
+    const callId = requestLogger.beginHttpCall({
+      type: "auth",
+      method: "POST",
+      url,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
     try {
       response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),
       });
+      requestLogger.logHttpResponse(callId, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
     } catch (error) {
+      requestLogger.logError("auth-token-request", error, {
+        environment: env.name,
+        url,
+      });
       throw new AuthenticationError(
         env.name,
         `Network error: ${error instanceof Error ? error.message : String(error)}`,
@@ -366,6 +422,14 @@ export class TokenManager {
   ): Promise<AuthenticationError> {
     const body = await response.text();
     const parsed = this.parseAuthErrorBody(body);
+    requestLogger.logError("auth-response", {
+      name: "AuthenticationError",
+      message: parsed.error_description || parsed.error || `HTTP ${response.status}: ${body}`,
+      environment: environmentName,
+      errorCode: parsed.error || null,
+      statusCode: response.status,
+      body,
+    });
     return new AuthenticationError(
       environmentName,
       parsed.error_description || parsed.error || `HTTP ${response.status}: ${body}`,

@@ -577,6 +577,22 @@ Use this when you want one report that combines direct usage and dependency risk
 - **Rate limits**: Respect `Retry-After` when Dataverse returns it
 - **Timeouts and network errors**: Use `DynamicsRequestError` with clear environment and request URL details
 
+## Optional Request Logs
+
+Set `D365_MCP_LOG_ENABLED=true` to write request logs to `logs/DDMMYYYY`.
+
+Each tool call writes one log file. The file can include:
+
+- tool input
+- Dataverse request and response data
+- formatted `createToolSuccessResponse` / `createToolErrorResponse` output
+- errors seen during that tool call
+
+Optional settings:
+
+- `D365_MCP_LOG_DIR=logs`
+- `D365_MCP_LOG_MAX_BODY_CHARS=0`
+
 ## Notes
 
 - User input that goes into OData filters is escaped before query build.
