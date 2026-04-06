@@ -2,6 +2,11 @@
 
 An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugins, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
 
+## Docs
+
+- [Run the MCP after cloning](./docs/run-mcp.md)
+- [Manual tool test prompts](./docs/prompt-examples.md)
+
 ## Tech Stack
 
 - **Runtime**: Node.js 18+ (ESM)
