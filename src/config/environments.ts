@@ -134,7 +134,7 @@ export function loadConfig(): AppConfig {
   }
 
   // Priority 2: Default config file location
-  const defaultPath = resolve(homedir(), ".dynamics365-mcp", "config.json");
+  const defaultPath = resolve(homedir(), ".dynamics-365-mcp", "config.json");
   try {
     return loadFromJsonFile(defaultPath);
   } catch {

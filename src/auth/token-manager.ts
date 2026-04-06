@@ -45,7 +45,7 @@ interface TokenRequestOptions {
 
 const DEFAULT_DEVICE_CODE_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 const EXPIRY_BUFFER_SECONDS = 300;
-const DEFAULT_TOKEN_CACHE_PATH = resolve(homedir(), ".dynamics365-mcp", "token-cache.json");
+const DEFAULT_TOKEN_CACHE_PATH = resolve(homedir(), ".dynamics-365-mcp", "token-cache.json");
 
 export class AuthenticationError extends Error {
   constructor(

@@ -120,7 +120,7 @@ webresource (webresourceset)
 
 ### JSON Config File
 
-Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json`.
+Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.json`.
 
 ```json
 {
@@ -167,7 +167,7 @@ Use this when the user can sign in in a browser and does not have a client secre
 
 `clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
 
-Device-code tokens are stored in `~/.dynamics365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
+Device-code tokens are stored in `~/.dynamics-365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
 
 ### Connection String (single env)
 
@@ -217,7 +217,7 @@ The server also supports HTTP mode for service scripts. Use this when you want a
 ### Start On macOS Or Linux
 
 ```bash
-./scripts/mcp-service.sh start 3003 ~/.dynamics365-mcp/config.json
+./scripts/mcp-service.sh start 3003 ~/.dynamics-365-mcp/config.json
 ```
 
 Stop:
@@ -229,13 +229,13 @@ Stop:
 Restart:
 
 ```bash
-./scripts/mcp-service.sh restart 3003 ~/.dynamics365-mcp/config.json
+./scripts/mcp-service.sh restart 3003 ~/.dynamics-365-mcp/config.json
 ```
 
 ### Start On Windows
 
 ```bat
-scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics365-mcp\config.json
+scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
 Stop:
@@ -247,7 +247,7 @@ scripts\mcp-service.bat stop 3003
 Restart:
 
 ```bat
-scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
+scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
 The scripts store PID files in `run/` and logs in `logs/`.
