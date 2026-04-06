@@ -1,4 +1,4 @@
-import { buildQueryString, odataStringLiteral } from "../utils/odata-helpers.js";
+import { buildQueryString, odataEq, odataStringLiteral } from "../utils/odata-helpers.js";
 
 const DEFAULT_SOLUTION_SELECT = [
   "solutionid",
@@ -33,5 +33,25 @@ export function listSolutionComponentsQuery(solutionId: string): string {
     ],
     filter: `_solutionid_value eq ${odataStringLiteral(solutionId)}`,
     orderby: "componenttype asc",
+  });
+}
+
+export function listSolutionComponentsByObjectIdsQuery(
+  componentType: number,
+  objectIds: string[],
+): string {
+  return buildQueryString({
+    select: [
+      "solutioncomponentid",
+      "objectid",
+      "componenttype",
+      "rootsolutioncomponentid",
+      "rootcomponentbehavior",
+    ],
+    filter: [
+      `componenttype eq ${componentType}`,
+      `(${objectIds.map((objectId) => odataEq("objectid", objectId)).join(" or ")})`,
+    ].join(" and "),
+    orderby: "solutioncomponentid asc",
   });
 }

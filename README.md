@@ -286,6 +286,7 @@ Priority order:
 | `find_table_usage`          | Find where one table is used                                  | `environment`, `table`                                  |
 | `find_column_usage`         | Find where one column is used                                 | `environment`, `column`, `table`                        |
 | `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
+| `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
 | `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
 | `list_plugins`              | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                                 |
 | `list_plugin_steps`         | List registered steps for a plugin                            | `environment`, `pluginName`                             |
@@ -368,6 +369,15 @@ Use `get_solution_dependencies` when you want to see which supported solution co
 This tool uses Dataverse dependency functions instead of guessing links from names.
 
 `componentType` can now target both old and new groups like `table`, `column`, `security_role`, `dashboard`, `app_module`, `connection_reference`, `environment_variable_definition`, and `environment_variable_value`.
+
+### Impact Analysis
+
+Use `analyze_impact` when you want one report for likely change impact.
+
+- Supported targets: table, column, plugin, workflow, flow, web resource, and solution
+- The report reuses current usage and dependency logic where possible
+- The summary shows risk level, total references, dependency count, and likely affected areas
+- Detailed sections are added only when data exists, like forms, views, plugin steps, cloud flows, or dependencies
 
 ### Performance Notes
 
@@ -517,6 +527,21 @@ Use `uniqueName` when possible. It is safer than display name.
   "arguments": {
     "environment": "test",
     "uniqueName": "contoso_AccountSync"
+  }
+}
+```
+
+### Analyze Impact For One Plugin
+
+Use this when you want one report that combines direct usage and dependency risk.
+
+```json
+{
+  "tool": "analyze_impact",
+  "arguments": {
+    "environment": "dev",
+    "componentType": "plugin",
+    "name": "Contoso.Plugins"
   }
 }
 ```

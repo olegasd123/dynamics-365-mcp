@@ -99,6 +99,7 @@ describe("TokenManager", () => {
   });
 
   it("supports device code auth without a client secret", async () => {
+    const cachePath = createTempCachePath();
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
       callback: TimerHandler,
@@ -123,7 +124,7 @@ describe("TokenManager", () => {
 
     global.fetch = fetchMock;
 
-    const manager = new TokenManager();
+    const manager = new TokenManager(cachePath);
 
     await expect(
       manager.getToken({
