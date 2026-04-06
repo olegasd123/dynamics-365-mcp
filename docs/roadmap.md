@@ -125,11 +125,13 @@ Status: completed on 2026-04-06
 - Error messages clearly show environment and failure type
 - HTTP mode has a documented and tested health contract
 
-## Milestone 5: Transport And Contract Testing
+## Milestone 5: Transport And Contract Testing [Done]
 
 ### Goal
 
 Test the full runtime, not only isolated helper logic.
+
+Status: completed on 2026-04-06
 
 ### Scope
 

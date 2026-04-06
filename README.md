@@ -570,3 +570,23 @@ Use `uniqueName` when possible. It is safer than display name.
   }
 }
 ```
+
+## Testing
+
+Run the full suite:
+
+```bash
+npm test
+```
+
+Run only the runtime transport smoke tests:
+
+```bash
+npm run test:transport
+```
+
+Run only the MCP tool contract tests:
+
+```bash
+npm run test:contracts
+```

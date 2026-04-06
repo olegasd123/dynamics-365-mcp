@@ -274,6 +274,18 @@ Run tests:
 npm test
 ```
 
+Run the transport smoke tests only:
+
+```bash
+npm run test:transport
+```
+
+Run the MCP contract tests only:
+
+```bash
+npm run test:contracts
+```
+
 Run lint:
 
 ```bash
