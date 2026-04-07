@@ -5,7 +5,7 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import { fetchPluginClassInventory, resolvePluginClass } from "./plugin-class-metadata.js";
+import { fetchPluginMetadata, resolvePluginClass } from "./plugin-class-metadata.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -35,8 +35,12 @@ export function registerListPluginSteps(
     async ({ environment, pluginName, assemblyName, solution }) => {
       try {
         const env = getEnvironment(config, environment);
-        const inventory = await fetchPluginClassInventory(env, client, { solution });
-        const plugin = resolvePluginClass(inventory.plugins, pluginName, assemblyName);
+        const inventory = await fetchPluginMetadata(env, client, {
+          solution,
+          includeSteps: true,
+          includeImages: false,
+        });
+        const plugin = resolvePluginClass(inventory.pluginClasses, pluginName, assemblyName);
         const steps = inventory.steps.filter((step) => step.pluginTypeId === plugin.pluginTypeId);
 
         if (steps.length === 0) {

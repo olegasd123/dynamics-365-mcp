@@ -3,10 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { getPluginAssemblyByNameQuery } from "../../queries/plugin-queries.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import { fetchPluginInventory } from "./plugin-inventory.js";
+import { fetchPluginMetadata, resolvePluginAssembly } from "./plugin-class-metadata.js";
 
 const IMAGE_TYPE_LABELS: Record<number, string> = {
   0: "PreImage",
@@ -41,25 +40,31 @@ export function registerListPluginAssemblyImages(
     }) => {
       try {
         const env = getEnvironment(config, environment);
-
-        // First get assemblies matching the name
-        const assemblies = await client.query<Record<string, unknown>>(
-          env,
-          "pluginassemblies",
-          getPluginAssemblyByNameQuery(assemblyName, ["pluginassemblyid", "name"]),
-        );
-
-        if (assemblies.length === 0) {
-          const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_assembly_images", text, text, {
-            environment: env.name,
-            found: false,
-            assemblyName,
-          });
+        const inventory = await fetchPluginMetadata(env, client, {
+          includeSteps: true,
+          includeImages: true,
+        });
+        let assembly: Record<string, unknown>;
+        try {
+          assembly = resolvePluginAssembly(inventory.assemblies, assemblyName);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === `Plugin assembly '${assemblyName}' not found.`
+          ) {
+            const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
+            return createToolSuccessResponse("list_plugin_assembly_images", text, text, {
+              environment: env.name,
+              found: false,
+              assemblyName,
+            });
+          }
+          throw error;
         }
-
-        const inventory = await fetchPluginInventory(env, client, assemblies);
         const allImages = inventory.images.filter((image) => {
+          if (image.assemblyId !== String(assembly.pluginassemblyid || "")) {
+            return false;
+          }
           if (message && String(image.messageName || "").toLowerCase() !== message.toLowerCase()) {
             return false;
           }

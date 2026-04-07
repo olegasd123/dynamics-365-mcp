@@ -5,7 +5,11 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import { fetchPluginClassInventory } from "./plugin-class-metadata.js";
+import {
+  countStepsByPluginTypeId,
+  fetchPluginMetadata,
+  filterPluginClassesByRegistration,
+} from "./plugin-class-metadata.js";
 
 export function registerListPlugins(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
@@ -25,18 +29,16 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
     async ({ environment, filter, solution }) => {
       try {
         const env = getEnvironment(config, environment);
-        const inventory = await fetchPluginClassInventory(env, client, { solution });
-        const stepCountByPluginId = new Map<string, number>();
-
-        for (const step of inventory.steps) {
-          stepCountByPluginId.set(
-            step.pluginTypeId,
-            (stepCountByPluginId.get(step.pluginTypeId) || 0) + 1,
-          );
-        }
-
-        const plugins = inventory.plugins.filter((plugin) =>
-          filter === "no_steps" ? !stepCountByPluginId.has(plugin.pluginTypeId) : true,
+        const inventory = await fetchPluginMetadata(env, client, {
+          solution,
+          includeSteps: true,
+          includeImages: false,
+        });
+        const stepCountByPluginId = countStepsByPluginTypeId(inventory.steps);
+        const plugins = filterPluginClassesByRegistration(
+          inventory.pluginClasses,
+          inventory.steps,
+          filter,
         );
 
         if (plugins.length === 0) {

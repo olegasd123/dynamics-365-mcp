@@ -4,11 +4,13 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
+import type { PluginImageRecord, PluginStepRecord, PluginTypeRecord } from "./plugin-inventory.js";
 import {
-  getPluginAssemblyByNameQuery,
-  listPluginTypesForAssembliesQuery,
-} from "../../queries/plugin-queries.js";
-import { fetchPluginInventory } from "./plugin-inventory.js";
+  fetchPluginMetadata,
+  groupImagesByStepId,
+  groupStepsByPluginTypeId,
+  resolvePluginAssembly,
+} from "./plugin-class-metadata.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -23,7 +25,11 @@ interface AssemblyTypeDetails {
   name: string;
   fullName: string;
   isWorkflowActivity: boolean;
-  steps: Array<Record<string, unknown>>;
+  steps: PluginStepDetails[];
+}
+
+interface PluginStepDetails extends Record<string, unknown> {
+  images: Record<string, unknown>[];
 }
 
 export function registerGetPluginAssemblyDetails(
@@ -41,23 +47,27 @@ export function registerGetPluginAssemblyDetails(
     async ({ environment, assemblyName }) => {
       try {
         const env = getEnvironment(config, environment);
-
-        const assemblies = await client.query<Record<string, unknown>>(
-          env,
-          "pluginassemblies",
-          getPluginAssemblyByNameQuery(assemblyName),
-        );
-
-        if (assemblies.length === 0) {
-          const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("get_plugin_assembly_details", text, text, {
-            environment: env.name,
-            found: false,
-            assemblyName,
-          });
+        const inventory = await fetchPluginMetadata(env, client, {
+          includeSteps: true,
+          includeImages: true,
+        });
+        let assembly: Record<string, unknown>;
+        try {
+          assembly = resolvePluginAssembly(inventory.assemblies, assemblyName);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === `Plugin assembly '${assemblyName}' not found.`
+          ) {
+            const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
+            return createToolSuccessResponse("get_plugin_assembly_details", text, text, {
+              environment: env.name,
+              found: false,
+              assemblyName,
+            });
+          }
+          throw error;
         }
-
-        const assembly = assemblies[0];
         const lines: string[] = [];
 
         lines.push(`## Plugin Assembly: ${assembly.name}`);
@@ -68,31 +78,13 @@ export function registerGetPluginAssemblyDetails(
         lines.push(`- **Created**: ${String(assembly.createdon || "").slice(0, 10)}`);
         lines.push(`- **Modified**: ${String(assembly.modifiedon || "").slice(0, 10)}`);
         lines.push("");
-
-        const types = await client.query<Record<string, unknown>>(
-          env,
-          "plugintypes",
-          listPluginTypesForAssembliesQuery([String(assembly.pluginassemblyid)]),
-        );
-        const inventory = await fetchPluginInventory(env, client, [assembly]);
-        const stepsByPluginTypeId = new Map<string, Record<string, unknown>[]>();
-        const imagesByStepId = new Map<string, Record<string, unknown>[]>();
-
-        for (const step of inventory.steps) {
-          const pluginTypeId = String(step.pluginTypeId || "");
-          const steps = stepsByPluginTypeId.get(pluginTypeId) || [];
-          steps.push(step);
-          stepsByPluginTypeId.set(pluginTypeId, steps);
-        }
-
-        for (const image of inventory.images) {
-          const stepId = String(image.sdkmessageprocessingstepid || "");
-          const images = imagesByStepId.get(stepId) || [];
-          images.push(image);
-          imagesByStepId.set(stepId, images);
-        }
-
-        const structuredTypes = types.map((type) =>
+        const assemblyId = String(assembly.pluginassemblyid || "");
+        const assemblyTypes = inventory.types.filter((type) => type.assemblyId === assemblyId);
+        const assemblySteps = inventory.steps.filter((step) => step.assemblyId === assemblyId);
+        const assemblyImages = inventory.images.filter((image) => image.assemblyId === assemblyId);
+        const stepsByPluginTypeId = groupStepsByPluginTypeId(assemblySteps);
+        const imagesByStepId = groupImagesByStepId(assemblyImages);
+        const structuredTypes = assemblyTypes.map((type) =>
           buildAssemblyTypeDetails(type, stepsByPluginTypeId, imagesByStepId),
         );
         const pluginClasses = structuredTypes.filter((type) => !type.isWorkflowActivity);
@@ -139,8 +131,8 @@ export function registerGetPluginAssemblyDetails(
               types: structuredTypes.length,
               pluginClasses: pluginClasses.length,
               workflowActivities: workflowActivities.length,
-              steps: inventory.steps.length,
-              images: inventory.images.length,
+              steps: assemblySteps.length,
+              images: assemblyImages.length,
             },
             pluginClasses,
             workflowActivities,
@@ -154,11 +146,11 @@ export function registerGetPluginAssemblyDetails(
 }
 
 function buildAssemblyTypeDetails(
-  type: Record<string, unknown>,
-  stepsByPluginTypeId: Map<string, Record<string, unknown>[]>,
-  imagesByStepId: Map<string, Record<string, unknown>[]>,
+  type: PluginTypeRecord,
+  stepsByPluginTypeId: Map<string, PluginStepRecord[]>,
+  imagesByStepId: Map<string, PluginImageRecord[]>,
 ): AssemblyTypeDetails {
-  const steps = (stepsByPluginTypeId.get(String(type.plugintypeid || "")) || []).map((step) => ({
+  const steps = (stepsByPluginTypeId.get(type.pluginTypeId) || []).map((step) => ({
     ...step,
     stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
     modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
@@ -170,10 +162,10 @@ function buildAssemblyTypeDetails(
   }));
 
   return {
-    plugintypeid: String(type.plugintypeid || ""),
-    name: String(type.name || ""),
-    fullName: String(type.typename || ""),
-    isWorkflowActivity: Boolean(type.isworkflowactivity),
+    plugintypeid: type.pluginTypeId,
+    name: type.name,
+    fullName: type.fullName,
+    isWorkflowActivity: type.isWorkflowActivity,
     steps,
   };
 }

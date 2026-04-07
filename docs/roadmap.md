@@ -126,7 +126,7 @@ Done when:
 - plugin tools do not return workflow activity classes
 - docs explain the boundary
 
-## Milestone 5: Refactor Shared Inventory Layer
+## Milestone 5: Refactor Shared Inventory Layer [done]
 
 Goal:
 

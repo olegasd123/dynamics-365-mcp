@@ -4,12 +4,11 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
-import {
-  listPluginAssembliesQuery,
-} from "../../queries/plugin-queries.js";
 import { formatTable } from "../../utils/formatters.js";
-import { fetchPluginSteps } from "./plugin-inventory.js";
-import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
+import {
+  fetchPluginMetadata,
+  filterAssembliesByRegistration,
+} from "./plugin-class-metadata.js";
 
 export function registerListPluginAssemblies(
   server: McpServer,
@@ -41,35 +40,16 @@ export function registerListPluginAssemblies(
     }) => {
       try {
         const env = getEnvironment(config, environment);
-        const solutionComponents = solution
-          ? await fetchSolutionComponentSets(env, client, solution)
-          : undefined;
-        const assemblies = await client.query<Record<string, unknown>>(
-          env,
-          "pluginassemblies",
-          listPluginAssembliesQuery(),
+        const inventory = await fetchPluginMetadata(env, client, {
+          solution,
+          includeSteps: true,
+          includeImages: false,
+        });
+        const results = filterAssembliesByRegistration(
+          inventory.assemblies,
+          inventory.steps,
+          filter,
         );
-
-        let results = assemblies;
-
-        if (solutionComponents) {
-          results = results.filter((assembly) =>
-            solutionComponents.pluginAssemblyIds.has(String(assembly.pluginassemblyid || "")),
-          );
-        }
-
-        if (filter === "no_steps") {
-          const steps = await fetchPluginSteps(env, client, assemblies);
-          const assemblyIdsWithSteps = new Set(steps.map((step) => String(step.assemblyId || "")));
-          results = assemblies.filter(
-            (assembly) => !assemblyIdsWithSteps.has(String(assembly.pluginassemblyid || "")),
-          );
-          if (solutionComponents) {
-            results = results.filter((assembly) =>
-              solutionComponents.pluginAssemblyIds.has(String(assembly.pluginassemblyid || "")),
-            );
-          }
-        }
 
         const items = results.map((assembly) => ({
           ...assembly,

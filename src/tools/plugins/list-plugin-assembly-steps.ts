@@ -3,10 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { getPluginAssemblyByNameQuery } from "../../queries/plugin-queries.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import { fetchPluginSteps } from "./plugin-inventory.js";
+import { fetchPluginMetadata, resolvePluginAssembly } from "./plugin-class-metadata.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -34,22 +33,30 @@ export function registerListPluginAssemblySteps(
     async ({ environment, assemblyName }) => {
       try {
         const env = getEnvironment(config, environment);
-        const assemblies = await client.query<Record<string, unknown>>(
-          env,
-          "pluginassemblies",
-          getPluginAssemblyByNameQuery(assemblyName, ["pluginassemblyid", "name"]),
-        );
-
-        if (assemblies.length === 0) {
-          const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_assembly_steps", text, text, {
-            environment: env.name,
-            found: false,
-            assemblyName,
-          });
+        const inventory = await fetchPluginMetadata(env, client, {
+          includeSteps: true,
+          includeImages: false,
+        });
+        let assembly: Record<string, unknown>;
+        try {
+          assembly = resolvePluginAssembly(inventory.assemblies, assemblyName);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === `Plugin assembly '${assemblyName}' not found.`
+          ) {
+            const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
+            return createToolSuccessResponse("list_plugin_assembly_steps", text, text, {
+              environment: env.name,
+              found: false,
+              assemblyName,
+            });
+          }
+          throw error;
         }
-
-        const steps = await fetchPluginSteps(env, client, assemblies);
+        const steps = inventory.steps.filter(
+          (step) => step.assemblyId === String(assembly.pluginassemblyid || ""),
+        );
 
         if (steps.length === 0) {
           const text = `No steps found for plugin assembly '${assemblyName}' in '${env.name}'.`;

@@ -4,7 +4,11 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
-import { fetchPluginClassInventory, resolvePluginClass } from "./plugin-class-metadata.js";
+import {
+  fetchPluginMetadata,
+  groupImagesByStepId,
+  resolvePluginClass,
+} from "./plugin-class-metadata.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -32,18 +36,15 @@ export function registerGetPluginDetails(
     async ({ environment, pluginName, assemblyName, solution }) => {
       try {
         const env = getEnvironment(config, environment);
-        const inventory = await fetchPluginClassInventory(env, client, { solution });
-        const plugin = resolvePluginClass(inventory.plugins, pluginName, assemblyName);
+        const inventory = await fetchPluginMetadata(env, client, {
+          solution,
+          includeSteps: true,
+          includeImages: true,
+        });
+        const plugin = resolvePluginClass(inventory.pluginClasses, pluginName, assemblyName);
         const steps = inventory.steps.filter((step) => step.pluginTypeId === plugin.pluginTypeId);
-        const stepIds = new Set(steps.map((step) => step.sdkmessageprocessingstepid));
-        const images = inventory.images.filter((image) => stepIds.has(image.sdkmessageprocessingstepid));
-        const imagesByStepId = new Map<string, typeof images>();
-
-        for (const image of images) {
-          const stepImages = imagesByStepId.get(image.sdkmessageprocessingstepid) || [];
-          stepImages.push(image);
-          imagesByStepId.set(image.sdkmessageprocessingstepid, stepImages);
-        }
+        const images = inventory.images.filter((image) => image.pluginTypeId === plugin.pluginTypeId);
+        const imagesByStepId = groupImagesByStepId(images);
 
         const lines: string[] = [];
         lines.push(`## Plugin: ${plugin.name}`);
