@@ -34,11 +34,11 @@ Tip:
 
 - Start with the `list_*` prompt in a group.
 - Then use one returned name in the related `get_*`, `find_*`, or `compare_*` prompt.
-- In plugin prompts, `<PLUGIN>` means plugin assembly. Use `<PLUGIN_CLASS>` for one `IPlugin` class.
+- In plugin prompts, `<PLUGIN>` means plugin assembly. Use `<PLUGIN_CLASS>` for one `IPlugin` class. If you say "plugin type", it still means the class, not the assembly.
 
 ## Plugins
 
-Plugin tools return plugin classes only. Workflow activities stay under workflow terminology. Use the assembly detail tool when you need to inspect both plugin classes and workflow activities in one DLL.
+Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) stay under workflow terminology. Use the assembly detail tool when you need to inspect both plugin classes and workflow activities in one DLL.
 
 - `list_plugins`
   `In <ENV>, list plugin classes from solution <SOLUTION>. Show only orphaned plugin classes with no registered steps. Include assembly names.`

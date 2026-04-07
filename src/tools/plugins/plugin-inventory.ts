@@ -21,6 +21,8 @@ export interface PluginTypeRecord extends Record<string, unknown> {
   fullName: string;
   friendlyName: string;
   isWorkflowActivity: boolean;
+  workflowActivityGroupName: string;
+  customWorkflowActivityInfo: string;
 }
 
 export type PluginClassRecord = PluginTypeRecord;
@@ -317,6 +319,8 @@ function normalizePluginType(
   assemblyMap: Map<string, string>,
 ): PluginTypeRecord {
   const assemblyId = String(type._pluginassemblyid_value || "");
+  const workflowActivityGroupName = String(type.workflowactivitygroupname || "").trim();
+  const customWorkflowActivityInfo = String(type.customworkflowactivityinfo || "").trim();
 
   return {
     key: [assemblyMap.get(assemblyId) || "(unknown assembly)", String(type.typename || "")].join(" | "),
@@ -326,7 +330,12 @@ function normalizePluginType(
     name: String(type.name || ""),
     fullName: String(type.typename || ""),
     friendlyName: String(type.friendlyname || ""),
-    isWorkflowActivity: Boolean(type.isworkflowactivity),
+    isWorkflowActivity:
+      Boolean(type.isworkflowactivity) ||
+      workflowActivityGroupName.length > 0 ||
+      customWorkflowActivityInfo.length > 0,
+    workflowActivityGroupName,
+    customWorkflowActivityInfo,
   };
 }
 

@@ -354,7 +354,7 @@ The server resolves the solution first, then filters supported solution componen
 ### Plugin Boundary
 
 - `list_plugins`, `list_plugin_steps`, and `get_plugin_details` return plugin classes only.
-- These tools exclude workflow activities where `isworkflowactivity=true`.
+- These tools exclude workflow activities. A type is treated as workflow activity when Dataverse marks `isworkflowactivity=true` or fills workflow-only fields like `workflowactivitygroupname` or `customworkflowactivityinfo`.
 - `list_plugin_assemblies`, `list_plugin_assembly_steps`, `list_plugin_assembly_images`, and `get_plugin_assembly_details` work at plugin assembly level.
 - Use `get_plugin_assembly_details` when you need the full assembly view, including workflow activities.
 - Dataverse can store other handlers as plugin types. Until a separate tool exists, those handlers can still appear in plugin-class results when they are not marked as workflow activities.
@@ -478,7 +478,7 @@ This means an MCP client or another agent can read the text for people, or use `
 
 ### List Plugin Classes In One Solution
 
-Use this when you want `IPlugin` classes, not assemblies.
+Use this when you want `IPlugin` classes (plugin types), not assemblies or `CodeActivity` workflow classes.
 
 ```json
 {

@@ -43,7 +43,15 @@ export function listPluginAssembliesByIdsQuery(assemblyIds: string[]): string {
 
 export function listPluginTypesQuery(assemblyId: string): string {
   return buildQueryString({
-    select: ["plugintypeid", "name", "typename", "friendlyname", "isworkflowactivity"],
+    select: [
+      "plugintypeid",
+      "name",
+      "typename",
+      "friendlyname",
+      "isworkflowactivity",
+      "workflowactivitygroupname",
+      "customworkflowactivityinfo",
+    ],
     filter: odataEq("pluginassemblyid/pluginassemblyid", assemblyId),
     orderby: "name asc",
   });
@@ -57,6 +65,8 @@ export function listPluginTypesForAssembliesQuery(assemblyIds: string[]): string
       "typename",
       "friendlyname",
       "isworkflowactivity",
+      "workflowactivitygroupname",
+      "customworkflowactivityinfo",
       "_pluginassemblyid_value",
     ],
     filter: buildOrFilter("_pluginassemblyid_value", assemblyIds),
@@ -72,6 +82,8 @@ export function listPluginTypesByIdsQuery(pluginTypeIds: string[]): string {
       "typename",
       "friendlyname",
       "isworkflowactivity",
+      "workflowactivitygroupname",
+      "customworkflowactivityinfo",
       "_pluginassemblyid_value",
     ],
     filter: buildOrFilter("plugintypeid", pluginTypeIds),

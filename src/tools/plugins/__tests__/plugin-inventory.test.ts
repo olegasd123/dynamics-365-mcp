@@ -167,4 +167,40 @@ describe("plugin inventory", () => {
     expect(plugins).toHaveLength(1);
     expect(plugins[0].fullName).toBe("Plugins.AccountPlugin");
   });
+
+  it("filters CodeActivity records even when isworkflowactivity is false", async () => {
+    const client = {
+      async query<T>(_env: EnvironmentConfig, entitySet: string): Promise<T[]> {
+        if (entitySet === "plugintypes") {
+          return [
+            {
+              plugintypeid: "type-1",
+              name: "AccountPlugin",
+              typename: "Plugins.AccountPlugin",
+              isworkflowactivity: false,
+              _pluginassemblyid_value: "asm-1",
+            },
+            {
+              plugintypeid: "type-2",
+              name: "PostVacancyToSap",
+              typename: "Masao.Workflows.PostVacancyToSap",
+              isworkflowactivity: false,
+              workflowactivitygroupname: "Masao Workflows",
+              customworkflowactivityinfo: "{\"arguments\":[]}",
+              _pluginassemblyid_value: "asm-1",
+            },
+          ] as T[];
+        }
+
+        return [] as T[];
+      },
+    } as never;
+
+    const plugins = await fetchPluginClasses(env, client, [
+      { pluginassemblyid: "asm-1", name: "Assembly.One" },
+    ]);
+
+    expect(plugins).toHaveLength(1);
+    expect(plugins[0].fullName).toBe("Plugins.AccountPlugin");
+  });
 });

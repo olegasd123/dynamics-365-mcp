@@ -126,6 +126,8 @@ describe("plugin shared metadata", () => {
         fullName: "Core.Plugins.AccountPlugin",
         friendlyName: "",
         isWorkflowActivity: false,
+        workflowActivityGroupName: "",
+        customWorkflowActivityInfo: "",
       },
       {
         key: "asm-2|Other.Plugins.ContactPlugin",
@@ -136,6 +138,8 @@ describe("plugin shared metadata", () => {
         fullName: "Other.Plugins.ContactPlugin",
         friendlyName: "",
         isWorkflowActivity: false,
+        workflowActivityGroupName: "",
+        customWorkflowActivityInfo: "",
       },
     ];
     const steps = [
@@ -167,6 +171,8 @@ describe("plugin shared metadata", () => {
         fullName: "Other.Plugins.ContactPlugin",
         friendlyName: "",
         isWorkflowActivity: false,
+        workflowActivityGroupName: "",
+        customWorkflowActivityInfo: "",
       },
     ]);
     expect(countStepsByPluginTypeId(steps).get("type-1")).toBe(1);

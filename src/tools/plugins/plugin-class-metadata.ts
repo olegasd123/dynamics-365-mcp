@@ -113,7 +113,9 @@ export function resolvePluginClass(
     ) ||
     resolveSinglePluginClass(
       assemblyScoped,
-      (plugin) => plugin.friendlyName && plugin.friendlyName.toLowerCase() === pluginName.toLowerCase(),
+      (plugin) =>
+        plugin.friendlyName.length > 0 &&
+        plugin.friendlyName.toLowerCase() === pluginName.toLowerCase(),
     );
 
   if (resolved) {
