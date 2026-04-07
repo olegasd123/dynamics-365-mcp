@@ -18,6 +18,7 @@ Replace these values before you run a prompt:
 - `<TARGET_TABLE>`: target table name if it is different
 - `<COLUMN>`: column logical name like `name`
 - `<PLUGIN>`: plugin assembly name
+- `<PLUGIN_CLASS>`: plugin class name or full type name
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
 - `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
@@ -35,6 +36,15 @@ Tip:
 - Then use one returned name in the related `get_*`, `find_*`, or `compare_*` prompt.
 
 ## Plugins
+
+- `list_plugins`
+  `In <ENV>, list plugin classes from solution <SOLUTION>. Show only orphaned plugin classes with no registered steps. Include assembly names.`
+
+- `list_plugin_steps`
+  `In <ENV>, list all registered steps for plugin class <PLUGIN_CLASS>. If needed, narrow the match to assembly <PLUGIN>.`
+
+- `get_plugin_details`
+  `In <ENV>, show full details for plugin class <PLUGIN_CLASS>. Include the assembly name, registered steps, and images.`
 
 - `list_plugin_assemblies`
   `In <ENV>, list plugin assemblies for solution <SOLUTION>. Show only orphaned assemblies with no registered steps.`
@@ -210,6 +220,7 @@ This prompt list covers these tools:
 - `get_custom_api_details`
 - `get_flow_details`
 - `get_form_details`
+- `get_plugin_details`
 - `get_plugin_assembly_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
@@ -223,6 +234,8 @@ This prompt list covers these tools:
 - `list_cloud_flows`
 - `list_custom_apis`
 - `list_forms`
+- `list_plugin_steps`
+- `list_plugins`
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`
 - `list_plugin_assemblies`

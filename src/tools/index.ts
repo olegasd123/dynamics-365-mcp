@@ -3,6 +3,9 @@ import type { AppConfig } from "../config/types.js";
 import type { DynamicsClient } from "../client/dynamics-client.js";
 
 // Plugin tools
+import { registerListPlugins } from "./plugins/list-plugins.js";
+import { registerListPluginSteps } from "./plugins/list-plugin-steps.js";
+import { registerGetPluginDetails } from "./plugins/get-plugin-details.js";
 import { registerListPluginAssemblies } from "./plugins/list-plugin-assemblies.js";
 import { registerListPluginAssemblySteps } from "./plugins/list-plugin-assembly-steps.js";
 import { registerListPluginAssemblyImages } from "./plugins/list-plugin-assembly-images.js";
@@ -76,6 +79,9 @@ export function registerAllTools(
   client: DynamicsClient,
 ): void {
   // Plugin tools
+  registerListPlugins(server, config, client);
+  registerListPluginSteps(server, config, client);
+  registerGetPluginDetails(server, config, client);
   registerListPluginAssemblies(server, config, client);
   registerListPluginAssemblySteps(server, config, client);
   registerListPluginAssemblyImages(server, config, client);

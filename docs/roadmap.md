@@ -78,7 +78,7 @@ Done when:
 - existing prompts still work
 - new prompts and docs point to the renamed tools
 
-## Milestone 3: Add Real Plugin-Level Tools
+## Milestone 3: Add Real Plugin-Level Tools [done]
 
 Goal:
 

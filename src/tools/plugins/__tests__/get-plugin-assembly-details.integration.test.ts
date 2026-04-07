@@ -160,43 +160,4 @@ describe("get_plugin_assembly_details tool", () => {
       },
     });
   });
-
-  it("supports the deprecated get_plugin_details alias with pluginName", async () => {
-    const server = new FakeServer();
-    const config = createTestConfig(["dev"]);
-    const { client } = createRecordingClient({
-      dev: {
-        pluginassemblies: [
-          {
-            pluginassemblyid: "asm-1",
-            name: "Core.Plugins",
-            version: "1.2.3",
-            isolationmode: 2,
-            ismanaged: false,
-          },
-        ],
-        plugintypes: [],
-        sdkmessageprocessingsteps: [],
-      },
-    });
-
-    registerGetPluginAssemblyDetails(server as never, config, client);
-
-    const response = await server.getHandler("get_plugin_details")({
-      pluginName: "Core.Plugins",
-    });
-
-    expect(response.isError).toBeUndefined();
-    expect(response.structuredContent).toMatchObject({
-      tool: "get_plugin_details",
-      ok: true,
-      data: {
-        found: true,
-        pluginAssembly: {
-          name: "Core.Plugins",
-        },
-      },
-    });
-    expect(response.content[0].text).toContain("Plugin Assembly: Core.Plugins");
-  });
 });

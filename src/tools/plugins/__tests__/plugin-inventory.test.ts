@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchPluginInventory, fetchPluginSteps } from "../plugin-inventory.js";
+import { fetchPluginClasses, fetchPluginInventory, fetchPluginSteps } from "../plugin-inventory.js";
 import type { EnvironmentConfig } from "../../../config/types.js";
 
 describe("plugin inventory", () => {
@@ -132,5 +132,39 @@ describe("plugin inventory", () => {
     expect(inventory.steps).toHaveLength(1);
     expect(inventory.images).toHaveLength(1);
     expect(calls).toEqual(["plugintypes", "sdkmessageprocessingsteps", "sdkmessageprocessingstepimages"]);
+  });
+
+  it("filters workflow activities from plugin classes by default", async () => {
+    const client = {
+      async query<T>(_env: EnvironmentConfig, entitySet: string): Promise<T[]> {
+        if (entitySet === "plugintypes") {
+          return [
+            {
+              plugintypeid: "type-1",
+              name: "AccountPlugin",
+              typename: "Plugins.AccountPlugin",
+              isworkflowactivity: false,
+              _pluginassemblyid_value: "asm-1",
+            },
+            {
+              plugintypeid: "type-2",
+              name: "AccountActivity",
+              typename: "Plugins.AccountActivity",
+              isworkflowactivity: true,
+              _pluginassemblyid_value: "asm-1",
+            },
+          ] as T[];
+        }
+
+        return [] as T[];
+      },
+    } as never;
+
+    const plugins = await fetchPluginClasses(env, client, [
+      { pluginassemblyid: "asm-1", name: "Assembly.One" },
+    ]);
+
+    expect(plugins).toHaveLength(1);
+    expect(plugins[0].fullName).toBe("Plugins.AccountPlugin");
   });
 });

@@ -19,24 +19,19 @@ const MODE_LABELS: Record<number, string> = {
   1: "Asynchronous",
 };
 
-const NEW_SCHEMA = {
-  environment: z.string().optional().describe("Environment name"),
-  assemblyName: z.string().describe("Name of the plugin assembly"),
-};
-
-const LEGACY_SCHEMA = {
-  environment: z.string().optional().describe("Environment name"),
-  pluginName: z.string().describe("Name of the plugin assembly"),
-};
-
 export function registerListPluginAssemblySteps(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  const createHandler =
-    (toolName: string) =>
-    async ({ environment, assemblyName }: { environment?: string; assemblyName: string }) => {
+  server.tool(
+    "list_plugin_assembly_steps",
+    "List registered steps (message processing steps) for a plugin assembly in Dynamics 365.",
+    {
+      environment: z.string().optional().describe("Environment name"),
+      assemblyName: z.string().describe("Name of the plugin assembly"),
+    },
+    async ({ environment, assemblyName }) => {
       try {
         const env = getEnvironment(config, environment);
         const assemblies = await client.query<Record<string, unknown>>(
@@ -47,7 +42,7 @@ export function registerListPluginAssemblySteps(
 
         if (assemblies.length === 0) {
           const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse(toolName, text, text, {
+          return createToolSuccessResponse("list_plugin_assembly_steps", text, text, {
             environment: env.name,
             found: false,
             assemblyName,
@@ -58,7 +53,7 @@ export function registerListPluginAssemblySteps(
 
         if (steps.length === 0) {
           const text = `No steps found for plugin assembly '${assemblyName}' in '${env.name}'.`;
-          return createToolSuccessResponse(toolName, text, text, {
+          return createToolSuccessResponse("list_plugin_assembly_steps", text, text, {
             environment: env.name,
             found: true,
             assemblyName,
@@ -88,7 +83,7 @@ export function registerListPluginAssemblySteps(
         }));
         const text = `## Plugin Assembly Steps for '${assemblyName}' in '${env.name}'\n\nFound ${steps.length} step(s).\n\n${formatTable(headers, rows)}`;
         return createToolSuccessResponse(
-          toolName,
+          "list_plugin_assembly_steps",
           text,
           `Found ${steps.length} step(s) for plugin assembly '${assemblyName}' in '${env.name}'.`,
           {
@@ -100,22 +95,8 @@ export function registerListPluginAssemblySteps(
           },
         );
       } catch (error) {
-        return createToolErrorResponse(toolName, error);
+        return createToolErrorResponse("list_plugin_assembly_steps", error);
       }
-    };
-
-  server.tool(
-    "list_plugin_assembly_steps",
-    "List registered steps (message processing steps) for a plugin assembly in Dynamics 365.",
-    NEW_SCHEMA,
-    createHandler("list_plugin_assembly_steps"),
-  );
-
-  server.tool(
-    "list_plugin_steps",
-    "Deprecated alias for the assembly-level tool `list_plugin_assembly_steps`. Lists steps for a plugin assembly, not for one plugin class.",
-    LEGACY_SCHEMA,
-    async ({ environment, pluginName }) =>
-      createHandler("list_plugin_steps")({ environment, assemblyName: pluginName }),
+    },
   );
 }

@@ -1,6 +1,6 @@
 # Dynamics 365 CRM MCP Server
 
-An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugin assemblies, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
+An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugin assemblies, plugin classes, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
 
 ## Docs
 
@@ -58,10 +58,14 @@ src/
     health/
       environment-health-report.ts
     plugins/
+      list-plugins.ts
+      list-plugin-steps.ts
+      get-plugin-details.ts
       list-plugin-assemblies.ts
       list-plugin-assembly-steps.ts
       list-plugin-assembly-images.ts
       get-plugin-assembly-details.ts
+      plugin-class-metadata.ts
     workflows/
       list-workflows.ts
       list-actions.ts
@@ -293,10 +297,13 @@ Priority order:
 | `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
 | `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
 | `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
-| `list_plugin_assemblies`       | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
-| `list_plugin_assembly_steps`   | List registered steps for one plugin assembly                 | `environment`, `assemblyName`                           |
-| `list_plugin_assembly_images`  | List pre/post images on steps for one plugin assembly         | `environment`, `assemblyName`, `stepName`, `message`    |
-| `get_plugin_assembly_details`  | Deep info: assembly → types → steps → images                  | `environment`, `assemblyName`                           |
+| `list_plugins`             | List plugin classes; optionally filter orphaned (no steps)    | `environment`, `filter`, `solution`                     |
+| `list_plugin_steps`        | List registered steps for one plugin class                    | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `get_plugin_details`       | Deep info for one plugin class with steps and images          | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `list_plugin_assemblies`   | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
+| `list_plugin_assembly_steps` | List registered steps for one plugin assembly               | `environment`, `assemblyName`                           |
+| `list_plugin_assembly_images` | List pre/post images on steps for one plugin assembly      | `environment`, `assemblyName`, `stepName`, `message`    |
+| `get_plugin_assembly_details` | Deep info: assembly → types → steps → images               | `environment`, `assemblyName`                           |
 | `list_solutions`            | List solutions by display name and unique name                | `environment`, `nameFilter`                             |
 | `get_solution_details`      | Show solution summary and supported ALM component groups      | `environment`, `solution`                               |
 | `get_solution_dependencies` | Show dependency links for supported solution components       | `environment`, `solution`, `direction`, `componentType` |
@@ -325,6 +332,7 @@ Priority order:
 
 Users can now work with a solution by display name or unique name.
 
+- `list_plugins` supports `solution`
 - `list_plugin_assemblies` supports `solution`
 - `list_workflows` supports `solution`
 - `list_actions` supports `solution`
@@ -451,13 +459,42 @@ Error shape:
 The `data` payload depends on the tool, but it follows the same idea:
 
 - list tools usually return fields like `environment`, `filters`, `count`, and `items`
-- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin assembly`, or `solution`
+- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin`, `plugin assembly`, or `solution`
 - compare tools usually return environment names, filters, and one or more diff objects
 - error results always use the shared `error.name` and `error.message` fields
 
 This means an MCP client or another agent can read the text for people, or use `structuredContent` for stable follow-up logic without parsing markdown tables.
 
 ## Examples
+
+### List Plugin Classes In One Solution
+
+Use this when you want `IPlugin` classes, not assemblies.
+
+```json
+{
+  "tool": "list_plugins",
+  "arguments": {
+    "environment": "dev",
+    "solution": "Contoso Core",
+    "filter": "no_steps"
+  }
+}
+```
+
+### Get One Plugin Class
+
+Use this when you want one plugin class with its registered steps and images.
+
+```json
+{
+  "tool": "get_plugin_details",
+  "arguments": {
+    "environment": "dev",
+    "pluginName": "Contoso.Plugins.AccountPlugin"
+  }
+}
+```
 
 ### Compare One Plugin Assembly Across Two Environments
 

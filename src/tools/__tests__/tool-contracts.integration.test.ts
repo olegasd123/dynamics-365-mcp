@@ -63,23 +63,25 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         assemblyName: expect.any(Object),
       });
+      expect(toolsByName.list_plugins.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        filter: expect.any(Object),
+        solution: expect.any(Object),
+      });
       expect(toolsByName.list_plugin_steps.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        solution: expect.any(Object),
       });
       expect(toolsByName.get_plugin_details.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        solution: expect.any(Object),
       });
-      expect(toolsByName.compare_plugins.inputSchema.properties).toMatchObject({
-        sourceEnvironment: expect.any(Object),
-        targetEnvironment: expect.any(Object),
-        pluginName: expect.any(Object),
-      });
-      expect(toolsByName.list_plugins.description).toContain("Deprecated alias");
-      expect(toolsByName.list_plugins.description).toContain("assembly-level");
-      expect(toolsByName.get_plugin_details.description).toContain("Deprecated alias");
-      expect(toolsByName.compare_plugins.description).toContain("Deprecated alias");
+      expect(toolsByName.list_plugins.description).toContain("plugin classes");
+      expect(toolsByName.get_plugin_details.description).toContain("plugin class");
       expect(toolsByName.compare_custom_apis.inputSchema.required).toEqual([
         "sourceEnvironment",
         "targetEnvironment",

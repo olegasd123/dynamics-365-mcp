@@ -50,38 +50,4 @@ describe("list_plugin_assemblies solution filter", () => {
     expect(text).toContain("Core.Plugins");
     expect(text).not.toContain("Other.Plugins");
   });
-
-  it("supports the deprecated list_plugins alias", async () => {
-    const server = new FakeServer();
-    const config = createTestConfig(["dev"]);
-    const { client } = createRecordingClient({
-      dev: {
-        pluginassemblies: [
-          {
-            pluginassemblyid: "asm-1",
-            name: "Core.Plugins",
-            version: "1.0.0",
-            isolationmode: 2,
-            ismanaged: false,
-            modifiedon: "2026-03-01T12:00:00Z",
-          },
-        ],
-      },
-    });
-
-    registerListPluginAssemblies(server as never, config, client);
-
-    const response = await server.getHandler("list_plugins")({});
-
-    expect(response.isError).toBeUndefined();
-    expect(response.structuredContent).toMatchObject({
-      tool: "list_plugins",
-      ok: true,
-      data: {
-        environment: "dev",
-        count: 1,
-      },
-    });
-    expect(response.content[0].text).toContain("Plugin Assemblies");
-  });
 });

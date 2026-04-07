@@ -18,24 +18,19 @@ const STAGE_LABELS: Record<number, string> = {
 const MODE_LABELS: Record<number, string> = { 0: "Synchronous", 1: "Asynchronous" };
 const IMAGE_TYPE_LABELS: Record<number, string> = { 0: "PreImage", 1: "PostImage", 2: "Both" };
 
-const NEW_SCHEMA = {
-  environment: z.string().optional().describe("Environment name"),
-  assemblyName: z.string().describe("Name of the plugin assembly"),
-};
-
-const LEGACY_SCHEMA = {
-  environment: z.string().optional().describe("Environment name"),
-  pluginName: z.string().describe("Name of the plugin assembly"),
-};
-
 export function registerGetPluginAssemblyDetails(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  const createHandler =
-    (toolName: string) =>
-    async ({ environment, assemblyName }: { environment?: string; assemblyName: string }) => {
+  server.tool(
+    "get_plugin_assembly_details",
+    "Get detailed information about a plugin assembly including all types, steps, and images.",
+    {
+      environment: z.string().optional().describe("Environment name"),
+      assemblyName: z.string().describe("Name of the plugin assembly"),
+    },
+    async ({ environment, assemblyName }) => {
       try {
         const env = getEnvironment(config, environment);
 
@@ -47,7 +42,7 @@ export function registerGetPluginAssemblyDetails(
 
         if (assemblies.length === 0) {
           const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse(toolName, text, text, {
+          return createToolSuccessResponse("get_plugin_assembly_details", text, text, {
             environment: env.name,
             found: false,
             assemblyName,
@@ -153,7 +148,7 @@ export function registerGetPluginAssemblyDetails(
         });
 
         return createToolSuccessResponse(
-          toolName,
+          "get_plugin_assembly_details",
           lines.join("\n"),
           `Loaded plugin assembly '${String(assembly.name || assemblyName)}' in '${env.name}'.`,
           {
@@ -178,22 +173,8 @@ export function registerGetPluginAssemblyDetails(
           },
         );
       } catch (error) {
-        return createToolErrorResponse(toolName, error);
+        return createToolErrorResponse("get_plugin_assembly_details", error);
       }
-    };
-
-  server.tool(
-    "get_plugin_assembly_details",
-    "Get detailed information about a plugin assembly including all types, steps, and images.",
-    NEW_SCHEMA,
-    createHandler("get_plugin_assembly_details"),
-  );
-
-  server.tool(
-    "get_plugin_details",
-    "Deprecated alias for the assembly-level tool `get_plugin_assembly_details`. Shows details for a plugin assembly, not one plugin class.",
-    LEGACY_SCHEMA,
-    async ({ environment, pluginName }) =>
-      createHandler("get_plugin_details")({ environment, assemblyName: pluginName }),
+    },
   );
 }
