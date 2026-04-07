@@ -55,7 +55,7 @@ export function registerCompareEnvironmentMatrix(
 ) {
   server.tool(
     "compare_environment_matrix",
-    "Compare one baseline environment against many target environments and show a drift matrix for plugin assemblies, workflows, or web resources.",
+    "Compare one baseline environment against many target environments and show a drift matrix for plugin assemblies with their steps and images, workflows, or web resources.",
     {
       baselineEnvironment: z
         .string()
@@ -68,7 +68,7 @@ export function registerCompareEnvironmentMatrix(
       componentType: z
         .enum(["plugins", "workflows", "web_resources", "all"])
         .optional()
-        .describe("Component type to compare. Default: all"),
+        .describe("Component type to compare. 'plugins' means plugin assemblies with steps and images. Default: all"),
       assemblyName: z.string().optional().describe("Filter to one plugin assembly"),
       workflowName: z.string().optional().describe("Filter workflows by name"),
       category: z

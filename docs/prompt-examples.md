@@ -34,6 +34,7 @@ Tip:
 
 - Start with the `list_*` prompt in a group.
 - Then use one returned name in the related `get_*`, `find_*`, or `compare_*` prompt.
+- In plugin prompts, `<PLUGIN>` means plugin assembly. Use `<PLUGIN_CLASS>` for one `IPlugin` class.
 
 ## Plugins
 
@@ -183,7 +184,7 @@ This group needs at least two configured environments.
   `Compare JavaScript web resources with names that contain 'account' between <SOURCE_ENV> and <TARGET_ENV>, and compare content too.`
 
 - `compare_environment_matrix`
-  `Use <SOURCE_ENV> as the baseline and compare it with <TARGET_ENVS>. Include plugins, workflows, and web resources, and compare web resource content hashes too.`
+  `Use <SOURCE_ENV> as the baseline and compare it with <TARGET_ENVS>. Include plugin assemblies, workflows, and web resources, and compare web resource content hashes too.`
 
 - `compare_table_schema`
   `Compare table <TABLE> in <SOURCE_ENV> with table <TARGET_TABLE> in <TARGET_ENV>.`

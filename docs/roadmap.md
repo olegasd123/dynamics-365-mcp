@@ -145,7 +145,7 @@ Done when:
 - assembly-level and plugin-level tools share one fetch model
 - orphan logic is consistent across tools
 
-## Milestone 6: Update Documentation
+## Milestone 6: Update Documentation [done]
 
 Goal:
 

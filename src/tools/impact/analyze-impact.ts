@@ -14,12 +14,12 @@ export function registerAnalyzeImpact(
 ) {
   server.tool(
     "analyze_impact",
-    "Analyze likely impact for a table, column, plugin, workflow, cloud flow, web resource, or solution.",
+    "Analyze likely impact for a table, column, plugin assembly, workflow, cloud flow, web resource, or solution.",
     {
       environment: z.string().optional().describe("Environment name"),
       componentType: z
         .enum(["table", "column", "plugin", "workflow", "flow", "web_resource", "solution"])
-        .describe("Component type to analyze"),
+        .describe("Component type to analyze. Use 'plugin' for plugin assembly impact."),
       name: z.string().describe("Component name, unique name, or other main identifier"),
       table: z
         .string()

@@ -95,7 +95,7 @@ src/
     custom-api-queries.ts           # Custom API metadata query builders
     flow-queries.ts                 # Cloud flow query builders on workflow metadata
     security-queries.ts             # Security role and privilege query builders
-    plugin-queries.ts               # OData query builders for plugin entities
+    plugin-queries.ts               # OData query builders for plugin assemblies, types, steps, and images
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
     solution-queries.ts             # OData query builders for solutions and solution components
@@ -297,10 +297,10 @@ Priority order:
 | `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
 | `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
 | `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
-| `list_plugins`             | List plugin classes; optionally filter orphaned (no steps)    | `environment`, `filter`, `solution`                     |
-| `list_plugin_steps`        | List registered steps for one plugin class                    | `environment`, `pluginName`, `assemblyName`, `solution` |
-| `get_plugin_details`       | Deep info for one plugin class with steps and images          | `environment`, `pluginName`, `assemblyName`, `solution` |
-| `list_plugin_assemblies`   | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
+| `list_plugins`              | List plugin classes; optionally filter orphaned (no steps)    | `environment`, `filter`, `solution`                     |
+| `list_plugin_steps`         | List registered steps for one plugin class                    | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `get_plugin_details`        | Deep info for one plugin class with steps and images          | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `list_plugin_assemblies`    | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
 | `list_plugin_assembly_steps` | List registered steps for one plugin assembly               | `environment`, `assemblyName`                           |
 | `list_plugin_assembly_images` | List pre/post images on steps for one plugin assembly      | `environment`, `assemblyName`, `stepName`, `message`    |
 | `get_plugin_assembly_details` | Deep info: assembly → plugin classes/workflow activities → steps → images | `environment`, `assemblyName`            |
@@ -322,7 +322,7 @@ Priority order:
 | `compare_views`              | Compare views across envs                      | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
 | `compare_custom_apis`        | Compare Custom APIs across envs                | `sourceEnvironment`, `targetEnvironment`, `apiName`                    |
 | `compare_security_roles`     | Compare security roles across envs             | `sourceEnvironment`, `targetEnvironment`, `roleName`                   |
-| `compare_plugin_assemblies` | Compare plugin assemblies across envs          | `sourceEnvironment`, `targetEnvironment`, `assemblyName`               |
+| `compare_plugin_assemblies` | Compare plugin assemblies across envs           | `sourceEnvironment`, `targetEnvironment`, `assemblyName`               |
 | `compare_solutions`          | Compare supported solution components          | `sourceEnvironment`, `targetEnvironment`, `solution`                   |
 | `compare_workflows`          | Compare workflow state/definitions             | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName`   |
 | `compare_web_resources`      | Compare web resource content                   | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`         |
@@ -355,6 +355,7 @@ The server resolves the solution first, then filters supported solution componen
 
 - `list_plugins`, `list_plugin_steps`, and `get_plugin_details` return plugin classes only.
 - These tools exclude workflow activities where `isworkflowactivity=true`.
+- `list_plugin_assemblies`, `list_plugin_assembly_steps`, `list_plugin_assembly_images`, and `get_plugin_assembly_details` work at plugin assembly level.
 - Use `get_plugin_assembly_details` when you need the full assembly view, including workflow activities.
 - Dataverse can store other handlers as plugin types. Until a separate tool exists, those handlers can still appear in plugin-class results when they are not marked as workflow activities.
 
@@ -394,7 +395,8 @@ This tool uses Dataverse dependency functions instead of guessing links from nam
 
 Use `analyze_impact` when you want one report for likely change impact.
 
-- Supported targets: table, column, plugin, workflow, flow, web resource, and solution
+- Supported targets: table, column, plugin assembly, workflow, flow, web resource, and solution
+- The `analyze_impact` tool still uses `componentType: "plugin"` for plugin assembly impact
 - The report reuses current usage and dependency logic where possible
 - The summary shows risk level, total references, dependency count, and likely affected areas
 - Detailed sections are added only when data exists, like forms, views, plugin steps, cloud flows, or dependencies
@@ -410,7 +412,7 @@ See [docs/performance-notes.md](docs/performance-notes.md) for the protected tes
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
-`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugins it shows drift on three levels:
+`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugin assemblies it shows drift on three levels:
 
 - plugin assemblies
 - plugin steps
@@ -466,7 +468,7 @@ Error shape:
 The `data` payload depends on the tool, but it follows the same idea:
 
 - list tools usually return fields like `environment`, `filters`, `count`, and `items`
-- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin`, `plugin assembly`, or `solution`
+- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin class`, `plugin assembly`, or `solution`
 - compare tools usually return environment names, filters, and one or more diff objects
 - error results always use the shared `error.name` and `error.message` fields
 
@@ -485,6 +487,36 @@ Use this when you want `IPlugin` classes, not assemblies.
     "environment": "dev",
     "solution": "Contoso Core",
     "filter": "no_steps"
+  }
+}
+```
+
+### List Plugin Assemblies In One Solution
+
+Use this when you want DLL-level registration, not plugin classes.
+
+```json
+{
+  "tool": "list_plugin_assemblies",
+  "arguments": {
+    "environment": "dev",
+    "solution": "Contoso Core",
+    "filter": "no_steps"
+  }
+}
+```
+
+### List Steps For One Plugin Class
+
+Use this when you already know the plugin class and want only its registered steps.
+
+```json
+{
+  "tool": "list_plugin_steps",
+  "arguments": {
+    "environment": "dev",
+    "pluginName": "Contoso.Plugins.AccountPlugin",
+    "assemblyName": "Contoso.Plugins"
   }
 }
 ```
@@ -534,7 +566,7 @@ Use this when you want a detailed plugin assembly diff, including steps and imag
 
 ### Compare Many Environments Against Prod
 
-Use this when you want one drift report for many environments.
+Use this when you want one drift report for many environments across plugin assemblies, workflows, and web resources.
 
 ```json
 {
@@ -547,7 +579,7 @@ Use this when you want one drift report for many environments.
 }
 ```
 
-### Compare Plugin Drift On All Plugin Levels
+### Compare Plugin Assembly Drift On All Registration Levels
 
 Use this when you want to see plugin assembly, step, and image drift for one plugin assembly.
 
@@ -594,9 +626,9 @@ Use `uniqueName` when possible. It is safer than display name.
 }
 ```
 
-### Analyze Impact For One Plugin
+### Analyze Impact For One Plugin Assembly
 
-Use this when you want one report that combines direct usage and dependency risk.
+Use this when you want one report that combines direct usage and dependency risk for one plugin assembly. The input still uses `componentType: "plugin"`.
 
 ```json
 {
