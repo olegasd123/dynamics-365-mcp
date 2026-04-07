@@ -1,6 +1,7 @@
 import type { AppConfig, EnvironmentConfig } from "../../config/types.js";
 
 export const EXPECTED_TOOL_NAMES = [
+  "analyze_create_triggers",
   "analyze_impact",
   "analyze_update_triggers",
   "compare_custom_apis",

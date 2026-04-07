@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { registerAnalyzeCreateTriggers } from "../analyze-create-triggers.js";
 import { registerAnalyzeUpdateTriggers } from "../analyze-update-triggers.js";
 import { registerFindColumnUsage } from "../find-column-usage.js";
 import { registerFindTableUsage } from "../find-table-usage.js";
@@ -371,6 +372,147 @@ describe("usage tools", () => {
           ],
           relatedCloudFlows: [
             expect.objectContaining({ name: "Contact Flow", matchedAttributes: ["firstname"] }),
+          ],
+        },
+      },
+    });
+  });
+
+  it("analyzes direct create triggers and keeps field references separate", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const relatedFlowClientData = JSON.stringify({
+      properties: {
+        definition: {
+          triggers: { When_contact_created: { entityName: "contact", columnName: "firstname" } },
+          actions: {},
+        },
+      },
+    });
+
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "contact",
+            SchemaName: "Contact",
+            DisplayName: { UserLocalizedLabel: { Label: "Contact" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Contacts" } },
+            EntitySetName: "contacts",
+            PrimaryIdAttribute: "contactid",
+            PrimaryNameAttribute: "fullname",
+            OwnershipType: { Value: "UserOwned" },
+          },
+        ],
+        pluginassemblies: [{ pluginassemblyid: "asm-1", name: "Core.Plugins" }],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "CreatePlugin",
+            typename: "Core.Plugins.CreatePlugin",
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-2",
+            name: "UpdatePlugin",
+            typename: "Core.Plugins.UpdatePlugin",
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [
+          {
+            sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
+            name: "Contact Create Step",
+            statecode: 0,
+            stage: 20,
+            mode: 0,
+            filteringattributes: "",
+            sdkmessageid: { name: "Create" },
+            sdkmessagefilterid: { primaryobjecttypecode: "contact" },
+          },
+          {
+            sdkmessageprocessingstepid: "step-2",
+            _eventhandler_value: "type-2",
+            name: "Contact Update Step",
+            statecode: 0,
+            stage: 40,
+            mode: 1,
+            filteringattributes: "firstname",
+            sdkmessageid: { name: "Update" },
+            sdkmessagefilterid: { primaryobjecttypecode: "contact" },
+          },
+        ],
+        sdkmessageprocessingstepimages: [],
+        workflows: [
+          {
+            workflowid: "wf-1",
+            name: "Contact Create Workflow",
+            uniquename: "contoso_ContactCreateWorkflow",
+            category: 0,
+            statecode: 1,
+            mode: 1,
+            primaryentity: "contact",
+            triggeroncreate: true,
+            triggeronupdateattributelist: "",
+          },
+          {
+            workflowid: "wf-2",
+            name: "Contact Update Workflow",
+            uniquename: "contoso_ContactUpdateWorkflow",
+            category: 0,
+            statecode: 1,
+            mode: 1,
+            primaryentity: "contact",
+            triggeroncreate: false,
+            triggeronupdateattributelist: "firstname",
+          },
+          {
+            workflowid: "flow-1",
+            workflowidunique: "flow-u-1",
+            name: "Contact Create Flow",
+            uniquename: "contoso_ContactCreateFlow",
+            category: 5,
+            statecode: 1,
+            type: 1,
+            primaryentity: "contact",
+            clientdata: relatedFlowClientData,
+            connectionreferences: "",
+          },
+        ],
+      },
+    });
+
+    registerAnalyzeCreateTriggers(server as never, config, client);
+
+    const response = await server.getHandler("analyze_create_triggers")({
+      table: "contact",
+      providedAttributes: ["firstname"],
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Contact Create Step");
+    expect(response.content[0].text).toContain("Contact Create Workflow");
+    expect(response.content[0].text).toContain("Contact Create Flow");
+    expect(response.content[0].text).not.toContain("Contact Update Step");
+    expect(response.content[0].text).not.toContain("Contact Update Workflow");
+    expect(response.content[0].text).toContain(
+      "Direct create matches are table-level. The provided fields do not narrow plugin Create steps or workflow Create triggers.",
+    );
+    expect(response.structuredContent).toMatchObject({
+      data: {
+        analysis: {
+          tableLogicalName: "contact",
+          providedAttributes: ["firstname"],
+          directPluginSteps: [
+            expect.objectContaining({ name: "Contact Create Step" }),
+          ],
+          directWorkflows: [
+            expect.objectContaining({ name: "Contact Create Workflow" }),
+          ],
+          relatedCloudFlows: [
+            expect.objectContaining({ name: "Contact Create Flow", matchedAttributes: ["firstname"] }),
           ],
         },
       },

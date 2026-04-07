@@ -15,6 +15,7 @@ describe("workflow queries", () => {
 
     expect(query).toContain("$filter=type eq 1 and category eq 3 and statecode eq 1");
     expect(query).toContain("$orderby=name asc");
+    expect(query).toContain("triggeroncreate");
   });
 
   it("builds the actions query", () => {
@@ -22,6 +23,7 @@ describe("workflow queries", () => {
 
     expect(query).toContain("$filter=type eq 1 and category eq 3");
     expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
+    expect(query).toContain("triggeroncreate");
   });
 
   it("builds the workflow details query", () => {

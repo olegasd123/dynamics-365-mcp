@@ -163,6 +163,9 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `find_web_resource_usage`
   `In <ENV>, find where web resource <WEB_RESOURCE> is used in forms and other text web resources.`
 
+- `analyze_create_triggers`
+  `In <ENV>, analyze what direct triggers can run when table <TABLE> is created with columns <COLUMNS>. Keep direct triggers separate from related cloud flow references.`
+
 - `analyze_update_triggers`
   `In <ENV>, analyze what direct triggers can run when table <TABLE> is updated with columns <COLUMNS>. Keep direct triggers separate from related cloud flow references.`
 
@@ -213,6 +216,7 @@ This group needs at least two configured environments.
 This prompt list covers these tools:
 
 - `analyze_impact`
+- `analyze_create_triggers`
 - `analyze_update_triggers`
 - `compare_custom_apis`
 - `compare_environment_matrix`

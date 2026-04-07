@@ -106,6 +106,36 @@ export interface UpdateTriggerAnalysisData {
   }>;
 }
 
+export interface CreateTriggerAnalysisData {
+  tableLogicalName: string;
+  tableDisplayName: string;
+  providedAttributes: string[];
+  warnings?: string[];
+  notes: string[];
+  directPluginSteps: Array<{
+    name: string;
+    assemblyName: string;
+    pluginTypeName: string;
+    pluginTypeFullName: string;
+    stageLabel: string;
+    modeLabel: string;
+  }>;
+  directWorkflows: Array<{
+    name: string;
+    uniqueName: string;
+    category: number;
+    categoryLabel: string;
+    modeLabel: string;
+  }>;
+  relatedCloudFlows: Array<{
+    name: string;
+    uniqueName: string;
+    triggerNames: string[];
+    matchedAttributes: string[];
+    reason: string;
+  }>;
+}
+
 const PLUGIN_STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
   20: "Pre-Operation",
@@ -590,6 +620,101 @@ export async function analyzeUpdateTriggersData(
           reason:
             tableMatched && matchedAttributes.length > 0
               ? `Flow metadata mentions table '${table.logicalName}' and changed attribute values.`
+              : "",
+        };
+      })
+      .filter((flow) => flow.reason),
+  };
+}
+
+export async function analyzeCreateTriggersData(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  tableRef: string,
+  providedAttributes: string[],
+): Promise<CreateTriggerAnalysisData> {
+  const table = await resolveTable(env, client, tableRef);
+  const normalizedAttributes = normalizeAttributeList(providedAttributes);
+  const warnings: string[] = [];
+  const notes = [
+    "Direct create matches are table-level. The provided fields do not narrow plugin Create steps or workflow Create triggers.",
+    "Provided fields are used only for related cloud flow references in this report.",
+    "The report does not simulate downstream updates done by plugins, workflows, or cloud flows.",
+  ];
+
+  const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
+    client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
+    client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery({ status: "activated" })),
+    listCloudFlows(env, client, { status: "activated" }),
+  ]);
+
+  const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
+  if (cloudFlows.length > MAX_USAGE_DETAIL_ITEMS) {
+    warnings.push(
+      `Cloud flow detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} flows per request. Add a smaller scope when you need a full search.`,
+    );
+  }
+
+  const [pluginInventory, flowDetails] = await Promise.all([
+    fetchPluginInventory(env, client, pluginAssemblies),
+    Promise.all(
+      flowCandidates.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name)),
+    ),
+  ]);
+
+  return {
+    tableLogicalName: table.logicalName,
+    tableDisplayName: table.displayName,
+    providedAttributes: normalizedAttributes,
+    warnings,
+    notes,
+    directPluginSteps: pluginInventory.steps
+      .filter(
+        (step) =>
+          step.statecode === 0 &&
+          step.messageName.toLowerCase() === "create" &&
+          step.primaryEntity === table.logicalName,
+      )
+      .map((step) => ({
+        name: step.name,
+        assemblyName: step.assemblyName,
+        pluginTypeName: step.pluginTypeName,
+        pluginTypeFullName: step.pluginTypeFullName,
+        stageLabel: PLUGIN_STAGE_LABELS[Number(step.stage || 0)] || String(step.stage || ""),
+        modeLabel: PLUGIN_MODE_LABELS[Number(step.mode || 0)] || String(step.mode || ""),
+      })),
+    directWorkflows: workflows
+      .filter(
+        (workflow) =>
+          String(workflow.primaryentity || "") === table.logicalName && Boolean(workflow.triggeroncreate),
+      )
+      .map((workflow) => ({
+        name: String(workflow.name || ""),
+        uniqueName: String(workflow.uniquename || ""),
+        category: Number(workflow.category || 0),
+        categoryLabel:
+          WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
+          String(workflow.category || ""),
+        modeLabel:
+          WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
+      })),
+    relatedCloudFlows: flowDetails
+      .map((flow) => {
+        const matchedAttributes = normalizedAttributes.filter((attribute) =>
+          flowJsonIncludesValue(flow, attribute),
+        );
+        const tableMatched =
+          flow.primaryentity.toLowerCase() === table.logicalName ||
+          flowJsonIncludesValue(flow, table.logicalName);
+
+        return {
+          name: flow.name,
+          uniqueName: flow.uniquename,
+          triggerNames: flow.summary.triggerNames,
+          matchedAttributes,
+          reason:
+            tableMatched && matchedAttributes.length > 0
+              ? `Flow metadata mentions table '${table.logicalName}' and provided field values.`
               : "",
         };
       })

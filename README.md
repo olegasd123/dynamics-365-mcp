@@ -295,6 +295,7 @@ Priority order:
 | `find_table_usage`          | Find where one table is used                                  | `environment`, `table`                                  |
 | `find_column_usage`         | Find where one column is used                                 | `environment`, `column`, `table`                        |
 | `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
+| `analyze_create_triggers`   | Analyze direct create triggers for a table create             | `environment`, `table`, `providedAttributes`            |
 | `analyze_update_triggers`   | Analyze direct update triggers for a table change             | `environment`, `table`, `changedAttributes`             |
 | `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
 | `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
