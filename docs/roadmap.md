@@ -103,7 +103,7 @@ Done when:
 - a prompt with `list plugin assemblies` returns assemblies
 - the two results are clearly different
 
-## Milestone 4: Keep Workflow Activities Separate
+## Milestone 4: Keep Workflow Activities Separate [done]
 
 Goal:
 

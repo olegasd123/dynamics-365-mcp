@@ -22,7 +22,7 @@ export function registerGetPluginDetails(
 ) {
   server.tool(
     "get_plugin_details",
-    "Get detailed information about one plugin class including its assembly, steps, and images.",
+    "Get detailed information about one plugin class including its assembly, steps, and images. Workflow activities (CodeActivity) are excluded.",
     {
       environment: z.string().optional().describe("Environment name"),
       pluginName: z.string().describe("Plugin class name or full type name"),

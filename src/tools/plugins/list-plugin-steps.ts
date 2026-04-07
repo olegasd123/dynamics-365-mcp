@@ -25,7 +25,7 @@ export function registerListPluginSteps(
 ) {
   server.tool(
     "list_plugin_steps",
-    "List registered steps (message processing steps) for one plugin class in Dynamics 365.",
+    "List registered steps (message processing steps) for one plugin class in Dynamics 365. Workflow activities (CodeActivity) are excluded.",
     {
       environment: z.string().optional().describe("Environment name"),
       pluginName: z.string().describe("Plugin class name or full type name"),

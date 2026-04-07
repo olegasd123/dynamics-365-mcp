@@ -303,7 +303,7 @@ Priority order:
 | `list_plugin_assemblies`   | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
 | `list_plugin_assembly_steps` | List registered steps for one plugin assembly               | `environment`, `assemblyName`                           |
 | `list_plugin_assembly_images` | List pre/post images on steps for one plugin assembly      | `environment`, `assemblyName`, `stepName`, `message`    |
-| `get_plugin_assembly_details` | Deep info: assembly → types → steps → images               | `environment`, `assemblyName`                           |
+| `get_plugin_assembly_details` | Deep info: assembly → plugin classes/workflow activities → steps → images | `environment`, `assemblyName`            |
 | `list_solutions`            | List solutions by display name and unique name                | `environment`, `nameFilter`                             |
 | `get_solution_details`      | Show solution summary and supported ALM component groups      | `environment`, `solution`                               |
 | `get_solution_dependencies` | Show dependency links for supported solution components       | `environment`, `solution`, `direction`, `componentType` |
@@ -350,6 +350,13 @@ Users can now work with a solution by display name or unique name.
 - `get_flow_details` supports `solution`
 
 The server resolves the solution first, then filters supported solution components from that solution.
+
+### Plugin Boundary
+
+- `list_plugins`, `list_plugin_steps`, and `get_plugin_details` return plugin classes only.
+- These tools exclude workflow activities where `isworkflowactivity=true`.
+- Use `get_plugin_assembly_details` when you need the full assembly view, including workflow activities.
+- Dataverse can store other handlers as plugin types. Until a separate tool exists, those handlers can still appear in plugin-class results when they are not marked as workflow activities.
 
 ### Supported Solution Coverage
 
@@ -492,6 +499,20 @@ Use this when you want one plugin class with its registered steps and images.
   "arguments": {
     "environment": "dev",
     "pluginName": "Contoso.Plugins.AccountPlugin"
+  }
+}
+```
+
+### Inspect One Plugin Assembly With Workflow Activities
+
+Use this when you want the full assembly view, including workflow activities stored in the same assembly.
+
+```json
+{
+  "tool": "get_plugin_assembly_details",
+  "arguments": {
+    "environment": "dev",
+    "assemblyName": "Contoso.Plugins"
   }
 }
 ```

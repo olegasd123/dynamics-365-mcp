@@ -7,7 +7,7 @@ import {
 } from "../../__tests__/tool-test-helpers.js";
 
 describe("get_plugin_assembly_details tool", () => {
-  it("renders plugin details with types, steps, and images", async () => {
+  it("renders plugin classes and workflow activities in separate sections", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
@@ -29,6 +29,13 @@ describe("get_plugin_assembly_details tool", () => {
             plugintypeid: "type-1",
             name: "AccountPlugin",
             typename: "Core.Plugins.AccountPlugin",
+            isworkflowactivity: false,
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-2",
+            name: "AccountActivity",
+            typename: "Core.Plugins.AccountActivity",
             isworkflowactivity: true,
             _pluginassemblyid_value: "asm-1",
           },
@@ -46,6 +53,20 @@ describe("get_plugin_assembly_details tool", () => {
             supporteddeployment: 0,
             asyncautodelete: false,
             sdkmessageid: { name: "Create" },
+            sdkmessagefilterid: { primaryobjecttypecode: "account" },
+          },
+          {
+            sdkmessageprocessingstepid: "step-2",
+            _eventhandler_value: "type-2",
+            name: "Activity Execute",
+            stage: 40,
+            mode: 0,
+            rank: 1,
+            statecode: 0,
+            filteringattributes: "",
+            supporteddeployment: 0,
+            asyncautodelete: false,
+            sdkmessageid: { name: "Update" },
             sdkmessagefilterid: { primaryobjecttypecode: "account" },
           },
         ],
@@ -73,11 +94,15 @@ describe("get_plugin_assembly_details tool", () => {
     expect(response.isError).toBeUndefined();
     expect(text).toContain("## Plugin Assembly: Core.Plugins");
     expect(text).toContain("- **Version**: 1.2.3");
+    expect(text).toContain("### Plugin Classes (1)");
+    expect(text).toContain("### Workflow Activities (1)");
     expect(text).toContain("#### AccountPlugin (`Core.Plugins.AccountPlugin`)");
-    expect(text).toContain("*Workflow Activity*");
+    expect(text).toContain("#### AccountActivity (`Core.Plugins.AccountActivity`)");
     expect(text).toContain("Message: Create | Entity: account | Stage: Pre-Operation | Mode: Synchronous | Status: Enabled");
+    expect(text).toContain("Message: Update | Entity: account | Stage: Post-Operation | Mode: Synchronous | Status: Enabled");
     expect(text).toContain("Filtering: name");
     expect(text).toContain("PreImage (PreImage, alias: pre, attributes: name)");
+    expect(text).toContain("plugin tools exclude workflow activities");
     expect(response.structuredContent).toMatchObject({
       tool: "get_plugin_assembly_details",
       ok: true,
@@ -85,8 +110,10 @@ describe("get_plugin_assembly_details tool", () => {
         environment: "dev",
         found: true,
         counts: {
-          types: 1,
-          steps: 1,
+          types: 2,
+          pluginClasses: 1,
+          workflowActivities: 1,
+          steps: 2,
           images: 1,
         },
       },
@@ -94,15 +121,21 @@ describe("get_plugin_assembly_details tool", () => {
 
     const payload = response.structuredContent as {
       data: {
-        types: Array<{
+        pluginClasses: Array<{
           name: string;
           steps: Array<{ stageLabel: string; images: Array<{ imageTypeLabel: string }> }>;
         }>;
+        workflowActivities: Array<{
+          name: string;
+          steps: Array<{ stageLabel: string }>;
+        }>;
       };
     };
-    expect(payload.data.types[0].name).toBe("AccountPlugin");
-    expect(payload.data.types[0].steps[0].stageLabel).toBe("Pre-Operation");
-    expect(payload.data.types[0].steps[0].images[0].imageTypeLabel).toBe("PreImage");
+    expect(payload.data.pluginClasses[0].name).toBe("AccountPlugin");
+    expect(payload.data.pluginClasses[0].steps[0].stageLabel).toBe("Pre-Operation");
+    expect(payload.data.pluginClasses[0].steps[0].images[0].imageTypeLabel).toBe("PreImage");
+    expect(payload.data.workflowActivities[0].name).toBe("AccountActivity");
+    expect(payload.data.workflowActivities[0].steps[0].stageLabel).toBe("Post-Operation");
   });
 
   it("returns a not found message when the plugin assembly does not exist", async () => {

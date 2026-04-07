@@ -10,7 +10,7 @@ import { fetchPluginClassInventory } from "./plugin-class-metadata.js";
 export function registerListPlugins(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
     "list_plugins",
-    "List plugin classes (IPlugin implementations) registered in Dynamics 365. Use filter='no_steps' to find orphaned plugin classes with no registered steps.",
+    "List plugin classes (IPlugin implementations) registered in Dynamics 365. Workflow activities (CodeActivity) are excluded. Use filter='no_steps' to find orphaned plugin classes with no registered steps.",
     {
       environment: z.string().optional().describe("Environment name (e.g. 'dev', 'prod')"),
       filter: z

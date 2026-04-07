@@ -37,6 +37,8 @@ Tip:
 
 ## Plugins
 
+Plugin tools return plugin classes only. Workflow activities stay under workflow terminology. Use the assembly detail tool when you need to inspect both plugin classes and workflow activities in one DLL.
+
 - `list_plugins`
   `In <ENV>, list plugin classes from solution <SOLUTION>. Show only orphaned plugin classes with no registered steps. Include assembly names.`
 
@@ -56,7 +58,7 @@ Tip:
   `In <ENV>, list plugin images for the plugin assembly <PLUGIN>. Filter to step <STEP> and message Update if possible.`
 
 - `get_plugin_assembly_details`
-  `In <ENV>, show full details for the plugin assembly <PLUGIN>, including types, steps, and images.`
+  `In <ENV>, show full details for the plugin assembly <PLUGIN>, and keep plugin classes and workflow activities in separate sections. Include steps and images.`
 
 ## Workflows And Actions
 

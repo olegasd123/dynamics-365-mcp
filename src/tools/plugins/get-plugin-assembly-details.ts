@@ -18,6 +18,14 @@ const STAGE_LABELS: Record<number, string> = {
 const MODE_LABELS: Record<number, string> = { 0: "Synchronous", 1: "Asynchronous" };
 const IMAGE_TYPE_LABELS: Record<number, string> = { 0: "PreImage", 1: "PostImage", 2: "Both" };
 
+interface AssemblyTypeDetails {
+  plugintypeid: string;
+  name: string;
+  fullName: string;
+  isWorkflowActivity: boolean;
+  steps: Array<Record<string, unknown>>;
+}
+
 export function registerGetPluginAssemblyDetails(
   server: McpServer,
   config: AppConfig,
@@ -25,7 +33,7 @@ export function registerGetPluginAssemblyDetails(
 ) {
   server.tool(
     "get_plugin_assembly_details",
-    "Get detailed information about a plugin assembly including all types, steps, and images.",
+    "Get detailed information about a plugin assembly. Output separates plugin classes and workflow activities.",
     {
       environment: z.string().optional().describe("Environment name"),
       assemblyName: z.string().describe("Name of the plugin assembly"),
@@ -84,68 +92,31 @@ export function registerGetPluginAssemblyDetails(
           imagesByStepId.set(stepId, images);
         }
 
-        lines.push(`### Plugin Types (${types.length})`);
+        const structuredTypes = types.map((type) =>
+          buildAssemblyTypeDetails(type, stepsByPluginTypeId, imagesByStepId),
+        );
+        const pluginClasses = structuredTypes.filter((type) => !type.isWorkflowActivity);
+        const workflowActivities = structuredTypes.filter((type) => type.isWorkflowActivity);
 
-        for (const type of types) {
-          lines.push(`\n#### ${type.name} (\`${type.typename}\`)`);
-          if (type.isworkflowactivity) lines.push("  - *Workflow Activity*");
-
-          const steps = stepsByPluginTypeId.get(String(type.plugintypeid || "")) || [];
-
-          if (steps.length === 0) {
-            lines.push("  - No registered steps");
-            continue;
-          }
-
-          lines.push(`  **Steps (${steps.length}):**`);
-          for (const step of steps) {
-            const stage = STAGE_LABELS[step.stage as number] || String(step.stage);
-            const mode = MODE_LABELS[step.mode as number] || String(step.mode);
-            const status = step.statecode === 0 ? "Enabled" : "Disabled";
-
-            lines.push(`  - **${step.name}**`);
-            lines.push(
-              `    Message: ${step.messageName || ""} | Entity: ${step.primaryEntity || "none"} | Stage: ${stage} | Mode: ${mode} | Status: ${status}`,
-            );
-
-            if (step.filteringattributes) {
-              lines.push(`    Filtering: ${step.filteringattributes}`);
-            }
-
-            const images = imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || [];
-
-            if (images.length > 0) {
-              lines.push(`    **Images (${images.length}):**`);
-              for (const img of images) {
-                const imgType = IMAGE_TYPE_LABELS[img.imagetype as number] || String(img.imagetype);
-                lines.push(
-                  `    - ${img.name} (${imgType}, alias: ${img.entityalias || "none"}, attributes: ${img.attributes || "all"})`,
-                );
-              }
-            }
-          }
-        }
-
-        const structuredTypes = types.map((type) => {
-          const steps = (stepsByPluginTypeId.get(String(type.plugintypeid || "")) || []).map((step) => ({
-            ...step,
-            stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
-            modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
-            statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
-            images: (imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || []).map((image) => ({
-              ...image,
-              imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
-            })),
-          }));
-
-          return {
-            plugintypeid: String(type.plugintypeid || ""),
-            name: String(type.name || ""),
-            fullName: String(type.typename || ""),
-            isWorkflowActivity: Boolean(type.isworkflowactivity),
-            steps,
-          };
-        });
+        lines.push(`### Plugin Classes (${pluginClasses.length})`);
+        lines.push(
+          ...renderAssemblyTypeSection(
+            pluginClasses,
+            "No plugin classes found in this assembly.",
+          ),
+        );
+        lines.push("");
+        lines.push(`### Workflow Activities (${workflowActivities.length})`);
+        lines.push(
+          ...renderAssemblyTypeSection(
+            workflowActivities,
+            "No workflow activities found in this assembly.",
+          ),
+        );
+        lines.push("");
+        lines.push(
+          "Note: plugin tools exclude workflow activities. Use workflow terminology for `CodeActivity` classes. Other Dataverse handlers can still appear as plugin classes when Dataverse stores them as plugin types.",
+        );
 
         return createToolSuccessResponse(
           "get_plugin_assembly_details",
@@ -166,10 +137,13 @@ export function registerGetPluginAssemblyDetails(
             },
             counts: {
               types: structuredTypes.length,
+              pluginClasses: pluginClasses.length,
+              workflowActivities: workflowActivities.length,
               steps: inventory.steps.length,
               images: inventory.images.length,
             },
-            types: structuredTypes,
+            pluginClasses,
+            workflowActivities,
           },
         );
       } catch (error) {
@@ -177,4 +151,73 @@ export function registerGetPluginAssemblyDetails(
       }
     },
   );
+}
+
+function buildAssemblyTypeDetails(
+  type: Record<string, unknown>,
+  stepsByPluginTypeId: Map<string, Record<string, unknown>[]>,
+  imagesByStepId: Map<string, Record<string, unknown>[]>,
+): AssemblyTypeDetails {
+  const steps = (stepsByPluginTypeId.get(String(type.plugintypeid || "")) || []).map((step) => ({
+    ...step,
+    stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
+    modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
+    statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
+    images: (imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || []).map((image) => ({
+      ...image,
+      imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
+    })),
+  }));
+
+  return {
+    plugintypeid: String(type.plugintypeid || ""),
+    name: String(type.name || ""),
+    fullName: String(type.typename || ""),
+    isWorkflowActivity: Boolean(type.isworkflowactivity),
+    steps,
+  };
+}
+
+function renderAssemblyTypeSection(
+  types: AssemblyTypeDetails[],
+  emptyMessage: string,
+): string[] {
+  if (types.length === 0) {
+    return [emptyMessage];
+  }
+
+  const lines: string[] = [];
+
+  for (const type of types) {
+    lines.push(`\n#### ${type.name} (\`${type.fullName}\`)`);
+
+    if (type.steps.length === 0) {
+      lines.push("- No registered steps");
+      continue;
+    }
+
+    lines.push(`- Steps (${type.steps.length}):`);
+    for (const step of type.steps) {
+      lines.push(`  - ${String(step.name || "")}`);
+      lines.push(
+        `    Message: ${String(step.messageName || "")} | Entity: ${String(step.primaryEntity || "none")} | Stage: ${String(step.stageLabel || "")} | Mode: ${String(step.modeLabel || "")} | Status: ${String(step.statusLabel || "")}`,
+      );
+
+      if (step.filteringattributes) {
+        lines.push(`    Filtering: ${String(step.filteringattributes)}`);
+      }
+
+      const images = Array.isArray(step.images) ? step.images : [];
+      if (images.length > 0) {
+        lines.push(`    Images (${images.length}):`);
+        for (const image of images) {
+          lines.push(
+            `    - ${String(image.name || "")} (${String(image.imageTypeLabel || "")}, alias: ${String(image.entityalias || "none")}, attributes: ${String(image.attributes || "all")})`,
+          );
+        }
+      }
+    }
+  }
+
+  return lines;
 }
