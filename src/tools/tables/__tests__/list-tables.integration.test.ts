@@ -58,4 +58,66 @@ describe("list_tables tool", () => {
     expect(payload.data.items[0].logicalName).toBe("account");
     expect(payload.data.items[0].flags).toContain("Managed");
   });
+
+  it("filters tables in code when nameFilter is provided", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            Description: { UserLocalizedLabel: { Label: "Main account table" } },
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+            OwnershipType: { Value: "UserOwned" },
+            IsCustomEntity: false,
+            IsManaged: true,
+            IsActivity: false,
+            IsAuditEnabled: { Value: true },
+            IsValidForAdvancedFind: true,
+            ChangeTrackingEnabled: false,
+          },
+          {
+            MetadataId: "table-2",
+            LogicalName: "contact",
+            SchemaName: "Contact",
+            DisplayName: { UserLocalizedLabel: { Label: "Contact" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Contacts" } },
+            Description: { UserLocalizedLabel: { Label: "Main contact table" } },
+            EntitySetName: "contacts",
+            PrimaryIdAttribute: "contactid",
+            PrimaryNameAttribute: "fullname",
+            OwnershipType: { Value: "UserOwned" },
+            IsCustomEntity: false,
+            IsManaged: true,
+            IsActivity: false,
+            IsAuditEnabled: { Value: true },
+            IsValidForAdvancedFind: true,
+            ChangeTrackingEnabled: false,
+          },
+        ],
+      },
+    });
+
+    registerListTables(server as never, config, client);
+
+    const response = await server.getHandler("list_tables")({ nameFilter: "contact" });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("contact");
+    expect(response.content[0].text).not.toContain("account");
+
+    const payload = response.structuredContent as {
+      data: { count: number; items: Array<{ logicalName: string }> };
+    };
+    expect(payload.data.count).toBe(1);
+    expect(payload.data.items).toHaveLength(1);
+    expect(payload.data.items[0]?.logicalName).toBe("contact");
+  });
 });

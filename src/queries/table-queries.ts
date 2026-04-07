@@ -1,6 +1,5 @@
 import {
   buildQueryString,
-  odataContains,
   odataEq,
   odataStringLiteral,
 } from "../utils/odata-helpers.js";
@@ -109,23 +108,9 @@ function buildOrStringFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");
 }
 
-export function listTablesQuery(nameFilter?: string): string {
-  const filters: string[] = [];
-
-  if (nameFilter) {
-    filters.push(
-      [
-        odataContains("LogicalName", nameFilter),
-        odataContains("SchemaName", nameFilter),
-        odataContains("EntitySetName", nameFilter),
-      ].join(" or "),
-    );
-  }
-
+export function listTablesQuery(): string {
   return buildQueryString({
     select: TABLE_SELECT,
-    filter: filters.length > 0 ? `(${filters.join(") and (")})` : undefined,
-    orderby: "LogicalName asc",
   });
 }
 
@@ -211,6 +196,5 @@ export function listTablesByMetadataIdsQuery(metadataIds: string[]): string {
   return buildQueryString({
     select: TABLE_SELECT,
     filter: buildOrStringFilter("MetadataId", metadataIds),
-    orderby: "LogicalName asc",
   });
 }
