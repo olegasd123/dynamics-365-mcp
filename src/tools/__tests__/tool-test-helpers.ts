@@ -48,6 +48,11 @@ export const EXPECTED_TOOL_NAMES = [
   "list_workflows",
 ] as const;
 
+export const REMOVED_LEGACY_TOOL_NAMES = [
+  "compare_plugins",
+  "list_plugin_images",
+] as const;
+
 export interface ToolResponse {
   content: Array<{ type: "text"; text: string }>;
   structuredContent?: Record<string, unknown>;
