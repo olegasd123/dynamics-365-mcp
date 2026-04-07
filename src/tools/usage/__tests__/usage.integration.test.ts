@@ -333,10 +333,11 @@ describe("usage tools", () => {
     expect(response.content[0].text).toContain("Plugin1 Step");
     expect(response.content[0].text).toContain("PluginAny Step");
     expect(response.content[0].text).toContain("Contact First Name Sync");
+    expect(response.content[0].text).toContain("### System-Managed Column Matches");
+    expect(response.content[0].text).toContain("Plugin2 Step");
+    expect(response.content[0].text).toContain("Plugin3 Step");
+    expect(response.content[0].text).toContain("Contact Last Name Sync");
     expect(response.content[0].text).toContain("Contact Flow");
-    expect(response.content[0].text).not.toContain("Plugin2 Step");
-    expect(response.content[0].text).not.toContain("Plugin3 Step");
-    expect(response.content[0].text).not.toContain("Contact Last Name Sync");
     expect(response.content[0].text).toContain(
       "System-managed columns like modifiedon and modifiedby are not treated as direct matches",
     );
@@ -351,6 +352,22 @@ describe("usage tools", () => {
           ],
           directWorkflows: [
             expect.objectContaining({ name: "Contact First Name Sync" }),
+          ],
+          systemManagedPluginSteps: [
+            expect.objectContaining({
+              name: "Plugin2 Step",
+              systemManagedAttributes: ["modifiedon"],
+            }),
+            expect.objectContaining({
+              name: "Plugin3 Step",
+              systemManagedAttributes: ["modifiedby"],
+            }),
+          ],
+          systemManagedWorkflows: [
+            expect.objectContaining({
+              name: "Contact Last Name Sync",
+              systemManagedAttributes: ["modifiedon"],
+            }),
           ],
           relatedCloudFlows: [
             expect.objectContaining({ name: "Contact Flow", matchedAttributes: ["firstname"] }),

@@ -78,6 +78,25 @@ export interface UpdateTriggerAnalysisData {
     triggerAttributes: string;
     matchedAttributes: string[];
   }>;
+  systemManagedPluginSteps: Array<{
+    name: string;
+    assemblyName: string;
+    pluginTypeName: string;
+    pluginTypeFullName: string;
+    filteringAttributes: string;
+    systemManagedAttributes: string[];
+    stageLabel: string;
+    modeLabel: string;
+  }>;
+  systemManagedWorkflows: Array<{
+    name: string;
+    uniqueName: string;
+    category: number;
+    categoryLabel: string;
+    modeLabel: string;
+    triggerAttributes: string;
+    systemManagedAttributes: string[];
+  }>;
   relatedCloudFlows: Array<{
     name: string;
     uniqueName: string;
@@ -111,6 +130,8 @@ const WORKFLOW_MODE_LABELS: Record<number, string> = {
   0: "Background",
   1: "Real-time",
 };
+
+const SYSTEM_MANAGED_UPDATE_COLUMNS = ["modifiedon", "modifiedby"];
 
 export async function findTableUsageData(
   env: EnvironmentConfig,
@@ -418,6 +439,7 @@ export async function analyzeUpdateTriggersData(
   const notes = [
     "Direct matches use exact registered update metadata only.",
     "System-managed columns like modifiedon and modifiedby are not treated as direct matches unless they are part of the input changed attributes.",
+    "System-managed column matches are shown separately when update registrations mention modifiedon or modifiedby.",
     "The report does not simulate downstream updates done by plugins, workflows, or cloud flows.",
   ];
 
@@ -441,59 +463,116 @@ export async function analyzeUpdateTriggersData(
     ),
   ]);
 
+  const eligiblePluginSteps = pluginInventory.steps.filter(
+    (step) =>
+      step.statecode === 0 &&
+      step.messageName.toLowerCase() === "update" &&
+      step.primaryEntity === table.logicalName,
+  );
+  const directPluginSteps = eligiblePluginSteps
+    .map((step) => {
+      const filteringAttributes = splitCsv(String(step.filteringattributes || ""));
+      const matchedAttributes = intersectAttributes(normalizedAttributes, filteringAttributes);
+      const matchType =
+        filteringAttributes.length === 0 ? ("all_updates" as const) : ("specific_attributes" as const);
+
+      return {
+        name: step.name,
+        assemblyName: step.assemblyName,
+        pluginTypeName: step.pluginTypeName,
+        pluginTypeFullName: step.pluginTypeFullName,
+        filteringAttributes: String(step.filteringattributes || ""),
+        matchedAttributes: matchType === "all_updates" ? normalizedAttributes : matchedAttributes,
+        matchType,
+        stageLabel: PLUGIN_STAGE_LABELS[Number(step.stage || 0)] || String(step.stage || ""),
+        modeLabel: PLUGIN_MODE_LABELS[Number(step.mode || 0)] || String(step.mode || ""),
+      };
+    })
+    .filter((step) => step.matchType === "all_updates" || step.matchedAttributes.length > 0);
+  const systemManagedPluginSteps = eligiblePluginSteps
+    .map((step) => {
+      const filteringAttributes = splitCsv(String(step.filteringattributes || ""));
+      const directMatchedAttributes = intersectAttributes(normalizedAttributes, filteringAttributes);
+      const systemManagedAttributes = intersectAttributes(
+        SYSTEM_MANAGED_UPDATE_COLUMNS,
+        filteringAttributes,
+      );
+
+      return {
+        name: step.name,
+        assemblyName: step.assemblyName,
+        pluginTypeName: step.pluginTypeName,
+        pluginTypeFullName: step.pluginTypeFullName,
+        filteringAttributes: String(step.filteringattributes || ""),
+        systemManagedAttributes,
+        directMatchedAttributes,
+        stageLabel: PLUGIN_STAGE_LABELS[Number(step.stage || 0)] || String(step.stage || ""),
+        modeLabel: PLUGIN_MODE_LABELS[Number(step.mode || 0)] || String(step.mode || ""),
+      };
+    })
+    .filter(
+      (step) =>
+        step.systemManagedAttributes.length > 0 &&
+        step.directMatchedAttributes.length === 0,
+    )
+    .map(({ directMatchedAttributes: _directMatchedAttributes, ...step }) => step);
+  const eligibleWorkflows = workflows.filter(
+    (workflow) => String(workflow.primaryentity || "") === table.logicalName,
+  );
+  const directWorkflows = eligibleWorkflows
+    .map((workflow) => {
+      const triggerAttributes = splitCsv(String(workflow.triggeronupdateattributelist || ""));
+      return {
+        name: String(workflow.name || ""),
+        uniqueName: String(workflow.uniquename || ""),
+        category: Number(workflow.category || 0),
+        categoryLabel:
+          WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
+          String(workflow.category || ""),
+        modeLabel:
+          WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
+        triggerAttributes: String(workflow.triggeronupdateattributelist || ""),
+        matchedAttributes: intersectAttributes(normalizedAttributes, triggerAttributes),
+      };
+    })
+    .filter((workflow) => workflow.matchedAttributes.length > 0);
+  const systemManagedWorkflows = eligibleWorkflows
+    .map((workflow) => {
+      const triggerAttributes = splitCsv(String(workflow.triggeronupdateattributelist || ""));
+      return {
+        name: String(workflow.name || ""),
+        uniqueName: String(workflow.uniquename || ""),
+        category: Number(workflow.category || 0),
+        categoryLabel:
+          WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
+          String(workflow.category || ""),
+        modeLabel:
+          WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
+        triggerAttributes: String(workflow.triggeronupdateattributelist || ""),
+        systemManagedAttributes: intersectAttributes(
+          SYSTEM_MANAGED_UPDATE_COLUMNS,
+          triggerAttributes,
+        ),
+        directMatchedAttributes: intersectAttributes(normalizedAttributes, triggerAttributes),
+      };
+    })
+    .filter(
+      (workflow) =>
+        workflow.systemManagedAttributes.length > 0 &&
+        workflow.directMatchedAttributes.length === 0,
+    )
+    .map(({ directMatchedAttributes: _directMatchedAttributes, ...workflow }) => workflow);
+
   return {
     tableLogicalName: table.logicalName,
     tableDisplayName: table.displayName,
     changedAttributes: normalizedAttributes,
     warnings,
     notes,
-    directPluginSteps: pluginInventory.steps
-      .filter(
-        (step) =>
-          step.statecode === 0 &&
-          step.messageName.toLowerCase() === "update" &&
-          step.primaryEntity === table.logicalName,
-      )
-      .map((step) => {
-        const filteringAttributes = splitCsv(String(step.filteringattributes || ""));
-        const matchedAttributes = intersectAttributes(normalizedAttributes, filteringAttributes);
-        const matchType =
-          filteringAttributes.length === 0 ? ("all_updates" as const) : ("specific_attributes" as const);
-
-        return {
-          name: step.name,
-          assemblyName: step.assemblyName,
-          pluginTypeName: step.pluginTypeName,
-          pluginTypeFullName: step.pluginTypeFullName,
-          filteringAttributes: String(step.filteringattributes || ""),
-          matchedAttributes:
-            matchType === "all_updates" ? normalizedAttributes : matchedAttributes,
-          matchType,
-          stageLabel: PLUGIN_STAGE_LABELS[Number(step.stage || 0)] || String(step.stage || ""),
-          modeLabel: PLUGIN_MODE_LABELS[Number(step.mode || 0)] || String(step.mode || ""),
-        };
-      })
-      .filter(
-        (step) => step.matchType === "all_updates" || step.matchedAttributes.length > 0,
-      ),
-    directWorkflows: workflows
-      .filter((workflow) => String(workflow.primaryentity || "") === table.logicalName)
-      .map((workflow) => {
-        const triggerAttributes = splitCsv(String(workflow.triggeronupdateattributelist || ""));
-        return {
-          name: String(workflow.name || ""),
-          uniqueName: String(workflow.uniquename || ""),
-          category: Number(workflow.category || 0),
-          categoryLabel:
-            WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
-            String(workflow.category || ""),
-          modeLabel:
-            WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
-          triggerAttributes: String(workflow.triggeronupdateattributelist || ""),
-          matchedAttributes: intersectAttributes(normalizedAttributes, triggerAttributes),
-        };
-      })
-      .filter((workflow) => workflow.matchedAttributes.length > 0),
+    directPluginSteps,
+    directWorkflows,
+    systemManagedPluginSteps,
+    systemManagedWorkflows,
     relatedCloudFlows: flowDetails
       .map((flow) => {
         const matchedAttributes = normalizedAttributes.filter((attribute) =>

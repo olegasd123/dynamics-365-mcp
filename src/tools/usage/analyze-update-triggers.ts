@@ -37,7 +37,7 @@ export function registerAnalyzeUpdateTriggers(
           lines.push(`- Warnings: ${analysis.warnings.join(" | ")}`);
         }
         lines.push(
-          `- Summary: Direct Plugin Steps ${analysis.directPluginSteps.length} | Direct Workflows ${analysis.directWorkflows.length} | Related Cloud Flows ${analysis.relatedCloudFlows.length}`,
+          `- Summary: Direct Plugin Steps ${analysis.directPluginSteps.length} | Direct Workflows ${analysis.directWorkflows.length} | System-Managed Plugin Steps ${analysis.systemManagedPluginSteps.length} | System-Managed Workflows ${analysis.systemManagedWorkflows.length} | Related Cloud Flows ${analysis.relatedCloudFlows.length}`,
         );
         lines.push(`- Notes: ${analysis.notes.join(" | ")}`);
 
@@ -74,6 +74,53 @@ export function registerAnalyzeUpdateTriggers(
                 workflow.modeLabel || "-",
                 workflow.triggerAttributes || "-",
                 workflow.matchedAttributes.join(", "),
+              ]),
+            ),
+          );
+        }
+
+        if (
+          analysis.systemManagedPluginSteps.length > 0 ||
+          analysis.systemManagedWorkflows.length > 0
+        ) {
+          lines.push("");
+          lines.push("### System-Managed Column Matches");
+          lines.push(
+            "These registrations mention modifiedon or modifiedby. They are shown separately because those columns are usually not part of the initial update request.",
+          );
+        }
+
+        if (analysis.systemManagedPluginSteps.length > 0) {
+          lines.push("");
+          lines.push("#### Plugin Steps");
+          lines.push(
+            formatTable(
+              ["Assembly", "Step", "Filtering", "System-Managed Columns", "Stage", "Mode"],
+              analysis.systemManagedPluginSteps.map((step) => [
+                step.assemblyName,
+                step.name,
+                step.filteringAttributes || "(all update attributes)",
+                step.systemManagedAttributes.join(", "),
+                step.stageLabel || "-",
+                step.modeLabel || "-",
+              ]),
+            ),
+          );
+        }
+
+        if (analysis.systemManagedWorkflows.length > 0) {
+          lines.push("");
+          lines.push("#### Workflows");
+          lines.push(
+            formatTable(
+              ["Name", "Unique Name", "Category", "Mode", "Trigger Attributes", "System-Managed Columns"],
+              analysis.systemManagedWorkflows.map((workflow) => [
+                workflow.name,
+                workflow.uniqueName || "-",
+                workflow.categoryLabel,
+                workflow.modeLabel || "-",
+                workflow.triggerAttributes || "-",
+                workflow.systemManagedAttributes.join(", "),
               ]),
             ),
           );
