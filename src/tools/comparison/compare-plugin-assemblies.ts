@@ -6,20 +6,34 @@ import { createToolErrorResponse, createToolSuccessResponse } from "../response.
 import { formatDiffResult } from "../../utils/formatters.js";
 import { comparePluginAssembliesData } from "./comparison-data.js";
 
+const NEW_SCHEMA = {
+  sourceEnvironment: z.string().describe("Source environment name (e.g. 'dev')"),
+  targetEnvironment: z.string().describe("Target environment name (e.g. 'prod')"),
+  assemblyName: z.string().optional().describe("Compare a specific plugin assembly by name"),
+};
+
+const LEGACY_SCHEMA = {
+  sourceEnvironment: z.string().describe("Source environment name (e.g. 'dev')"),
+  targetEnvironment: z.string().describe("Target environment name (e.g. 'prod')"),
+  pluginName: z.string().optional().describe("Compare a specific plugin assembly by name"),
+};
+
 export function registerComparePluginAssemblies(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "compare_plugin_assemblies",
-    "Compare plugin assemblies and their registrations between two Dynamics 365 environments.",
-    {
-      sourceEnvironment: z.string().describe("Source environment name (e.g. 'dev')"),
-      targetEnvironment: z.string().describe("Target environment name (e.g. 'prod')"),
-      assemblyName: z.string().optional().describe("Compare a specific plugin assembly by name"),
-    },
-    async ({ sourceEnvironment, targetEnvironment, assemblyName }) => {
+  const createHandler =
+    (toolName: string) =>
+    async ({
+      sourceEnvironment,
+      targetEnvironment,
+      assemblyName,
+    }: {
+      sourceEnvironment: string;
+      targetEnvironment: string;
+      assemblyName?: string;
+    }) => {
       try {
         const {
           sourceItems,
@@ -55,7 +69,7 @@ export function registerComparePluginAssemblies(
         }
 
         return createToolSuccessResponse(
-          "compare_plugin_assemblies",
+          toolName,
           text,
           `Compared plugin assemblies between '${sourceEnvironment}' and '${targetEnvironment}'.`,
           {
@@ -72,8 +86,26 @@ export function registerComparePluginAssemblies(
           },
         );
       } catch (error) {
-        return createToolErrorResponse("compare_plugin_assemblies", error);
+        return createToolErrorResponse(toolName, error);
       }
-    },
+    };
+
+  server.tool(
+    "compare_plugin_assemblies",
+    "Compare plugin assemblies and their registrations between two Dynamics 365 environments.",
+    NEW_SCHEMA,
+    createHandler("compare_plugin_assemblies"),
+  );
+
+  server.tool(
+    "compare_plugins",
+    "Deprecated alias for the assembly-level tool `compare_plugin_assemblies`. Compares plugin assemblies and their registrations, not individual plugin classes.",
+    LEGACY_SCHEMA,
+    async ({ sourceEnvironment, targetEnvironment, pluginName }) =>
+      createHandler("compare_plugins")({
+        sourceEnvironment,
+        targetEnvironment,
+        assemblyName: pluginName,
+      }),
   );
 }

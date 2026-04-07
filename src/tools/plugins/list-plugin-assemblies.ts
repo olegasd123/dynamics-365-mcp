@@ -16,21 +16,29 @@ export function registerListPluginAssemblies(
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "list_plugin_assemblies",
-    "List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugin assemblies with no registered steps.",
-    {
-      environment: z.string().optional().describe("Environment name (e.g. 'dev', 'prod')"),
-      filter: z
-        .enum(["all", "no_steps"])
-        .optional()
-        .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugin assemblies"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
-    },
-    async ({ environment, filter, solution }) => {
+  const schema = {
+    environment: z.string().optional().describe("Environment name (e.g. 'dev', 'prod')"),
+    filter: z
+      .enum(["all", "no_steps"])
+      .optional()
+      .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugin assemblies"),
+    solution: z
+      .string()
+      .optional()
+      .describe("Optional solution display name or unique name"),
+  };
+
+  const createHandler =
+    (toolName: string) =>
+    async ({
+      environment,
+      filter,
+      solution,
+    }: {
+      environment?: string;
+      filter?: "all" | "no_steps";
+      solution?: string;
+    }) => {
       try {
         const env = getEnvironment(config, environment);
         const solutionComponents = solution
@@ -76,7 +84,7 @@ export function registerListPluginAssemblies(
               ? `No orphaned plugin assemblies found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
               : `No plugin assemblies found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`;
 
-          return createToolSuccessResponse("list_plugin_assemblies", text, text, {
+          return createToolSuccessResponse(toolName, text, text, {
             environment: env.name,
             filter: filter || "all",
             solution: solution || null,
@@ -104,7 +112,7 @@ export function registerListPluginAssemblies(
         const text = `## Plugin Assemblies in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\nFound ${results.length} ${assemblyLabel}.\n\n${formatTable(headers, rows)}`;
 
         return createToolSuccessResponse(
-          "list_plugin_assemblies",
+          toolName,
           text,
           `Found ${results.length} ${assemblyLabel} in '${env.name}'.`,
           {
@@ -116,8 +124,21 @@ export function registerListPluginAssemblies(
           },
         );
       } catch (error) {
-        return createToolErrorResponse("list_plugin_assemblies", error);
+        return createToolErrorResponse(toolName, error);
       }
-    },
+    };
+
+  server.tool(
+    "list_plugin_assemblies",
+    "List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugin assemblies with no registered steps.",
+    schema,
+    createHandler("list_plugin_assemblies"),
+  );
+
+  server.tool(
+    "list_plugins",
+    "Deprecated alias for the assembly-level tool `list_plugin_assemblies`. Lists plugin assemblies registered in Dynamics 365, not plugin classes.",
+    schema,
+    createHandler("list_plugins"),
   );
 }

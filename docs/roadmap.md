@@ -61,7 +61,7 @@ Done when:
 - output headings use `plugin assembly`
 - README and prompt examples use the new names
 
-## Milestone 2: Add Compatibility Aliases
+## Milestone 2: Add Compatibility Aliases [done]
 
 Goal:
 

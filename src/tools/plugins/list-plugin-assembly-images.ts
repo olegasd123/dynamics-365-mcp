@@ -14,21 +14,38 @@ const IMAGE_TYPE_LABELS: Record<number, string> = {
   2: "Both",
 };
 
+const NEW_SCHEMA = {
+  environment: z.string().optional().describe("Environment name"),
+  assemblyName: z.string().describe("Name of the plugin assembly"),
+  stepName: z.string().optional().describe("Filter by specific step name"),
+  message: z.string().optional().describe("Filter by message name (e.g. 'Create', 'Update')"),
+};
+
+const LEGACY_SCHEMA = {
+  environment: z.string().optional().describe("Environment name"),
+  pluginName: z.string().describe("Name of the plugin assembly"),
+  stepName: z.string().optional().describe("Filter by specific step name"),
+  message: z.string().optional().describe("Filter by message name (e.g. 'Create', 'Update')"),
+};
+
 export function registerListPluginAssemblyImages(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "list_plugin_assembly_images",
-    "List pre/post entity images registered on steps for a plugin assembly in Dynamics 365.",
-    {
-      environment: z.string().optional().describe("Environment name"),
-      assemblyName: z.string().describe("Name of the plugin assembly"),
-      stepName: z.string().optional().describe("Filter by specific step name"),
-      message: z.string().optional().describe("Filter by message name (e.g. 'Create', 'Update')"),
-    },
-    async ({ environment, assemblyName, stepName, message }) => {
+  const createHandler =
+    (toolName: string) =>
+    async ({
+      environment,
+      assemblyName,
+      stepName,
+      message,
+    }: {
+      environment?: string;
+      assemblyName: string;
+      stepName?: string;
+      message?: string;
+    }) => {
       try {
         const env = getEnvironment(config, environment);
 
@@ -41,7 +58,7 @@ export function registerListPluginAssemblyImages(
 
         if (assemblies.length === 0) {
           const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_assembly_images", text, text, {
+          return createToolSuccessResponse(toolName, text, text, {
             environment: env.name,
             found: false,
             assemblyName,
@@ -64,7 +81,7 @@ export function registerListPluginAssemblyImages(
           if (message) filterDesc += ` (message: ${message})`;
           if (stepName) filterDesc += ` (step: ${stepName})`;
           const text = `No images found for ${filterDesc} in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_assembly_images", text, text, {
+          return createToolSuccessResponse(toolName, text, text, {
             environment: env.name,
             found: true,
             assemblyName,
@@ -90,7 +107,7 @@ export function registerListPluginAssemblyImages(
         }));
         const text = `## Plugin Assembly Images for '${assemblyName}' in '${env.name}'\n\nFound ${allImages.length} image(s).\n\n${formatTable(headers, rows)}`;
         return createToolSuccessResponse(
-          "list_plugin_assembly_images",
+          toolName,
           text,
           `Found ${allImages.length} image(s) for plugin assembly '${assemblyName}' in '${env.name}'.`,
           {
@@ -103,8 +120,27 @@ export function registerListPluginAssemblyImages(
           },
         );
       } catch (error) {
-        return createToolErrorResponse("list_plugin_assembly_images", error);
+        return createToolErrorResponse(toolName, error);
       }
-    },
+    };
+
+  server.tool(
+    "list_plugin_assembly_images",
+    "List pre/post entity images registered on steps for a plugin assembly in Dynamics 365.",
+    NEW_SCHEMA,
+    createHandler("list_plugin_assembly_images"),
+  );
+
+  server.tool(
+    "list_plugin_images",
+    "Deprecated alias for the assembly-level tool `list_plugin_assembly_images`. Lists images for plugin assembly steps, not for one plugin class.",
+    LEGACY_SCHEMA,
+    async ({ environment, pluginName, stepName, message }) =>
+      createHandler("list_plugin_images")({
+        environment,
+        assemblyName: pluginName,
+        stepName,
+        message,
+      }),
   );
 }
