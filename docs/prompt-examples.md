@@ -65,6 +65,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 - `list_workflows`
   `In <ENV>, list activated business rules from solution <SOLUTION>.`
+  `In <ENV>, list workflows rules from solution <SOLUTION>.`
+  `In <ENV>, list bpfs from solution <SOLUTION>.`
+  `In <ENV>, list modern flows from solution <SOLUTION>.`
+  `In <ENV>, list dialogs from solution <SOLUTION>.`
 
 - `list_actions`
   `In <ENV>, list custom actions from solution <SOLUTION>.`
