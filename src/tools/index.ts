@@ -56,6 +56,7 @@ import { registerGetRolePrivileges } from "./security/get-role-privileges.js";
 import { registerFindTableUsage } from "./usage/find-table-usage.js";
 import { registerFindColumnUsage } from "./usage/find-column-usage.js";
 import { registerFindWebResourceUsage } from "./usage/find-web-resource-usage.js";
+import { registerAnalyzeUpdateTriggers } from "./usage/analyze-update-triggers.js";
 import { registerAnalyzeImpact } from "./impact/analyze-impact.js";
 
 // Health tools
@@ -132,6 +133,7 @@ export function registerAllTools(
   registerFindTableUsage(server, config, client);
   registerFindColumnUsage(server, config, client);
   registerFindWebResourceUsage(server, config, client);
+  registerAnalyzeUpdateTriggers(server, config, client);
   registerAnalyzeImpact(server, config, client);
 
   // Health tools

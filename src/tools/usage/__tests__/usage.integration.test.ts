@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { registerAnalyzeUpdateTriggers } from "../analyze-update-triggers.js";
 import { registerFindColumnUsage } from "../find-column-usage.js";
 import { registerFindTableUsage } from "../find-table-usage.js";
 import { registerFindWebResourceUsage } from "../find-web-resource-usage.js";
@@ -181,6 +182,182 @@ describe("usage tools", () => {
     expect(columnResponse.content[0].text).toContain("Active Accounts");
     expect(webResourceResponse.content[0].text).toContain("Account Main");
     expect(webResourceResponse.content[0].text).toContain("contoso_/pages/page.html");
+  });
+
+  it("analyzes direct update triggers without guessing from system-managed fields", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const relatedFlowClientData = JSON.stringify({
+      properties: {
+        definition: {
+          triggers: { When_contact_changes: { entityName: "contact", columnName: "firstname" } },
+          actions: {},
+        },
+      },
+    });
+
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "contact",
+            SchemaName: "Contact",
+            DisplayName: { UserLocalizedLabel: { Label: "Contact" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Contacts" } },
+            EntitySetName: "contacts",
+            PrimaryIdAttribute: "contactid",
+            PrimaryNameAttribute: "fullname",
+            OwnershipType: { Value: "UserOwned" },
+          },
+        ],
+        pluginassemblies: [{ pluginassemblyid: "asm-1", name: "Core.Plugins" }],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "Plugin1",
+            typename: "Core.Plugins.Plugin1",
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-2",
+            name: "Plugin2",
+            typename: "Core.Plugins.Plugin2",
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-3",
+            name: "Plugin3",
+            typename: "Core.Plugins.Plugin3",
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-4",
+            name: "PluginAny",
+            typename: "Core.Plugins.PluginAny",
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [
+          {
+            sdkmessageprocessingstepid: "step-1",
+            _eventhandler_value: "type-1",
+            name: "Plugin1 Step",
+            statecode: 0,
+            stage: 20,
+            mode: 0,
+            filteringattributes: "firstname",
+            sdkmessageid: { name: "Update" },
+            sdkmessagefilterid: { primaryobjecttypecode: "contact" },
+          },
+          {
+            sdkmessageprocessingstepid: "step-2",
+            _eventhandler_value: "type-2",
+            name: "Plugin2 Step",
+            statecode: 0,
+            stage: 20,
+            mode: 0,
+            filteringattributes: "lastname,modifiedon",
+            sdkmessageid: { name: "Update" },
+            sdkmessagefilterid: { primaryobjecttypecode: "contact" },
+          },
+          {
+            sdkmessageprocessingstepid: "step-3",
+            _eventhandler_value: "type-3",
+            name: "Plugin3 Step",
+            statecode: 0,
+            stage: 40,
+            mode: 1,
+            filteringattributes: "modifiedby",
+            sdkmessageid: { name: "Update" },
+            sdkmessagefilterid: { primaryobjecttypecode: "contact" },
+          },
+          {
+            sdkmessageprocessingstepid: "step-4",
+            _eventhandler_value: "type-4",
+            name: "PluginAny Step",
+            statecode: 0,
+            stage: 40,
+            mode: 0,
+            filteringattributes: "",
+            sdkmessageid: { name: "Update" },
+            sdkmessagefilterid: { primaryobjecttypecode: "contact" },
+          },
+        ],
+        sdkmessageprocessingstepimages: [],
+        workflows: [
+          {
+            workflowid: "wf-1",
+            name: "Contact First Name Sync",
+            uniquename: "contoso_ContactFirstNameSync",
+            category: 0,
+            statecode: 1,
+            mode: 1,
+            primaryentity: "contact",
+            triggeronupdateattributelist: "firstname",
+          },
+          {
+            workflowid: "wf-2",
+            name: "Contact Last Name Sync",
+            uniquename: "contoso_ContactLastNameSync",
+            category: 0,
+            statecode: 1,
+            mode: 1,
+            primaryentity: "contact",
+            triggeronupdateattributelist: "lastname,modifiedon",
+          },
+          {
+            workflowid: "flow-1",
+            workflowidunique: "flow-u-1",
+            name: "Contact Flow",
+            uniquename: "contoso_ContactFlow",
+            category: 5,
+            statecode: 1,
+            type: 1,
+            primaryentity: "contact",
+            clientdata: relatedFlowClientData,
+            connectionreferences: "",
+          },
+        ],
+      },
+    });
+
+    registerAnalyzeUpdateTriggers(server as never, config, client);
+
+    const response = await server.getHandler("analyze_update_triggers")({
+      table: "contact",
+      changedAttributes: ["firstname"],
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Plugin1 Step");
+    expect(response.content[0].text).toContain("PluginAny Step");
+    expect(response.content[0].text).toContain("Contact First Name Sync");
+    expect(response.content[0].text).toContain("Contact Flow");
+    expect(response.content[0].text).not.toContain("Plugin2 Step");
+    expect(response.content[0].text).not.toContain("Plugin3 Step");
+    expect(response.content[0].text).not.toContain("Contact Last Name Sync");
+    expect(response.content[0].text).toContain(
+      "System-managed columns like modifiedon and modifiedby are not treated as direct matches",
+    );
+    expect(response.structuredContent).toMatchObject({
+      data: {
+        analysis: {
+          tableLogicalName: "contact",
+          changedAttributes: ["firstname"],
+          directPluginSteps: [
+            expect.objectContaining({ name: "Plugin1 Step", matchType: "specific_attributes" }),
+            expect.objectContaining({ name: "PluginAny Step", matchType: "all_updates" }),
+          ],
+          directWorkflows: [
+            expect.objectContaining({ name: "Contact First Name Sync" }),
+          ],
+          relatedCloudFlows: [
+            expect.objectContaining({ name: "Contact Flow", matchedAttributes: ["firstname"] }),
+          ],
+        },
+      },
+    });
   });
 
   it("warns when web resource usage needs a broad form scan", async () => {

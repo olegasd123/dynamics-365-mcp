@@ -60,6 +60,11 @@ describe("tool contracts", () => {
         nameFilter: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.analyze_update_triggers.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        changedAttributes: expect.any(Object),
+      });
       expect(toolsByName.list_plugin_assembly_steps.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         assemblyName: expect.any(Object),
