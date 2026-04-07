@@ -112,4 +112,24 @@ describe("request logger", () => {
 
     expect(loggerState.config.logsDir).toBe(join(homedir(), ".dynamics-365-mcp", "logs"));
   });
+
+  it("registers a commentary compatibility alias for tools", async () => {
+    const server = new FakeServer();
+    instrumentServerToolLogging(server as never);
+
+    server.tool("demo_tool", "Demo", {}, async () =>
+      createToolSuccessResponse("demo_tool", "Done", "Done", {
+        ok: true,
+      }),
+    );
+
+    const canonicalHandler = server.getHandler("demo_tool");
+    const compatibilityHandler = server.getHandler("demo_toolcommentary");
+
+    const canonicalResponse = await canonicalHandler({});
+    const compatibilityResponse = await compatibilityHandler({});
+
+    expect(canonicalResponse.content[0].text).toBe("Done");
+    expect(compatibilityResponse.content[0].text).toBe("Done");
+  });
 });

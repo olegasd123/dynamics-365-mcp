@@ -45,6 +45,7 @@ const DEFAULT_LOG_DIR = resolve(homedir(), ".dynamics-365-mcp", "logs");
 const DEFAULT_MAX_BODY_CHARS = 0;
 const SENSITIVE_KEY_PATTERN = /(authorization|clientsecret|client_secret|token|secret|password|cookie)/i;
 const instrumentedServers = new WeakSet<object>();
+const TOOL_CALL_COMPATIBILITY_SUFFIX = "commentary";
 
 export class RequestLogger {
   private config: LoggerConfig = {
@@ -254,10 +255,27 @@ export function instrumentServerToolLogging(server: McpServer): void {
 
     const wrappedArgs = [...args];
     wrappedArgs[handlerIndex] = wrappedHandler;
-    return originalTool(name, ...wrappedArgs);
+    const registrationResult = originalTool(name, ...wrappedArgs);
+
+    const compatibilityAlias = buildCompatibilityAliasName(name);
+    if (compatibilityAlias) {
+      const compatibilityArgs = [...wrappedArgs];
+      compatibilityArgs[0] = `${String(args[0] || "")} Compatibility alias for malformed tool calls.`;
+      originalTool(compatibilityAlias, ...compatibilityArgs);
+    }
+
+    return registrationResult;
   }) as typeof server.tool;
 
   instrumentedServers.add(server as object);
+}
+
+function buildCompatibilityAliasName(toolName: string): string | null {
+  if (!toolName || toolName.endsWith(TOOL_CALL_COMPATIBILITY_SUFFIX)) {
+    return null;
+  }
+
+  return `${toolName}${TOOL_CALL_COMPATIBILITY_SUFFIX}`;
 }
 
 function buildFileLabel(toolName: string, toolArgs: unknown, requestId: string): string {

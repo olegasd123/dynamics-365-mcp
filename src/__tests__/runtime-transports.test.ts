@@ -151,8 +151,11 @@ describe("runtime transports", () => {
       const toolNames = result.tools
         .map((tool) => tool.name)
         .sort((left, right) => left.localeCompare(right));
+      const canonicalToolNames = toolNames.filter((name) => !name.endsWith("commentary"));
 
-      expect(toolNames).toEqual(EXPECTED_TOOL_NAMES);
+      expect(canonicalToolNames).toEqual(EXPECTED_TOOL_NAMES);
+      expect(toolNames).toContain("list_tablescommentary");
+      expect(toolNames).toContain("analyze_update_triggerscommentary");
     } catch (error) {
       throw new Error(
         `Stdio runtime smoke test failed: ${error instanceof Error ? error.message : String(error)}\n${stderr.buffer}`,
@@ -214,8 +217,11 @@ describe("runtime transports", () => {
       const toolNames = result.tools
         .map((tool) => tool.name)
         .sort((left, right) => left.localeCompare(right));
+      const canonicalToolNames = toolNames.filter((name) => !name.endsWith("commentary"));
 
-      expect(toolNames).toEqual(EXPECTED_TOOL_NAMES);
+      expect(canonicalToolNames).toEqual(EXPECTED_TOOL_NAMES);
+      expect(toolNames).toContain("list_tablescommentary");
+      expect(toolNames).toContain("analyze_update_triggerscommentary");
     } catch (error) {
       throw new Error(
         `HTTP runtime smoke test failed: ${error instanceof Error ? error.message : String(error)}\nSTDOUT:\n${stdout.buffer}\nSTDERR:\n${stderr.buffer}`,
