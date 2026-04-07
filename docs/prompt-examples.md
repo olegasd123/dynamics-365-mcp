@@ -36,16 +36,16 @@ Tip:
 
 ## Plugins
 
-- `list_plugins`
+- `list_plugin_assemblies`
   `In <ENV>, list plugin assemblies for solution <SOLUTION>. Show only orphaned assemblies with no registered steps.`
 
-- `list_plugin_steps`
+- `list_plugin_assembly_steps`
   `In <ENV>, list all registered steps for the plugin assembly <PLUGIN>.`
 
-- `list_plugin_images`
+- `list_plugin_assembly_images`
   `In <ENV>, list plugin images for the plugin assembly <PLUGIN>. Filter to step <STEP> and message Update if possible.`
 
-- `get_plugin_details`
+- `get_plugin_assembly_details`
   `In <ENV>, show full details for the plugin assembly <PLUGIN>, including types, steps, and images.`
 
 ## Workflows And Actions
@@ -158,7 +158,7 @@ Tip:
 
 This group needs at least two configured environments.
 
-- `compare_plugins`
+- `compare_plugin_assemblies`
   `Compare plugin assembly <PLUGIN> between <SOURCE_ENV> and <TARGET_ENV>. Include step and image differences.`
 
 - `compare_solutions`
@@ -196,7 +196,7 @@ This prompt list covers these tools:
 - `compare_custom_apis`
 - `compare_environment_matrix`
 - `compare_forms`
-- `compare_plugins`
+- `compare_plugin_assemblies`
 - `compare_security_roles`
 - `compare_solutions`
 - `compare_table_schema`
@@ -210,7 +210,7 @@ This prompt list covers these tools:
 - `get_custom_api_details`
 - `get_flow_details`
 - `get_form_details`
-- `get_plugin_details`
+- `get_plugin_assembly_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
 - `get_solution_details`
@@ -223,9 +223,9 @@ This prompt list covers these tools:
 - `list_cloud_flows`
 - `list_custom_apis`
 - `list_forms`
-- `list_plugin_images`
-- `list_plugin_steps`
-- `list_plugins`
+- `list_plugin_assembly_images`
+- `list_plugin_assembly_steps`
+- `list_plugin_assemblies`
 - `list_security_roles`
 - `list_solutions`
 - `list_table_columns`

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { registerListPluginSteps } from "../list-plugin-steps.js";
+import { registerListPluginAssemblySteps } from "../list-plugin-assembly-steps.js";
 import {
   FakeServer,
   createRecordingClient,
   createTestConfig,
 } from "../../__tests__/tool-test-helpers.js";
 
-describe("list_plugin_steps tool", () => {
+describe("list_plugin_assembly_steps tool", () => {
   it("returns plugin steps through the bulk inventory path", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
@@ -54,10 +54,10 @@ describe("list_plugin_steps tool", () => {
       },
     });
 
-    registerListPluginSteps(server as never, config, client);
+    registerListPluginAssemblySteps(server as never, config, client);
 
-    const response = await server.getHandler("list_plugin_steps")({
-      pluginName: "Core.Plugins",
+    const response = await server.getHandler("list_plugin_assembly_steps")({
+      assemblyName: "Core.Plugins",
     });
 
     expect(response.isError).toBeUndefined();
@@ -77,11 +77,11 @@ describe("list_plugin_steps tool", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({ dev: {} });
 
-    registerListPluginSteps(server as never, config, client);
+    registerListPluginAssemblySteps(server as never, config, client);
 
-    const response = await server.getHandler("list_plugin_steps")({
+    const response = await server.getHandler("list_plugin_assembly_steps")({
       environment: "prod",
-      pluginName: "Core.Plugins",
+      assemblyName: "Core.Plugins",
     });
 
     expect(response.isError).toBe(true);
@@ -97,10 +97,10 @@ describe("list_plugin_steps tool", () => {
       },
     });
 
-    registerListPluginSteps(server as never, config, client);
+    registerListPluginAssemblySteps(server as never, config, client);
 
-    const response = await server.getHandler("list_plugin_steps")({
-      pluginName: "Missing.Plugin",
+    const response = await server.getHandler("list_plugin_assembly_steps")({
+      assemblyName: "Missing.Plugin",
     });
 
     expect(response.isError).toBeUndefined();
@@ -116,10 +116,10 @@ describe("list_plugin_steps tool", () => {
       },
     } as never;
 
-    registerListPluginSteps(server as never, config, client);
+    registerListPluginAssemblySteps(server as never, config, client);
 
-    const response = await server.getHandler("list_plugin_steps")({
-      pluginName: "Core.Plugins",
+    const response = await server.getHandler("list_plugin_assembly_steps")({
+      assemblyName: "Core.Plugins",
     });
 
     expect(response.isError).toBe(true);

@@ -157,7 +157,7 @@ describe("compare_environment_matrix tool", () => {
       baselineEnvironment: "prod",
       targetEnvironments: ["dev", "test"],
       componentType: "plugins",
-      pluginName: "Core.Plugins",
+      assemblyName: "Core.Plugins",
     });
 
     const text = response.content[0].text;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { comparePluginsData } from "../comparison-data.js";
+import { comparePluginAssembliesData } from "../comparison-data.js";
 import type { AppConfig } from "../../../config/types.js";
 
-describe("comparePluginsData", () => {
+describe("comparePluginAssembliesData", () => {
   it("compares plugin assemblies, steps, and images when child components are enabled", async () => {
     const config: AppConfig = {
       environments: [
@@ -125,8 +125,8 @@ describe("comparePluginsData", () => {
       },
     } as never;
 
-    const result = await comparePluginsData(config, client, "prod", "dev", {
-      pluginName: "Core.Plugins",
+    const result = await comparePluginAssembliesData(config, client, "prod", "dev", {
+      assemblyName: "Core.Plugins",
       includeChildComponents: true,
     });
 

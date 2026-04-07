@@ -8,7 +8,7 @@ import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
-  comparePluginsData,
+  comparePluginAssembliesData,
   compareWebResourcesData,
   compareWorkflowsData,
   type PluginComparisonData,
@@ -20,7 +20,7 @@ import {
 } from "./matrix-helpers.js";
 
 const COMPONENT_TYPE_LABELS = {
-  plugins: "Plugins",
+  plugins: "Plugin Assemblies",
   workflows: "Workflows",
   web_resources: "Web Resources",
 } as const;
@@ -40,7 +40,7 @@ interface ComponentSection {
 }
 
 interface MatrixFilters {
-  pluginName?: string;
+  assemblyName?: string;
   workflowName?: string;
   category?: WorkflowCategory;
   type?: WebResourceType;
@@ -55,7 +55,7 @@ export function registerCompareEnvironmentMatrix(
 ) {
   server.tool(
     "compare_environment_matrix",
-    "Compare one baseline environment against many target environments and show a drift matrix for plugins, workflows, or web resources.",
+    "Compare one baseline environment against many target environments and show a drift matrix for plugin assemblies, workflows, or web resources.",
     {
       baselineEnvironment: z
         .string()
@@ -69,7 +69,7 @@ export function registerCompareEnvironmentMatrix(
         .enum(["plugins", "workflows", "web_resources", "all"])
         .optional()
         .describe("Component type to compare. Default: all"),
-      pluginName: z.string().optional().describe("Filter to one plugin assembly"),
+      assemblyName: z.string().optional().describe("Filter to one plugin assembly"),
       workflowName: z.string().optional().describe("Filter workflows by name"),
       category: z
         .enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"])
@@ -96,7 +96,7 @@ export function registerCompareEnvironmentMatrix(
       baselineEnvironment,
       targetEnvironments,
       componentType,
-      pluginName,
+      assemblyName,
       workflowName,
       category,
       type,
@@ -123,7 +123,7 @@ export function registerCompareEnvironmentMatrix(
 
         const selectedComponents = resolveComponentTypes(componentType);
         const filters: MatrixFilters = {
-          pluginName,
+          assemblyName,
           workflowName,
           category: category as WorkflowCategory | undefined,
           type: type as WebResourceType | undefined,
@@ -175,7 +175,7 @@ export function registerCompareEnvironmentMatrix(
             targetEnvironments: resolvedTargetNames,
             componentTypes: selectedComponents,
             filters: {
-              pluginName: pluginName || null,
+              assemblyName: assemblyName || null,
               workflowName: workflowName || null,
               category: category || null,
               type: type || null,
@@ -214,8 +214,8 @@ async function buildComponentSection(
         await Promise.all(
           targetNames.map(async (targetName) => ({
             environment: targetName,
-            ...(await comparePluginsData(config, client, baselineName, targetName, {
-              pluginName: filters.pluginName,
+            ...(await comparePluginAssembliesData(config, client, baselineName, targetName, {
+              assemblyName: filters.assemblyName,
               includeChildComponents: true,
             })),
           })),
@@ -405,7 +405,7 @@ function renderPluginMatrixSections(
     componentType: "plugins",
     title: COMPONENT_TYPE_LABELS.plugins,
     text: [
-      "### Plugins",
+      "### Plugin Assemblies And Registrations",
       "",
       renderMatrixSection("Plugin Assemblies", baselineName, targetNames, assemblyReport),
       "",
@@ -456,8 +456,8 @@ function resolveComponentTypes(
 function describeFilters(filters: MatrixFilters): string[] {
   const parts: string[] = [];
 
-  if (filters.pluginName) {
-    parts.push(`plugin=${filters.pluginName}`);
+  if (filters.assemblyName) {
+    parts.push(`plugin assembly=${filters.assemblyName}`);
   }
   if (filters.workflowName) {
     parts.push(`workflow=${filters.workflowName}`);

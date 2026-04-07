@@ -19,44 +19,44 @@ const MODE_LABELS: Record<number, string> = {
   1: "Asynchronous",
 };
 
-export function registerListPluginSteps(
+export function registerListPluginAssemblySteps(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
   server.tool(
-    "list_plugin_steps",
+    "list_plugin_assembly_steps",
     "List registered steps (message processing steps) for a plugin assembly in Dynamics 365.",
     {
       environment: z.string().optional().describe("Environment name"),
-      pluginName: z.string().describe("Name of the plugin assembly"),
+      assemblyName: z.string().describe("Name of the plugin assembly"),
     },
-    async ({ environment, pluginName }) => {
+    async ({ environment, assemblyName }) => {
       try {
         const env = getEnvironment(config, environment);
         const assemblies = await client.query<Record<string, unknown>>(
           env,
           "pluginassemblies",
-          getPluginAssemblyByNameQuery(pluginName, ["pluginassemblyid", "name"]),
+          getPluginAssemblyByNameQuery(assemblyName, ["pluginassemblyid", "name"]),
         );
 
         if (assemblies.length === 0) {
-          const text = `Plugin assembly '${pluginName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_steps", text, text, {
+          const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
+          return createToolSuccessResponse("list_plugin_assembly_steps", text, text, {
             environment: env.name,
             found: false,
-            pluginName,
+            assemblyName,
           });
         }
 
         const steps = await fetchPluginSteps(env, client, assemblies);
 
         if (steps.length === 0) {
-          const text = `No steps found for plugin '${pluginName}' in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_steps", text, text, {
+          const text = `No steps found for plugin assembly '${assemblyName}' in '${env.name}'.`;
+          return createToolSuccessResponse("list_plugin_assembly_steps", text, text, {
             environment: env.name,
             found: true,
-            pluginName,
+            assemblyName,
             count: 0,
             items: [],
           });
@@ -81,16 +81,21 @@ export function registerListPluginSteps(
           modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
           statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
         }));
-        const text = `## Plugin Steps for '${pluginName}' in '${env.name}'\n\nFound ${steps.length} step(s).\n\n${formatTable(headers, rows)}`;
-        return createToolSuccessResponse("list_plugin_steps", text, `Found ${steps.length} plugin step(s) for '${pluginName}' in '${env.name}'.`, {
-          environment: env.name,
-          found: true,
-          pluginName,
-          count: steps.length,
-          items,
-        });
+        const text = `## Plugin Assembly Steps for '${assemblyName}' in '${env.name}'\n\nFound ${steps.length} step(s).\n\n${formatTable(headers, rows)}`;
+        return createToolSuccessResponse(
+          "list_plugin_assembly_steps",
+          text,
+          `Found ${steps.length} step(s) for plugin assembly '${assemblyName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            found: true,
+            assemblyName,
+            count: steps.length,
+            items,
+          },
+        );
       } catch (error) {
-        return createToolErrorResponse("list_plugin_steps", error);
+        return createToolErrorResponse("list_plugin_assembly_steps", error);
       }
     },
   );

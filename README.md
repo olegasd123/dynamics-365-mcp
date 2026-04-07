@@ -1,6 +1,6 @@
 # Dynamics 365 CRM MCP Server
 
-An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugins, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
+An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugin assemblies, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
 
 ## Docs
 
@@ -58,10 +58,10 @@ src/
     health/
       environment-health-report.ts
     plugins/
-      list-plugins.ts
-      list-plugin-steps.ts
-      list-plugin-images.ts
-      get-plugin-details.ts
+      list-plugin-assemblies.ts
+      list-plugin-assembly-steps.ts
+      list-plugin-assembly-images.ts
+      get-plugin-assembly-details.ts
     workflows/
       list-workflows.ts
       list-actions.ts
@@ -79,7 +79,7 @@ src/
       compare-views.ts
       compare-custom-apis.ts
       compare-security-roles.ts
-      compare-plugins.ts
+      compare-plugin-assemblies.ts
       compare-solutions.ts
       compare-workflows.ts
       compare-web-resources.ts
@@ -293,10 +293,10 @@ Priority order:
 | `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
 | `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
 | `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
-| `list_plugins`              | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                                 |
-| `list_plugin_steps`         | List registered steps for a plugin                            | `environment`, `pluginName`                             |
-| `list_plugin_images`        | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`                 |
-| `get_plugin_details`        | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                             |
+| `list_plugin_assemblies`       | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
+| `list_plugin_assembly_steps`   | List registered steps for one plugin assembly                 | `environment`, `assemblyName`                           |
+| `list_plugin_assembly_images`  | List pre/post images on steps for one plugin assembly         | `environment`, `assemblyName`, `stepName`, `message`    |
+| `get_plugin_assembly_details`  | Deep info: assembly → types → steps → images                  | `environment`, `assemblyName`                           |
 | `list_solutions`            | List solutions by display name and unique name                | `environment`, `nameFilter`                             |
 | `get_solution_details`      | Show solution summary and supported ALM component groups      | `environment`, `solution`                               |
 | `get_solution_dependencies` | Show dependency links for supported solution components       | `environment`, `solution`, `direction`, `componentType` |
@@ -315,7 +315,7 @@ Priority order:
 | `compare_views`              | Compare views across envs                      | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
 | `compare_custom_apis`        | Compare Custom APIs across envs                | `sourceEnvironment`, `targetEnvironment`, `apiName`                    |
 | `compare_security_roles`     | Compare security roles across envs             | `sourceEnvironment`, `targetEnvironment`, `roleName`                   |
-| `compare_plugins`            | Compare plugin registrations across envs       | `sourceEnvironment`, `targetEnvironment`, `pluginName`                 |
+| `compare_plugin_assemblies` | Compare plugin assemblies across envs          | `sourceEnvironment`, `targetEnvironment`, `assemblyName`               |
 | `compare_solutions`          | Compare supported solution components          | `sourceEnvironment`, `targetEnvironment`, `solution`                   |
 | `compare_workflows`          | Compare workflow state/definitions             | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName`   |
 | `compare_web_resources`      | Compare web resource content                   | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`         |
@@ -325,7 +325,7 @@ Priority order:
 
 Users can now work with a solution by display name or unique name.
 
-- `list_plugins` supports `solution`
+- `list_plugin_assemblies` supports `solution`
 - `list_workflows` supports `solution`
 - `list_actions` supports `solution`
 - `list_web_resources` supports `solution`
@@ -405,7 +405,7 @@ All comparison tools return three categories: **only in source**, **only in targ
 
 Pairwise comparison tools are best for deep checks between two environments.
 
-- Use `compare_plugins`, `compare_workflows`, or `compare_web_resources` when you already know the two environments you want to compare.
+- Use `compare_plugin_assemblies`, `compare_workflows`, or `compare_web_resources` when you already know the two environments you want to compare.
 - Use `compare_environment_matrix` when you want one baseline, usually `prod`, and many targets like `dev`, `test`, and `pre-prod`.
 
 Matrix status values:
@@ -451,7 +451,7 @@ Error shape:
 The `data` payload depends on the tool, but it follows the same idea:
 
 - list tools usually return fields like `environment`, `filters`, `count`, and `items`
-- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin`, or `solution`
+- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin assembly`, or `solution`
 - compare tools usually return environment names, filters, and one or more diff objects
 - error results always use the shared `error.name` and `error.message` fields
 
@@ -459,17 +459,17 @@ This means an MCP client or another agent can read the text for people, or use `
 
 ## Examples
 
-### Compare One Plugin Across Two Environments
+### Compare One Plugin Assembly Across Two Environments
 
-Use this when you want a detailed plugin diff, including steps and images.
+Use this when you want a detailed plugin assembly diff, including steps and images.
 
 ```json
 {
-  "tool": "compare_plugins",
+  "tool": "compare_plugin_assemblies",
   "arguments": {
     "sourceEnvironment": "dev",
     "targetEnvironment": "prod",
-    "pluginName": "Contoso.Plugins"
+    "assemblyName": "Contoso.Plugins"
   }
 }
 ```
@@ -491,7 +491,7 @@ Use this when you want one drift report for many environments.
 
 ### Compare Plugin Drift On All Plugin Levels
 
-Use this when you want to see plugin assembly, step, and image drift for one plugin.
+Use this when you want to see plugin assembly, step, and image drift for one plugin assembly.
 
 ```json
 {
@@ -500,7 +500,7 @@ Use this when you want to see plugin assembly, step, and image drift for one plu
     "baselineEnvironment": "prod",
     "targetEnvironments": ["dev", "test"],
     "componentType": "plugins",
-    "pluginName": "Contoso.Plugins"
+    "assemblyName": "Contoso.Plugins"
   }
 }
 ```

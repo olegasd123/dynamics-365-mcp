@@ -18,41 +18,41 @@ const STAGE_LABELS: Record<number, string> = {
 const MODE_LABELS: Record<number, string> = { 0: "Synchronous", 1: "Asynchronous" };
 const IMAGE_TYPE_LABELS: Record<number, string> = { 0: "PreImage", 1: "PostImage", 2: "Both" };
 
-export function registerGetPluginDetails(
+export function registerGetPluginAssemblyDetails(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
   server.tool(
-    "get_plugin_details",
+    "get_plugin_assembly_details",
     "Get detailed information about a plugin assembly including all types, steps, and images.",
     {
       environment: z.string().optional().describe("Environment name"),
-      pluginName: z.string().describe("Name of the plugin assembly"),
+      assemblyName: z.string().describe("Name of the plugin assembly"),
     },
-    async ({ environment, pluginName }) => {
+    async ({ environment, assemblyName }) => {
       try {
         const env = getEnvironment(config, environment);
 
         const assemblies = await client.query<Record<string, unknown>>(
           env,
           "pluginassemblies",
-          getPluginAssemblyByNameQuery(pluginName),
+          getPluginAssemblyByNameQuery(assemblyName),
         );
 
         if (assemblies.length === 0) {
-          const text = `Plugin assembly '${pluginName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("get_plugin_details", text, text, {
+          const text = `Plugin assembly '${assemblyName}' not found in '${env.name}'.`;
+          return createToolSuccessResponse("get_plugin_assembly_details", text, text, {
             environment: env.name,
             found: false,
-            pluginName,
+            assemblyName,
           });
         }
 
         const assembly = assemblies[0];
         const lines: string[] = [];
 
-        lines.push(`## Plugin: ${assembly.name}`);
+        lines.push(`## Plugin Assembly: ${assembly.name}`);
         lines.push(`- **Version**: ${assembly.version}`);
         lines.push(`- **Isolation**: ${assembly.isolationmode === 2 ? "Sandbox" : "None"}`);
         lines.push(`- **Managed**: ${assembly.ismanaged ? "Yes" : "No"}`);
@@ -148,13 +148,13 @@ export function registerGetPluginDetails(
         });
 
         return createToolSuccessResponse(
-          "get_plugin_details",
+          "get_plugin_assembly_details",
           lines.join("\n"),
-          `Loaded plugin '${String(assembly.name || pluginName)}' in '${env.name}'.`,
+          `Loaded plugin assembly '${String(assembly.name || assemblyName)}' in '${env.name}'.`,
           {
             environment: env.name,
             found: true,
-            plugin: {
+            pluginAssembly: {
               pluginassemblyid: String(assembly.pluginassemblyid || ""),
               name: String(assembly.name || ""),
               version: String(assembly.version || ""),
@@ -173,7 +173,7 @@ export function registerGetPluginDetails(
           },
         );
       } catch (error) {
-        return createToolErrorResponse("get_plugin_details", error);
+        return createToolErrorResponse("get_plugin_assembly_details", error);
       }
     },
   );

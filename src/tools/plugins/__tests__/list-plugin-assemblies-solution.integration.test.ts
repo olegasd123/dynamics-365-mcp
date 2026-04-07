@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { registerListPlugins } from "../list-plugins.js";
+import { registerListPluginAssemblies } from "../list-plugin-assemblies.js";
 import {
   FakeServer,
   createRecordingClient,
   createTestConfig,
 } from "../../__tests__/tool-test-helpers.js";
 
-describe("list_plugins solution filter", () => {
+describe("list_plugin_assemblies solution filter", () => {
   it("filters plugin assemblies by solution", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
@@ -39,9 +39,9 @@ describe("list_plugins solution filter", () => {
       },
     });
 
-    registerListPlugins(server as never, config, client);
+    registerListPluginAssemblies(server as never, config, client);
 
-    const response = await server.getHandler("list_plugins")({
+    const response = await server.getHandler("list_plugin_assemblies")({
       solution: "Core",
     });
 

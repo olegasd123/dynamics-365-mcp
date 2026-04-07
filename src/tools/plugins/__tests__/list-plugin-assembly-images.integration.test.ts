@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { registerListPluginImages } from "../list-plugin-images.js";
+import { registerListPluginAssemblyImages } from "../list-plugin-assembly-images.js";
 import {
   FakeServer,
   createRecordingClient,
   createTestConfig,
 } from "../../__tests__/tool-test-helpers.js";
 
-describe("list_plugin_images tool", () => {
+describe("list_plugin_assembly_images tool", () => {
   it("returns filtered plugin images through the bulk inventory path", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
@@ -68,10 +68,10 @@ describe("list_plugin_images tool", () => {
       },
     });
 
-    registerListPluginImages(server as never, config, client);
+    registerListPluginAssemblyImages(server as never, config, client);
 
-    const response = await server.getHandler("list_plugin_images")({
-      pluginName: "Core.Plugins",
+    const response = await server.getHandler("list_plugin_assembly_images")({
+      assemblyName: "Core.Plugins",
       message: "Update",
     });
 

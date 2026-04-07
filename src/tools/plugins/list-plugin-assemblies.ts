@@ -11,16 +11,20 @@ import { formatTable } from "../../utils/formatters.js";
 import { fetchPluginSteps } from "./plugin-inventory.js";
 import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
-export function registerListPlugins(server: McpServer, config: AppConfig, client: DynamicsClient) {
+export function registerListPluginAssemblies(
+  server: McpServer,
+  config: AppConfig,
+  client: DynamicsClient,
+) {
   server.tool(
-    "list_plugins",
-    "List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugins with no registered steps.",
+    "list_plugin_assemblies",
+    "List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugin assemblies with no registered steps.",
     {
       environment: z.string().optional().describe("Environment name (e.g. 'dev', 'prod')"),
       filter: z
         .enum(["all", "no_steps"])
         .optional()
-        .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugins"),
+        .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugin assemblies"),
       solution: z
         .string()
         .optional()
@@ -69,10 +73,10 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         if (results.length === 0) {
           const text =
             filter === "no_steps"
-              ? `No orphaned plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
-              : `No plugins found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`;
+              ? `No orphaned plugin assemblies found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
+              : `No plugin assemblies found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`;
 
-          return createToolSuccessResponse("list_plugins", text, text, {
+          return createToolSuccessResponse("list_plugin_assemblies", text, text, {
             environment: env.name,
             filter: filter || "all",
             solution: solution || null,
@@ -96,12 +100,13 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         ]
           .filter(Boolean)
           .join(", ");
-        const text = `## Plugins in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\nFound ${results.length} plugin(s).\n\n${formatTable(headers, rows)}`;
+        const assemblyLabel = results.length === 1 ? "plugin assembly" : "plugin assemblies";
+        const text = `## Plugin Assemblies in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\nFound ${results.length} ${assemblyLabel}.\n\n${formatTable(headers, rows)}`;
 
         return createToolSuccessResponse(
-          "list_plugins",
+          "list_plugin_assemblies",
           text,
-          `Found ${results.length} plugin(s) in '${env.name}'.`,
+          `Found ${results.length} ${assemblyLabel} in '${env.name}'.`,
           {
             environment: env.name,
             filter: filter || "all",
@@ -111,7 +116,7 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
           },
         );
       } catch (error) {
-        return createToolErrorResponse("list_plugins", error);
+        return createToolErrorResponse("list_plugin_assemblies", error);
       }
     },
   );

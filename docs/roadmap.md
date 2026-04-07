@@ -36,7 +36,7 @@ These terms should be used everywhere in code, tool names, docs, and prompt exam
 - `step`: one registered `sdkmessageprocessingstep`
 - `image`: one registered `sdkmessageprocessingstepimage`
 
-## Milestone 1: Rename Assembly-Level Tools
+## Milestone 1: Rename Assembly-Level Tools [done]
 
 Goal:
 

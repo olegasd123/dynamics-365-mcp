@@ -45,7 +45,7 @@ export interface PluginComparisonData extends CollectionComparisonData<Record<st
 }
 
 export interface PluginComparisonOptions {
-  pluginName?: string;
+  assemblyName?: string;
   includeChildComponents?: boolean;
 }
 
@@ -91,7 +91,7 @@ export interface CustomApiComparisonOptions {
 
 const MAX_COMPARE_DETAIL_ITEMS = 50;
 
-export async function comparePluginsData(
+export async function comparePluginAssembliesData(
   config: AppConfig,
   client: DynamicsClient,
   sourceEnvironment: string,
@@ -101,7 +101,7 @@ export async function comparePluginsData(
   const sourceEnv = getEnvironment(config, sourceEnvironment);
   const targetEnv = getEnvironment(config, targetEnvironment);
 
-  const [sourcePlugins, targetPlugins] = await Promise.all([
+  const [sourceAssemblies, targetAssemblies] = await Promise.all([
     client.query<Record<string, unknown>>(
       sourceEnv,
       "pluginassemblies",
@@ -114,15 +114,15 @@ export async function comparePluginsData(
     ),
   ]);
 
-  let sourceItems = sourcePlugins;
-  let targetItems = targetPlugins;
+  let sourceItems = sourceAssemblies;
+  let targetItems = targetAssemblies;
 
-  if (options?.pluginName) {
-    sourceItems = sourceItems.filter((plugin) => plugin.name === options.pluginName);
-    targetItems = targetItems.filter((plugin) => plugin.name === options.pluginName);
+  if (options?.assemblyName) {
+    sourceItems = sourceItems.filter((assembly) => assembly.name === options.assemblyName);
+    targetItems = targetItems.filter((assembly) => assembly.name === options.assemblyName);
   }
 
-  const result = diffCollections(sourceItems, targetItems, (plugin) => String(plugin.name), [
+  const result = diffCollections(sourceItems, targetItems, (assembly) => String(assembly.name), [
     "version",
     "isolationmode",
     "ismanaged",

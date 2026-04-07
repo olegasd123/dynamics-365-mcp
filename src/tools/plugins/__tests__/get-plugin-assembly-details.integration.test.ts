@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { registerGetPluginDetails } from "../get-plugin-details.js";
+import { registerGetPluginAssemblyDetails } from "../get-plugin-assembly-details.js";
 import {
   FakeServer,
   createRecordingClient,
   createTestConfig,
 } from "../../__tests__/tool-test-helpers.js";
 
-describe("get_plugin_details tool", () => {
+describe("get_plugin_assembly_details tool", () => {
   it("renders plugin details with types, steps, and images", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
@@ -63,15 +63,15 @@ describe("get_plugin_details tool", () => {
       },
     });
 
-    registerGetPluginDetails(server as never, config, client);
+    registerGetPluginAssemblyDetails(server as never, config, client);
 
-    const response = await server.getHandler("get_plugin_details")({
-      pluginName: "Core.Plugins",
+    const response = await server.getHandler("get_plugin_assembly_details")({
+      assemblyName: "Core.Plugins",
     });
 
     const text = response.content[0].text;
     expect(response.isError).toBeUndefined();
-    expect(text).toContain("## Plugin: Core.Plugins");
+    expect(text).toContain("## Plugin Assembly: Core.Plugins");
     expect(text).toContain("- **Version**: 1.2.3");
     expect(text).toContain("#### AccountPlugin (`Core.Plugins.AccountPlugin`)");
     expect(text).toContain("*Workflow Activity*");
@@ -79,7 +79,7 @@ describe("get_plugin_details tool", () => {
     expect(text).toContain("Filtering: name");
     expect(text).toContain("PreImage (PreImage, alias: pre, attributes: name)");
     expect(response.structuredContent).toMatchObject({
-      tool: "get_plugin_details",
+      tool: "get_plugin_assembly_details",
       ok: true,
       data: {
         environment: "dev",
@@ -114,21 +114,21 @@ describe("get_plugin_details tool", () => {
       },
     });
 
-    registerGetPluginDetails(server as never, config, client);
+    registerGetPluginAssemblyDetails(server as never, config, client);
 
-    const response = await server.getHandler("get_plugin_details")({
-      pluginName: "Missing.Plugin",
+    const response = await server.getHandler("get_plugin_assembly_details")({
+      assemblyName: "Missing.Plugin",
     });
 
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
     expect(response.structuredContent).toMatchObject({
-      tool: "get_plugin_details",
+      tool: "get_plugin_assembly_details",
       ok: true,
       data: {
         environment: "dev",
         found: false,
-        pluginName: "Missing.Plugin",
+        assemblyName: "Missing.Plugin",
       },
     });
   });
@@ -142,10 +142,10 @@ describe("get_plugin_details tool", () => {
       },
     } as never;
 
-    registerGetPluginDetails(server as never, config, client);
+    registerGetPluginAssemblyDetails(server as never, config, client);
 
-    const response = await server.getHandler("get_plugin_details")({
-      pluginName: "Core.Plugins",
+    const response = await server.getHandler("get_plugin_assembly_details")({
+      assemblyName: "Core.Plugins",
     });
 
     expect(response.isError).toBe(true);
@@ -153,7 +153,7 @@ describe("get_plugin_details tool", () => {
       "Dynamics API error [dev] (500): Plugin details failed",
     );
     expect(response.structuredContent).toMatchObject({
-      tool: "get_plugin_details",
+      tool: "get_plugin_assembly_details",
       ok: false,
       error: {
         message: "Dynamics API error [dev] (500): Plugin details failed",
