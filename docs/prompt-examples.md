@@ -97,6 +97,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 ## Tables
 
+- `find_metadata`
+  `In <ENV>, find metadata that matches 'account'.`
+  `In <ENV>, find only cloud flow metadata that matches 'sync'.`
+
 - `list_tables`
   `In <ENV>, list tables from solution <SOLUTION> where the name matches 'account'.`
 
@@ -231,6 +235,7 @@ This prompt list covers these tools:
 - `environment_health_report`
 - `find_column_usage`
 - `find_table_usage`
+- `find_metadata`
 - `find_web_resource_usage`
 - `get_custom_api_details`
 - `get_flow_details`

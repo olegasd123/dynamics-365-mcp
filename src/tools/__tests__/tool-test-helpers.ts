@@ -16,6 +16,7 @@ export const EXPECTED_TOOL_NAMES = [
   "compare_workflows",
   "environment_health_report",
   "find_column_usage",
+  "find_metadata",
   "find_table_usage",
   "find_web_resource_usage",
   "get_custom_api_details",

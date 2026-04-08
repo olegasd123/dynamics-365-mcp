@@ -2,6 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../config/types.js";
 import type { DynamicsClient } from "../client/dynamics-client.js";
 
+// Discovery tools
+import { registerFindMetadata } from "./discovery/find-metadata.js";
+
 // Plugin tools
 import { registerListPlugins } from "./plugins/list-plugins.js";
 import { registerListPluginSteps } from "./plugins/list-plugin-steps.js";
@@ -80,6 +83,9 @@ export function registerAllTools(
   config: AppConfig,
   client: DynamicsClient,
 ): void {
+  // Discovery tools
+  registerFindMetadata(server, config, client);
+
   // Plugin tools
   registerListPlugins(server, config, client);
   registerListPluginSteps(server, config, client);
