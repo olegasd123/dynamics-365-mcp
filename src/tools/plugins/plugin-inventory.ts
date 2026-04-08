@@ -117,7 +117,10 @@ export async function fetchPluginTypesForAssemblies(
   }
 
   const assemblyMap = new Map(
-    assemblies.map((assembly) => [String(assembly.pluginassemblyid || ""), String(assembly.name || "")]),
+    assemblies.map((assembly) => [
+      String(assembly.pluginassemblyid || ""),
+      String(assembly.name || ""),
+    ]),
   );
   const assemblyIds = assemblies
     .map((assembly) => String(assembly.pluginassemblyid || ""))
@@ -190,7 +193,10 @@ export async function fetchPluginImagesForSteps(
 
   return images
     .map((image) =>
-      normalizePluginImage(stepMap.get(String(image._sdkmessageprocessingstepid_value || "")), image),
+      normalizePluginImage(
+        stepMap.get(String(image._sdkmessageprocessingstepid_value || "")),
+        image,
+      ),
     )
     .filter((image): image is PluginImageRecord => image !== null);
 }
@@ -224,15 +230,13 @@ export async function fetchPluginStepsByIds(
     return [];
   }
 
-  const pluginTypeIds = [...new Set(steps.map((step) => String(step._eventhandler_value || "")).filter(Boolean))];
+  const pluginTypeIds = [
+    ...new Set(steps.map((step) => String(step._eventhandler_value || "")).filter(Boolean)),
+  ];
   const pluginTypes = (
     await Promise.all(
       chunkValues(pluginTypeIds).map((chunk) =>
-        client.query<Record<string, unknown>>(
-          env,
-          "plugintypes",
-          listPluginTypesByIdsQuery(chunk),
-        ),
+        client.query<Record<string, unknown>>(env, "plugintypes", listPluginTypesByIdsQuery(chunk)),
       ),
     )
   )
@@ -244,7 +248,9 @@ export async function fetchPluginStepsByIds(
   }
 
   const assemblyIds = [
-    ...new Set(pluginTypes.map((type) => String(type._pluginassemblyid_value || "")).filter(Boolean)),
+    ...new Set(
+      pluginTypes.map((type) => String(type._pluginassemblyid_value || "")).filter(Boolean),
+    ),
   ];
   const assemblies = (
     await Promise.all(
@@ -261,7 +267,10 @@ export async function fetchPluginStepsByIds(
     .filter((assembly) => assemblyIds.includes(String(assembly.pluginassemblyid || "")));
 
   const assemblyMap = new Map(
-    assemblies.map((assembly) => [String(assembly.pluginassemblyid || ""), String(assembly.name || "")]),
+    assemblies.map((assembly) => [
+      String(assembly.pluginassemblyid || ""),
+      String(assembly.name || ""),
+    ]),
   );
   const typeRecords = pluginTypes.map((type) => normalizePluginType(type, assemblyMap));
   const typeMap = new Map(typeRecords.map((type) => [type.pluginTypeId, type]));
@@ -294,7 +303,9 @@ export async function fetchPluginImagesByIds(
     )
   )
     .flat()
-    .filter((image) => uniqueImageIds.includes(String(image.sdkmessageprocessingstepimageid || "")));
+    .filter((image) =>
+      uniqueImageIds.includes(String(image.sdkmessageprocessingstepimageid || "")),
+    );
 
   if (images.length === 0) {
     return [];
@@ -309,7 +320,10 @@ export async function fetchPluginImagesByIds(
 
   return images
     .map((image) =>
-      normalizePluginImage(stepMap.get(String(image._sdkmessageprocessingstepid_value || "")), image),
+      normalizePluginImage(
+        stepMap.get(String(image._sdkmessageprocessingstepid_value || "")),
+        image,
+      ),
     )
     .filter((image): image is PluginImageRecord => image !== null);
 }
@@ -323,7 +337,9 @@ function normalizePluginType(
   const customWorkflowActivityInfo = String(type.customworkflowactivityinfo || "").trim();
 
   return {
-    key: [assemblyMap.get(assemblyId) || "(unknown assembly)", String(type.typename || "")].join(" | "),
+    key: [assemblyMap.get(assemblyId) || "(unknown assembly)", String(type.typename || "")].join(
+      " | ",
+    ),
     assemblyId,
     assemblyName: assemblyMap.get(assemblyId) || "(unknown assembly)",
     pluginTypeId: String(type.plugintypeid || ""),

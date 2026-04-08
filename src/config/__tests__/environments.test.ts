@@ -211,7 +211,8 @@ describe("environments config", () => {
 
   it("loads device code auth from a connection string", async () => {
     const dir = createTempDir();
-    process.env.D365_CONNECTION_STRING = "AuthType=DeviceCode;Url=https://org.crm.dynamics.com/;TenantId=tenant";
+    process.env.D365_CONNECTION_STRING =
+      "AuthType=DeviceCode;Url=https://org.crm.dynamics.com/;TenantId=tenant";
 
     const { loadConfig } = await importEnvironmentsModule(dir);
 

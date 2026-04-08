@@ -50,10 +50,7 @@ export const EXPECTED_TOOL_NAMES = [
   "list_workflows",
 ] as const;
 
-export const REMOVED_LEGACY_TOOL_NAMES = [
-  "compare_plugins",
-  "list_plugin_images",
-] as const;
+export const REMOVED_LEGACY_TOOL_NAMES = ["compare_plugins", "list_plugin_images"] as const;
 
 export interface ToolResponse {
   content: Array<{ type: "text"; text: string }>;
@@ -61,7 +58,10 @@ export interface ToolResponse {
   isError?: boolean;
 }
 
-export type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResponse>;
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  extra?: Record<string, unknown>,
+) => Promise<ToolResponse>;
 
 export class FakeServer {
   private readonly handlers = new Map<string, ToolHandler>();

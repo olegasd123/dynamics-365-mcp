@@ -113,7 +113,14 @@ export function registerAnalyzeUpdateTriggers(
           lines.push("#### Workflows");
           lines.push(
             formatTable(
-              ["Name", "Unique Name", "Category", "Mode", "Trigger Attributes", "System-Managed Columns"],
+              [
+                "Name",
+                "Unique Name",
+                "Category",
+                "Mode",
+                "Trigger Attributes",
+                "System-Managed Columns",
+              ],
               analysis.systemManagedWorkflows.map((workflow) => [
                 workflow.name,
                 workflow.uniqueName || "-",

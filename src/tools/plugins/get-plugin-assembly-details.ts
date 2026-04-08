@@ -92,10 +92,7 @@ export function registerGetPluginAssemblyDetails(
 
         lines.push(`### Plugin Classes (${pluginClasses.length})`);
         lines.push(
-          ...renderAssemblyTypeSection(
-            pluginClasses,
-            "No plugin classes found in this assembly.",
-          ),
+          ...renderAssemblyTypeSection(pluginClasses, "No plugin classes found in this assembly."),
         );
         lines.push("");
         lines.push(`### Workflow Activities (${workflowActivities.length})`);
@@ -155,10 +152,12 @@ function buildAssemblyTypeDetails(
     stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
     modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
     statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
-    images: (imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || []).map((image) => ({
-      ...image,
-      imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
-    })),
+    images: (imagesByStepId.get(String(step.sdkmessageprocessingstepid || "")) || []).map(
+      (image) => ({
+        ...image,
+        imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
+      }),
+    ),
   }));
 
   return {
@@ -170,10 +169,7 @@ function buildAssemblyTypeDetails(
   };
 }
 
-function renderAssemblyTypeSection(
-  types: AssemblyTypeDetails[],
-  emptyMessage: string,
-): string[] {
+function renderAssemblyTypeSection(types: AssemblyTypeDetails[], emptyMessage: string): string[] {
   if (types.length === 0) {
     return [emptyMessage];
   }

@@ -131,7 +131,11 @@ describe("plugin inventory", () => {
 
     expect(inventory.steps).toHaveLength(1);
     expect(inventory.images).toHaveLength(1);
-    expect(calls).toEqual(["plugintypes", "sdkmessageprocessingsteps", "sdkmessageprocessingstepimages"]);
+    expect(calls).toEqual([
+      "plugintypes",
+      "sdkmessageprocessingsteps",
+      "sdkmessageprocessingstepimages",
+    ]);
   });
 
   it("filters workflow activities from plugin classes by default", async () => {
@@ -186,7 +190,7 @@ describe("plugin inventory", () => {
               typename: "Masao.Workflows.PostVacancyToSap",
               isworkflowactivity: false,
               workflowactivitygroupname: "Masao Workflows",
-              customworkflowactivityinfo: "{\"arguments\":[]}",
+              customworkflowactivityinfo: '{"arguments":[]}',
               _pluginassemblyid_value: "asm-1",
             },
           ] as T[];

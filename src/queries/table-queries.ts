@@ -1,8 +1,4 @@
-import {
-  buildQueryString,
-  odataEq,
-  odataStringLiteral,
-} from "../utils/odata-helpers.js";
+import { buildQueryString, odataEq, odataStringLiteral } from "../utils/odata-helpers.js";
 
 const TABLE_SELECT = [
   "MetadataId",

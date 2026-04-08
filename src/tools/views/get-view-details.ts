@@ -75,11 +75,16 @@ export function registerGetViewDetails(
           ),
         );
 
-        return createToolSuccessResponse("get_view_details", lines.join("\n"), `Loaded view '${view.name}' in '${env.name}'.`, {
-          environment: env.name,
-          filters: { table: table || null, scope: scope || null, solution: solution || null },
-          view,
-        });
+        return createToolSuccessResponse(
+          "get_view_details",
+          lines.join("\n"),
+          `Loaded view '${view.name}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: { table: table || null, scope: scope || null, solution: solution || null },
+            view,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("get_view_details", error);
       }

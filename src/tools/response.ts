@@ -58,9 +58,7 @@ export function createToolErrorResponse(
   error: unknown,
 ): ToolResponse<Record<string, unknown>> {
   const normalizedError =
-    error instanceof Error
-      ? error
-      : new Error(typeof error === "string" ? error : String(error));
+    error instanceof Error ? error : new Error(typeof error === "string" ? error : String(error));
 
   const response: ToolResponse<Record<string, unknown>> = {
     content: [{ type: "text", text: `Error: ${normalizedError.message}` }],

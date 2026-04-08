@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getCloudFlowDetailsByIdentityQuery,
-  listCloudFlowsQuery,
-} from "../flow-queries.js";
+import { getCloudFlowDetailsByIdentityQuery, listCloudFlowsQuery } from "../flow-queries.js";
 
 describe("flow queries", () => {
   it("builds the cloud flow list query", () => {

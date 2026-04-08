@@ -1,8 +1,4 @@
-import {
-  buildQueryString,
-  odataContains,
-  odataEq,
-} from "../utils/odata-helpers.js";
+import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
 import type { WorkflowState } from "./workflow-queries.js";
 import { WORKFLOW_STATE } from "./workflow-queries.js";
 

@@ -86,12 +86,17 @@ export function registerGetCustomApiDetails(
           );
         }
 
-        return createToolSuccessResponse("get_custom_api_details", lines.join("\n"), `Loaded custom API '${details.api.name}' in '${env.name}'.`, {
-          environment: env.name,
-          api: details.api,
-          requestParameters: details.requestParameters,
-          responseProperties: details.responseProperties,
-        });
+        return createToolSuccessResponse(
+          "get_custom_api_details",
+          lines.join("\n"),
+          `Loaded custom API '${details.api.name}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            api: details.api,
+            requestParameters: details.requestParameters,
+            responseProperties: details.responseProperties,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("get_custom_api_details", error);
       }

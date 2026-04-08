@@ -8,11 +8,7 @@ import { formatTable } from "../../utils/formatters.js";
 import { buildTableFlags } from "./table-display.js";
 import { listTables } from "./table-metadata.js";
 
-export function registerListTables(
-  server: McpServer,
-  config: AppConfig,
-  client: DynamicsClient,
-) {
+export function registerListTables(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
     "list_tables",
     "List Dataverse tables with schema flags. Optionally filter by name or solution.",
@@ -22,10 +18,7 @@ export function registerListTables(
         .string()
         .optional()
         .describe("Optional filter for logical name, schema name, or entity set name"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, nameFilter, solution }) => {
       try {

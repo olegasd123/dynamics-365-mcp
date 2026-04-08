@@ -29,7 +29,10 @@ export function registerListPluginSteps(
     {
       environment: z.string().optional().describe("Environment name"),
       pluginName: z.string().describe("Plugin class name or full type name"),
-      assemblyName: z.string().optional().describe("Optional plugin assembly name to narrow matches"),
+      assemblyName: z
+        .string()
+        .optional()
+        .describe("Optional plugin assembly name to narrow matches"),
       solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, pluginName, assemblyName, solution }) => {

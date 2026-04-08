@@ -8,6 +8,7 @@ import {
   REMOVED_LEGACY_TOOL_NAMES,
   createRecordingClient,
   createTestConfig,
+  type ToolResponse,
 } from "./tool-test-helpers.js";
 
 async function createConnectedToolClient(
@@ -123,9 +124,9 @@ describe("tool contracts", () => {
         direction: expect.any(Object),
         componentType: expect.any(Object),
       });
-      expect(
-        REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName)),
-      ).toBe(true);
+      expect(REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName))).toBe(
+        true,
+      );
     } finally {
       await harness.close();
     }
@@ -219,18 +220,18 @@ describe("tool contracts", () => {
     );
 
     try {
-      const listTablesResult = await harness.client.callTool({
+      const listTablesResult = (await harness.client.callTool({
         name: "list_tables",
         arguments: {},
-      });
-      const compareApisResult = await harness.client.callTool({
+      })) as ToolResponse;
+      const compareApisResult = (await harness.client.callTool({
         name: "compare_custom_apis",
         arguments: {
           sourceEnvironment: "prod",
           targetEnvironment: "dev",
           apiName: "Do Thing",
         },
-      });
+      })) as ToolResponse;
 
       expect(listTablesResult.structuredContent).toMatchObject({
         version: "1",

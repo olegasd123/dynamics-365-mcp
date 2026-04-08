@@ -12,12 +12,8 @@ describe("list_web_resources solution filter", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
-        solutions: [
-          { solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
-        solutioncomponents: [
-          { solutioncomponentid: "sc-1", objectid: "wr-1", componenttype: 61 },
-        ],
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
+        solutioncomponents: [{ solutioncomponentid: "sc-1", objectid: "wr-1", componenttype: 61 }],
         webresourceset: [
           {
             webresourceid: "wr-1",

@@ -23,9 +23,7 @@ describe("plugin shared metadata", () => {
         calls.push(entitySet);
 
         if (entitySet === "pluginassemblies") {
-          return [
-            { pluginassemblyid: "asm-1", name: "Core.Plugins" },
-          ] as T[];
+          return [{ pluginassemblyid: "asm-1", name: "Core.Plugins" }] as T[];
         }
 
         if (entitySet === "plugintypes") {

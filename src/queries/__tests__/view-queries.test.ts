@@ -23,9 +23,9 @@ describe("view queries", () => {
   });
 
   it("builds identity queries", () => {
-    expect(getSavedViewByIdentityQuery({ table: "account", viewName: "Active Accounts" })).toContain(
-      "$filter=name eq 'Active Accounts' and returnedtypecode eq 'account'",
-    );
+    expect(
+      getSavedViewByIdentityQuery({ table: "account", viewName: "Active Accounts" }),
+    ).toContain("$filter=name eq 'Active Accounts' and returnedtypecode eq 'account'");
     expect(
       getPersonalViewByIdentityQuery({ table: "account", viewName: "My O'Hara View" }),
     ).toContain("$filter=name eq 'My O''Hara View' and returnedtypecode eq 'account'");

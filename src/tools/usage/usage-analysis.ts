@@ -475,7 +475,11 @@ export async function analyzeUpdateTriggersData(
 
   const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
-    client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery({ status: "activated" })),
+    client.query<Record<string, unknown>>(
+      env,
+      "workflows",
+      listWorkflowsQuery({ status: "activated" }),
+    ),
     listCloudFlows(env, client, { status: "activated" }),
   ]);
 
@@ -504,7 +508,9 @@ export async function analyzeUpdateTriggersData(
       const filteringAttributes = splitCsv(String(step.filteringattributes || ""));
       const matchedAttributes = intersectAttributes(normalizedAttributes, filteringAttributes);
       const matchType =
-        filteringAttributes.length === 0 ? ("all_updates" as const) : ("specific_attributes" as const);
+        filteringAttributes.length === 0
+          ? ("all_updates" as const)
+          : ("specific_attributes" as const);
 
       return {
         name: step.name,
@@ -522,7 +528,10 @@ export async function analyzeUpdateTriggersData(
   const systemManagedPluginSteps = eligiblePluginSteps
     .map((step) => {
       const filteringAttributes = splitCsv(String(step.filteringattributes || ""));
-      const directMatchedAttributes = intersectAttributes(normalizedAttributes, filteringAttributes);
+      const directMatchedAttributes = intersectAttributes(
+        normalizedAttributes,
+        filteringAttributes,
+      );
       const systemManagedAttributes = intersectAttributes(
         SYSTEM_MANAGED_UPDATE_COLUMNS,
         filteringAttributes,
@@ -542,10 +551,18 @@ export async function analyzeUpdateTriggersData(
     })
     .filter(
       (step) =>
-        step.systemManagedAttributes.length > 0 &&
-        step.directMatchedAttributes.length === 0,
+        step.systemManagedAttributes.length > 0 && step.directMatchedAttributes.length === 0,
     )
-    .map(({ directMatchedAttributes: _directMatchedAttributes, ...step }) => step);
+    .map((step) => ({
+      name: step.name,
+      assemblyName: step.assemblyName,
+      pluginTypeName: step.pluginTypeName,
+      pluginTypeFullName: step.pluginTypeFullName,
+      filteringAttributes: step.filteringAttributes,
+      systemManagedAttributes: step.systemManagedAttributes,
+      stageLabel: step.stageLabel,
+      modeLabel: step.modeLabel,
+    }));
   const eligibleWorkflows = workflows.filter(
     (workflow) => String(workflow.primaryentity || "") === table.logicalName,
   );
@@ -559,8 +576,7 @@ export async function analyzeUpdateTriggersData(
         categoryLabel:
           WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
           String(workflow.category || ""),
-        modeLabel:
-          WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
+        modeLabel: WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
         triggerAttributes: String(workflow.triggeronupdateattributelist || ""),
         matchedAttributes: intersectAttributes(normalizedAttributes, triggerAttributes),
       };
@@ -576,8 +592,7 @@ export async function analyzeUpdateTriggersData(
         categoryLabel:
           WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
           String(workflow.category || ""),
-        modeLabel:
-          WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
+        modeLabel: WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
         triggerAttributes: String(workflow.triggeronupdateattributelist || ""),
         systemManagedAttributes: intersectAttributes(
           SYSTEM_MANAGED_UPDATE_COLUMNS,
@@ -591,7 +606,15 @@ export async function analyzeUpdateTriggersData(
         workflow.systemManagedAttributes.length > 0 &&
         workflow.directMatchedAttributes.length === 0,
     )
-    .map(({ directMatchedAttributes: _directMatchedAttributes, ...workflow }) => workflow);
+    .map((workflow) => ({
+      name: workflow.name,
+      uniqueName: workflow.uniqueName,
+      category: workflow.category,
+      categoryLabel: workflow.categoryLabel,
+      modeLabel: workflow.modeLabel,
+      triggerAttributes: workflow.triggerAttributes,
+      systemManagedAttributes: workflow.systemManagedAttributes,
+    }));
 
   return {
     tableLogicalName: table.logicalName,
@@ -644,7 +667,11 @@ export async function analyzeCreateTriggersData(
 
   const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
-    client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery({ status: "activated" })),
+    client.query<Record<string, unknown>>(
+      env,
+      "workflows",
+      listWorkflowsQuery({ status: "activated" }),
+    ),
     listCloudFlows(env, client, { status: "activated" }),
   ]);
 
@@ -686,7 +713,8 @@ export async function analyzeCreateTriggersData(
     directWorkflows: workflows
       .filter(
         (workflow) =>
-          String(workflow.primaryentity || "") === table.logicalName && Boolean(workflow.triggeroncreate),
+          String(workflow.primaryentity || "") === table.logicalName &&
+          Boolean(workflow.triggeroncreate),
       )
       .map((workflow) => ({
         name: String(workflow.name || ""),
@@ -695,8 +723,7 @@ export async function analyzeCreateTriggersData(
         categoryLabel:
           WORKFLOW_CATEGORY_LABELS[Number(workflow.category || 0)] ||
           String(workflow.category || ""),
-        modeLabel:
-          WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
+        modeLabel: WORKFLOW_MODE_LABELS[Number(workflow.mode || 0)] || String(workflow.mode || ""),
       })),
     relatedCloudFlows: flowDetails
       .map((flow) => {

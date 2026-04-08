@@ -98,8 +98,12 @@ describe("get_plugin_assembly_details tool", () => {
     expect(text).toContain("### Workflow Activities (1)");
     expect(text).toContain("#### AccountPlugin (`Core.Plugins.AccountPlugin`)");
     expect(text).toContain("#### AccountActivity (`Core.Plugins.AccountActivity`)");
-    expect(text).toContain("Message: Create | Entity: account | Stage: Pre-Operation | Mode: Synchronous | Status: Enabled");
-    expect(text).toContain("Message: Update | Entity: account | Stage: Post-Operation | Mode: Synchronous | Status: Enabled");
+    expect(text).toContain(
+      "Message: Create | Entity: account | Stage: Pre-Operation | Mode: Synchronous | Status: Enabled",
+    );
+    expect(text).toContain(
+      "Message: Update | Entity: account | Stage: Post-Operation | Mode: Synchronous | Status: Enabled",
+    );
     expect(text).toContain("Filtering: name");
     expect(text).toContain("PreImage (PreImage, alias: pre, attributes: name)");
     expect(text).toContain("plugin tools exclude workflow activities");
@@ -154,7 +158,9 @@ describe("get_plugin_assembly_details tool", () => {
     });
 
     expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
+    expect(response.content[0].text).toContain(
+      "Plugin assembly 'Missing.Plugin' not found in 'dev'.",
+    );
     expect(response.structuredContent).toMatchObject({
       tool: "get_plugin_assembly_details",
       ok: true,

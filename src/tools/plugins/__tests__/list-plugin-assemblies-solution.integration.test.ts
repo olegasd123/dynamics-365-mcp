@@ -12,12 +12,8 @@ describe("list_plugin_assemblies solution filter", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
-        solutions: [
-          { solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
-        solutioncomponents: [
-          { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
-        ],
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
+        solutioncomponents: [{ solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 }],
         pluginassemblies: [
           {
             pluginassemblyid: "asm-1",

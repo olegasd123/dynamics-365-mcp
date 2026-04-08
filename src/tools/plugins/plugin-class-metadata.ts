@@ -49,7 +49,8 @@ export async function fetchPluginMetadata(
   const includeSteps = options?.includeSteps ?? true;
   const steps = includeSteps ? await fetchPluginStepsForTypes(env, client, types) : [];
   const includeImages = options?.includeImages ?? includeSteps;
-  const images = includeSteps && includeImages ? await fetchPluginImagesForSteps(env, client, steps) : [];
+  const images =
+    includeSteps && includeImages ? await fetchPluginImagesForSteps(env, client, steps) : [];
 
   return {
     assemblies,
@@ -97,7 +98,9 @@ export function resolvePluginClass(
     : plugins;
 
   if (assemblyName && assemblyScoped.length === 0) {
-    throw new Error(`Plugin assembly '${assemblyName}' has no plugin classes in the current scope.`);
+    throw new Error(
+      `Plugin assembly '${assemblyName}' has no plugin classes in the current scope.`,
+    );
   }
 
   const resolved =

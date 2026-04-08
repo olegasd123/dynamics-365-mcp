@@ -351,9 +351,7 @@ describe("usage tools", () => {
             expect.objectContaining({ name: "Plugin1 Step", matchType: "specific_attributes" }),
             expect.objectContaining({ name: "PluginAny Step", matchType: "all_updates" }),
           ],
-          directWorkflows: [
-            expect.objectContaining({ name: "Contact First Name Sync" }),
-          ],
+          directWorkflows: [expect.objectContaining({ name: "Contact First Name Sync" })],
           systemManagedPluginSteps: [
             expect.objectContaining({
               name: "Plugin2 Step",
@@ -505,14 +503,13 @@ describe("usage tools", () => {
         analysis: {
           tableLogicalName: "contact",
           providedAttributes: ["firstname"],
-          directPluginSteps: [
-            expect.objectContaining({ name: "Contact Create Step" }),
-          ],
-          directWorkflows: [
-            expect.objectContaining({ name: "Contact Create Workflow" }),
-          ],
+          directPluginSteps: [expect.objectContaining({ name: "Contact Create Step" })],
+          directWorkflows: [expect.objectContaining({ name: "Contact Create Workflow" })],
           relatedCloudFlows: [
-            expect.objectContaining({ name: "Contact Create Flow", matchedAttributes: ["firstname"] }),
+            expect.objectContaining({
+              name: "Contact Create Flow",
+              matchedAttributes: ["firstname"],
+            }),
           ],
         },
       },

@@ -30,7 +30,10 @@ export function registerGetPluginDetails(
     {
       environment: z.string().optional().describe("Environment name"),
       pluginName: z.string().describe("Plugin class name or full type name"),
-      assemblyName: z.string().optional().describe("Optional plugin assembly name to narrow matches"),
+      assemblyName: z
+        .string()
+        .optional()
+        .describe("Optional plugin assembly name to narrow matches"),
       solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, pluginName, assemblyName, solution }) => {
@@ -43,7 +46,9 @@ export function registerGetPluginDetails(
         });
         const plugin = resolvePluginClass(inventory.pluginClasses, pluginName, assemblyName);
         const steps = inventory.steps.filter((step) => step.pluginTypeId === plugin.pluginTypeId);
-        const images = inventory.images.filter((image) => image.pluginTypeId === plugin.pluginTypeId);
+        const images = inventory.images.filter(
+          (image) => image.pluginTypeId === plugin.pluginTypeId,
+        );
         const imagesByStepId = groupImagesByStepId(images);
 
         const lines: string[] = [];
@@ -78,7 +83,8 @@ export function registerGetPluginDetails(
             if (stepImages.length > 0) {
               lines.push(`- Images (${stepImages.length}):`);
               for (const image of stepImages) {
-                const imageType = IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype);
+                const imageType =
+                  IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype);
                 lines.push(
                   `  - ${image.name} (${imageType}, alias: ${image.entityalias || "none"}, attributes: ${image.attributes || "all"})`,
                 );
@@ -106,7 +112,8 @@ export function registerGetPluginDetails(
               statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
               images: (imagesByStepId.get(step.sdkmessageprocessingstepid) || []).map((image) => ({
                 ...image,
-                imageTypeLabel: IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
+                imageTypeLabel:
+                  IMAGE_TYPE_LABELS[image.imagetype as number] || String(image.imagetype),
               })),
             })),
           },

@@ -48,7 +48,7 @@ describe("request logger", () => {
       });
     });
 
-    const handler = server.getHandler("demo_tool") as never;
+    const handler = server.getHandler("demo_tool");
     await handler(
       { environment: "dev", nameFilter: "Account" },
       { requestId: "req-42", sessionId: "session-1" },
@@ -83,7 +83,7 @@ describe("request logger", () => {
       createToolErrorResponse("demo_error", "Something failed"),
     );
 
-    const handler = server.getHandler("demo_error") as never;
+    const handler = server.getHandler("demo_error");
     await handler({}, { requestId: "req-99" });
 
     const [dateFolder] = readdirSync(tempDir);

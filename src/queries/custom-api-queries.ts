@@ -1,8 +1,4 @@
-import {
-  buildQueryString,
-  odataContains,
-  odataEq,
-} from "../utils/odata-helpers.js";
+import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
 
 function buildOrFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");

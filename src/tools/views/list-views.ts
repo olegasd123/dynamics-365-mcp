@@ -13,11 +13,7 @@ const STATE_LABELS: Record<number, string> = {
   1: "Inactive",
 };
 
-export function registerListViews(
-  server: McpServer,
-  config: AppConfig,
-  client: DynamicsClient,
-) {
+export function registerListViews(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
     "list_views",
     "List system or personal views with normalized metadata.",
@@ -45,7 +41,12 @@ export function registerListViews(
           const text = `No views found in '${env.name}' with the specified filters.`;
           return createToolSuccessResponse("list_views", text, text, {
             environment: env.name,
-            filters: { table: table || null, scope: scope || null, nameFilter: nameFilter || null, solution: solution || null },
+            filters: {
+              table: table || null,
+              scope: scope || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
             count: 0,
             items: [],
           });
@@ -75,12 +76,22 @@ export function registerListViews(
           ["Table", "Scope", "Name", "Type", "Default", "Quick Find", "State", "Modified"],
           rows,
         )}`;
-        return createToolSuccessResponse("list_views", text, `Found ${views.length} view(s) in '${env.name}'.`, {
-          environment: env.name,
-          filters: { table: table || null, scope: scope || null, nameFilter: nameFilter || null, solution: solution || null },
-          count: views.length,
-          items: views,
-        });
+        return createToolSuccessResponse(
+          "list_views",
+          text,
+          `Found ${views.length} view(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: {
+              table: table || null,
+              scope: scope || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
+            count: views.length,
+            items: views,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_views", error);
       }

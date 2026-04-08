@@ -12,12 +12,8 @@ describe("list_workflows solution filter", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
-        solutions: [
-          { solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
-        solutioncomponents: [
-          { solutioncomponentid: "sc-1", objectid: "wf-1", componenttype: 29 },
-        ],
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
+        solutioncomponents: [{ solutioncomponentid: "sc-1", objectid: "wf-1", componenttype: 29 }],
         workflows: [
           {
             workflowid: "wf-1",

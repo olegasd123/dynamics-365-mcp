@@ -24,13 +24,8 @@ export function registerGetTableSchema(
     "Show table schema details, including columns, alternate keys, and relationships.",
     {
       environment: z.string().optional().describe("Environment name"),
-      table: z
-        .string()
-        .describe("Table logical name, schema name, or display name"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      table: z.string().describe("Table logical name, schema name, or display name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, table, solution }) => {
       try {
@@ -63,15 +58,7 @@ export function registerGetTableSchema(
         lines.push("### Columns");
         lines.push(
           formatTable(
-            [
-              "Logical Name",
-              "Type",
-              "Required",
-              "Primary",
-              "Audit",
-              "Search",
-              "Details",
-            ],
+            ["Logical Name", "Type", "Required", "Primary", "Audit", "Search", "Details"],
             schema.columns.map((column) => [
               column.logicalName,
               column.attributeType || "-",

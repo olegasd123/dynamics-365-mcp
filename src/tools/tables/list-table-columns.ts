@@ -18,13 +18,8 @@ export function registerListTableColumns(
     "List Dataverse table columns with type, required level, and schema flags.",
     {
       environment: z.string().optional().describe("Environment name"),
-      table: z
-        .string()
-        .describe("Table logical name, schema name, or display name"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      table: z.string().describe("Table logical name, schema name, or display name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, table, solution }) => {
       try {
@@ -71,13 +66,18 @@ export function registerListTableColumns(
           ...column,
           details: buildColumnDetails(column) || null,
         }));
-        return createToolSuccessResponse("list_table_columns", text, `Found ${result.columns.length} column(s) for table '${result.table.logicalName}' in '${env.name}'.`, {
-          environment: env.name,
-          solution: solution || null,
-          table: result.table,
-          count: result.columns.length,
-          items,
-        });
+        return createToolSuccessResponse(
+          "list_table_columns",
+          text,
+          `Found ${result.columns.length} column(s) for table '${result.table.logicalName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            solution: solution || null,
+            table: result.table,
+            count: result.columns.length,
+            items,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_table_columns", error);
       }

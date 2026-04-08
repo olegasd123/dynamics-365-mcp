@@ -57,11 +57,13 @@ function createChildEnv(configPath: string): Record<string, string> {
   };
 }
 
-function readStream(stream: NodeJS.ReadableStream | null): { buffer: string } {
+function readStream(
+  stream: { on(event: "data", listener: (chunk: unknown) => void): unknown } | null,
+): { buffer: string } {
   const state = { buffer: "" };
 
   stream?.on("data", (chunk) => {
-    state.buffer += chunk.toString();
+    state.buffer += String(chunk);
   });
 
   return state;

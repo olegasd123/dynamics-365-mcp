@@ -104,7 +104,9 @@ describe("list_plugin_assembly_steps tool", () => {
     });
 
     expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
+    expect(response.content[0].text).toContain(
+      "Plugin assembly 'Missing.Plugin' not found in 'dev'.",
+    );
   });
 
   it("returns an error when the client query fails", async () => {

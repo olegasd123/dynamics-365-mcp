@@ -43,7 +43,8 @@ type ToolHandlerExtra = RequestHandlerExtra<Request, Notification> | undefined;
 
 const DEFAULT_LOG_DIR = resolve(homedir(), ".dynamics-365-mcp", "logs");
 const DEFAULT_MAX_BODY_CHARS = 0;
-const SENSITIVE_KEY_PATTERN = /(authorization|clientsecret|client_secret|token|secret|password|cookie)/i;
+const SENSITIVE_KEY_PATTERN =
+  /(authorization|clientsecret|client_secret|token|secret|password|cookie)/i;
 const instrumentedServers = new WeakSet<object>();
 const TOOL_CALL_COMPATIBILITY_SUFFIX = "commentary";
 
@@ -229,7 +230,10 @@ export function instrumentServerToolLogging(server: McpServer): void {
   }
 
   const originalTool = server.tool.bind(server) as (...args: unknown[]) => unknown;
-  (server as unknown as { tool: typeof server.tool }).tool = ((name: string, ...args: unknown[]) => {
+  (server as unknown as { tool: typeof server.tool }).tool = ((
+    name: string,
+    ...args: unknown[]
+  ) => {
     const handlerIndex = args.length - 1;
     const originalHandler = args[handlerIndex];
     if (typeof originalHandler !== "function") {
@@ -242,7 +246,9 @@ export function instrumentServerToolLogging(server: McpServer): void {
 
       return requestLogger.runWithToolContext(name, toolArgs, extra, async () => {
         try {
-          return await (originalHandler as (...values: unknown[]) => Promise<unknown>)(...handlerArgs);
+          return await (originalHandler as (...values: unknown[]) => Promise<unknown>)(
+            ...handlerArgs,
+          );
         } catch (error) {
           requestLogger.logError(`tool:${name}`, error, {
             args: toolArgs,
@@ -287,9 +293,11 @@ function buildFileLabel(toolName: string, toolArgs: unknown, requestId: string):
           .map(([key, value]) => `${key}-${sanitizeSegment(String(value))}`)
       : [];
 
-  const parts = [sanitizeSegment(toolName), ...argHints, `req-${sanitizeSegment(requestId)}`].filter(
-    Boolean,
-  );
+  const parts = [
+    sanitizeSegment(toolName),
+    ...argHints,
+    `req-${sanitizeSegment(requestId)}`,
+  ].filter(Boolean);
 
   return parts.join("-").slice(0, 120) || "request";
 }
@@ -367,9 +375,7 @@ function sanitizeValue(value: unknown, key?: string): unknown {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
         entryKey,
-        SENSITIVE_KEY_PATTERN.test(entryKey)
-          ? "[REDACTED]"
-          : sanitizeValue(entryValue, entryKey),
+        SENSITIVE_KEY_PATTERN.test(entryKey) ? "[REDACTED]" : sanitizeValue(entryValue, entryKey),
       ]),
     );
   }

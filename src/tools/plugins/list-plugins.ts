@@ -21,10 +21,7 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         .enum(["all", "no_steps"])
         .optional()
         .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugin classes"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, filter, solution }) => {
       try {

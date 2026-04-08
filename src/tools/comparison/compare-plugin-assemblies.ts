@@ -29,22 +29,11 @@ export function registerComparePluginAssemblies(
       assemblyName?: string;
     }) => {
       try {
-        const {
-          sourceItems,
-          targetItems,
-          result,
-          stepResult,
-          imageResult,
-        } = await comparePluginAssembliesData(
-          config,
-          client,
-          sourceEnvironment,
-          targetEnvironment,
-          {
+        const { sourceItems, targetItems, result, stepResult, imageResult } =
+          await comparePluginAssembliesData(config, client, sourceEnvironment, targetEnvironment, {
             assemblyName,
             includeChildComponents: Boolean(assemblyName),
-          },
-        );
+          });
         let text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
 
         if (assemblyName && sourceItems.length > 0 && targetItems.length > 0 && stepResult) {

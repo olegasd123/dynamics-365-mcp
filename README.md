@@ -275,45 +275,45 @@ Priority order:
 
 ### Metadata Query Tools
 
-| Tool                        | Description                                                   | Key Parameters                                          |
-| --------------------------- | ------------------------------------------------------------- | ------------------------------------------------------- |
-| `list_tables`               | List Dataverse tables with main schema flags                  | `environment`, `nameFilter`, `solution`                 |
-| `get_table_schema`          | Show columns, alternate keys, and relationships for one table | `environment`, `table`, `solution`                      |
-| `list_table_columns`        | List table columns and choice details                         | `environment`, `table`, `solution`                      |
-| `list_table_relationships`  | List table relationships                                      | `environment`, `table`, `solution`                      |
-| `list_forms`                | List model-driven forms                                       | `environment`, `table`, `type`, `solution`              |
-| `get_form_details`          | Show one form with normalized XML summary                     | `environment`, `formName`, `table`, `solution`          |
-| `list_views`                | List system or personal views                                 | `environment`, `table`, `scope`, `solution`             |
-| `get_view_details`          | Show one view with normalized query summary                   | `environment`, `viewName`, `table`, `scope`             |
-| `get_view_fetchxml`         | Return normalized FetchXML for one view                       | `environment`, `viewName`, `table`, `scope`             |
-| `list_custom_apis`          | List Dataverse Custom APIs                                    | `environment`, `nameFilter`                             |
-| `get_custom_api_details`    | Show Custom API request and response metadata                 | `environment`, `apiName`                                |
-| `list_cloud_flows`          | List cloud flows from workflow metadata                       | `environment`, `status`, `solution`                     |
-| `get_flow_details`          | Show one cloud flow with parsed trigger/action summary        | `environment`, `flowName`, `solution`                   |
-| `list_security_roles`       | List security roles                                           | `environment`, `nameFilter`                             |
-| `get_role_privileges`       | Show privileges for one role                                  | `environment`, `roleName`, `businessUnit`               |
-| `find_table_usage`          | Find where one table is used                                  | `environment`, `table`                                  |
-| `find_column_usage`         | Find where one column is used                                 | `environment`, `column`, `table`                        |
-| `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
-| `analyze_create_triggers`   | Analyze direct create triggers for a table create             | `environment`, `table`, `providedAttributes`            |
-| `analyze_update_triggers`   | Analyze direct update triggers for a table change             | `environment`, `table`, `changedAttributes`             |
-| `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
-| `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
-| `list_plugins`              | List plugin classes; optionally filter orphaned (no steps)    | `environment`, `filter`, `solution`                     |
-| `list_plugin_steps`         | List registered steps for one plugin class                    | `environment`, `pluginName`, `assemblyName`, `solution` |
-| `get_plugin_details`        | Deep info for one plugin class with steps and images          | `environment`, `pluginName`, `assemblyName`, `solution` |
-| `list_plugin_assemblies`    | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`, `solution`                     |
-| `list_plugin_assembly_steps` | List registered steps for one plugin assembly               | `environment`, `assemblyName`                           |
-| `list_plugin_assembly_images` | List pre/post images on steps for one plugin assembly      | `environment`, `assemblyName`, `stepName`, `message`    |
-| `get_plugin_assembly_details` | Deep info: assembly → plugin classes/workflow activities → steps → images | `environment`, `assemblyName`            |
-| `list_solutions`            | List solutions by display name and unique name                | `environment`, `nameFilter`                             |
-| `get_solution_details`      | Show solution summary and supported ALM component groups      | `environment`, `solution`                               |
-| `get_solution_dependencies` | Show dependency links for supported solution components       | `environment`, `solution`, `direction`, `componentType` |
-| `list_workflows`            | List workflows/processes with status                          | `environment`, `category`, `status`                     |
-| `list_actions`              | List workflow-based custom actions                            | `environment`                                           |
-| `get_workflow_details`      | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName`            |
-| `list_web_resources`        | List web resources by type                                    | `environment`, `type`, `nameFilter`                     |
-| `get_web_resource_content`  | Fetch decoded web resource content                            | `environment`, `name`                                   |
+| Tool                          | Description                                                               | Key Parameters                                          |
+| ----------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `list_tables`                 | List Dataverse tables with main schema flags                              | `environment`, `nameFilter`, `solution`                 |
+| `get_table_schema`            | Show columns, alternate keys, and relationships for one table             | `environment`, `table`, `solution`                      |
+| `list_table_columns`          | List table columns and choice details                                     | `environment`, `table`, `solution`                      |
+| `list_table_relationships`    | List table relationships                                                  | `environment`, `table`, `solution`                      |
+| `list_forms`                  | List model-driven forms                                                   | `environment`, `table`, `type`, `solution`              |
+| `get_form_details`            | Show one form with normalized XML summary                                 | `environment`, `formName`, `table`, `solution`          |
+| `list_views`                  | List system or personal views                                             | `environment`, `table`, `scope`, `solution`             |
+| `get_view_details`            | Show one view with normalized query summary                               | `environment`, `viewName`, `table`, `scope`             |
+| `get_view_fetchxml`           | Return normalized FetchXML for one view                                   | `environment`, `viewName`, `table`, `scope`             |
+| `list_custom_apis`            | List Dataverse Custom APIs                                                | `environment`, `nameFilter`                             |
+| `get_custom_api_details`      | Show Custom API request and response metadata                             | `environment`, `apiName`                                |
+| `list_cloud_flows`            | List cloud flows from workflow metadata                                   | `environment`, `status`, `solution`                     |
+| `get_flow_details`            | Show one cloud flow with parsed trigger/action summary                    | `environment`, `flowName`, `solution`                   |
+| `list_security_roles`         | List security roles                                                       | `environment`, `nameFilter`                             |
+| `get_role_privileges`         | Show privileges for one role                                              | `environment`, `roleName`, `businessUnit`               |
+| `find_table_usage`            | Find where one table is used                                              | `environment`, `table`                                  |
+| `find_column_usage`           | Find where one column is used                                             | `environment`, `column`, `table`                        |
+| `find_web_resource_usage`     | Find where one web resource is used                                       | `environment`, `name`                                   |
+| `analyze_create_triggers`     | Analyze direct create triggers for a table create                         | `environment`, `table`, `providedAttributes`            |
+| `analyze_update_triggers`     | Analyze direct update triggers for a table change                         | `environment`, `table`, `changedAttributes`             |
+| `analyze_impact`              | Build one impact report for a component or solution                       | `environment`, `componentType`, `name`                  |
+| `environment_health_report`   | Build a release-health summary                                            | `environment`, `solution`                               |
+| `list_plugins`                | List plugin classes; optionally filter orphaned (no steps)                | `environment`, `filter`, `solution`                     |
+| `list_plugin_steps`           | List registered steps for one plugin class                                | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `get_plugin_details`          | Deep info for one plugin class with steps and images                      | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `list_plugin_assemblies`      | List plugin assemblies; optionally filter orphaned (no steps)             | `environment`, `filter`, `solution`                     |
+| `list_plugin_assembly_steps`  | List registered steps for one plugin assembly                             | `environment`, `assemblyName`                           |
+| `list_plugin_assembly_images` | List pre/post images on steps for one plugin assembly                     | `environment`, `assemblyName`, `stepName`, `message`    |
+| `get_plugin_assembly_details` | Deep info: assembly → plugin classes/workflow activities → steps → images | `environment`, `assemblyName`                           |
+| `list_solutions`              | List solutions by display name and unique name                            | `environment`, `nameFilter`                             |
+| `get_solution_details`        | Show solution summary and supported ALM component groups                  | `environment`, `solution`                               |
+| `get_solution_dependencies`   | Show dependency links for supported solution components                   | `environment`, `solution`, `direction`, `componentType` |
+| `list_workflows`              | List workflows/processes with status                                      | `environment`, `category`, `status`                     |
+| `list_actions`                | List workflow-based custom actions                                        | `environment`                                           |
+| `get_workflow_details`        | Full workflow definition                                                  | `environment`, `workflowName` / `uniqueName`            |
+| `list_web_resources`          | List web resources by type                                                | `environment`, `type`, `nameFilter`                     |
+| `get_web_resource_content`    | Fetch decoded web resource content                                        | `environment`, `name`                                   |
 
 ### Cross-Environment Comparison Tools
 
@@ -324,7 +324,7 @@ Priority order:
 | `compare_views`              | Compare views across envs                      | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
 | `compare_custom_apis`        | Compare Custom APIs across envs                | `sourceEnvironment`, `targetEnvironment`, `apiName`                    |
 | `compare_security_roles`     | Compare security roles across envs             | `sourceEnvironment`, `targetEnvironment`, `roleName`                   |
-| `compare_plugin_assemblies` | Compare plugin assemblies across envs           | `sourceEnvironment`, `targetEnvironment`, `assemblyName`               |
+| `compare_plugin_assemblies`  | Compare plugin assemblies across envs          | `sourceEnvironment`, `targetEnvironment`, `assemblyName`               |
 | `compare_solutions`          | Compare supported solution components          | `sourceEnvironment`, `targetEnvironment`, `solution`                   |
 | `compare_workflows`          | Compare workflow state/definitions             | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName`   |
 | `compare_web_resources`      | Compare web resource content                   | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`         |

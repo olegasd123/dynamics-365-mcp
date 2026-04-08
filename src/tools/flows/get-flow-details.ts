@@ -61,11 +61,16 @@ export function registerGetFlowDetails(
           ),
         );
 
-        return createToolSuccessResponse("get_flow_details", lines.join("\n"), `Loaded cloud flow '${flow.name}' in '${env.name}'.`, {
-          environment: env.name,
-          solution: solution || null,
-          flow,
-        });
+        return createToolSuccessResponse(
+          "get_flow_details",
+          lines.join("\n"),
+          `Loaded cloud flow '${flow.name}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            solution: solution || null,
+            flow,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("get_flow_details", error);
       }

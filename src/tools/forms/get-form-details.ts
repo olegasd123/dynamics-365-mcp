@@ -44,7 +44,9 @@ export function registerGetFormDetails(
         lines.push(`- Type: ${form.typeLabel}`);
         lines.push(`- Unique Name: ${form.uniquename || "-"}`);
         lines.push(`- Default: ${form.isdefault ? "Yes" : "No"}`);
-        lines.push(`- State: ${STATE_LABELS[form.formactivationstate] || form.formactivationstate}`);
+        lines.push(
+          `- State: ${STATE_LABELS[form.formactivationstate] || form.formactivationstate}`,
+        );
         lines.push(`- Managed: ${form.ismanaged ? "Yes" : "No"}`);
         lines.push(`- Published: ${String(form.publishedon || "").slice(0, 10)}`);
         lines.push(`- Modified: ${String(form.modifiedon || "").slice(0, 10)}`);
@@ -70,11 +72,16 @@ export function registerGetFormDetails(
           ),
         );
 
-        return createToolSuccessResponse("get_form_details", lines.join("\n"), `Loaded form '${form.name}' in '${env.name}'.`, {
-          environment: env.name,
-          filters: { table: table || null, type: type || null, solution: solution || null },
-          form,
-        });
+        return createToolSuccessResponse(
+          "get_form_details",
+          lines.join("\n"),
+          `Loaded form '${form.name}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: { table: table || null, type: type || null, solution: solution || null },
+            form,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("get_form_details", error);
       }

@@ -23,7 +23,13 @@ export function registerCompareSecurityRoles(
       sourceBusinessUnit: z.string().optional().describe("Optional source business unit name"),
       targetBusinessUnit: z.string().optional().describe("Optional target business unit name"),
     },
-    async ({ sourceEnvironment, targetEnvironment, roleName, sourceBusinessUnit, targetBusinessUnit }) => {
+    async ({
+      sourceEnvironment,
+      targetEnvironment,
+      roleName,
+      sourceBusinessUnit,
+      targetBusinessUnit,
+    }) => {
       try {
         const sourceEnv = getEnvironment(config, sourceEnvironment);
         const targetEnv = getEnvironment(config, targetEnvironment);
@@ -47,8 +53,12 @@ export function registerCompareSecurityRoles(
 
         const lines: string[] = [];
         lines.push("## Security Role Comparison");
-        lines.push(`- Source: ${sourceEnvironment} :: ${sourceRole.role.name} [${sourceRole.role.businessUnitName}]`);
-        lines.push(`- Target: ${targetEnvironment} :: ${targetRole.role.name} [${targetRole.role.businessUnitName}]`);
+        lines.push(
+          `- Source: ${sourceEnvironment} :: ${sourceRole.role.name} [${sourceRole.role.businessUnitName}]`,
+        );
+        lines.push(
+          `- Target: ${targetEnvironment} :: ${targetRole.role.name} [${targetRole.role.businessUnitName}]`,
+        );
         lines.push("");
         lines.push(
           formatNamedDiffSection({
@@ -70,15 +80,20 @@ export function registerCompareSecurityRoles(
           }),
         );
 
-        return createToolSuccessResponse("compare_security_roles", lines.join("\n"), `Compared security role '${roleName}' between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
-          sourceEnvironment,
-          targetEnvironment,
-          roleName,
-          sourceBusinessUnit: sourceBusinessUnit || null,
-          targetBusinessUnit: targetBusinessUnit || null,
-          roleComparison: roleDiff,
-          privilegeComparison: privilegeDiff,
-        });
+        return createToolSuccessResponse(
+          "compare_security_roles",
+          lines.join("\n"),
+          `Compared security role '${roleName}' between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            roleName,
+            sourceBusinessUnit: sourceBusinessUnit || null,
+            targetBusinessUnit: targetBusinessUnit || null,
+            roleComparison: roleDiff,
+            privilegeComparison: privilegeDiff,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("compare_security_roles", error);
       }

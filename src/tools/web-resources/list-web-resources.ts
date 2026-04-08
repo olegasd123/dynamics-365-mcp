@@ -39,10 +39,7 @@ export function registerListWebResources(
         .optional()
         .describe("Filter by web resource type"),
       nameFilter: z.string().optional().describe("Filter by name (contains match)"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, type, nameFilter, solution }) => {
       try {
@@ -67,7 +64,11 @@ export function registerListWebResources(
           const text = `No web resources found in '${env.name}' with the specified filters.`;
           return createToolSuccessResponse("list_web_resources", text, text, {
             environment: env.name,
-            filters: { type: type || null, nameFilter: nameFilter || null, solution: solution || null },
+            filters: {
+              type: type || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
             count: 0,
             items: [],
           });
@@ -92,15 +93,25 @@ export function registerListWebResources(
 
         const items = resources.map((resource) => ({
           ...resource,
-          typeLabel: TYPE_LABELS[resource.webresourcetype as number] || String(resource.webresourcetype),
+          typeLabel:
+            TYPE_LABELS[resource.webresourcetype as number] || String(resource.webresourcetype),
         }));
         const text = `## Web Resources in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\nFound ${resources.length} resource(s).\n\n${formatTable(headers, rows)}`;
-        return createToolSuccessResponse("list_web_resources", text, `Found ${resources.length} web resource(s) in '${env.name}'.`, {
-          environment: env.name,
-          filters: { type: type || null, nameFilter: nameFilter || null, solution: solution || null },
-          count: resources.length,
-          items,
-        });
+        return createToolSuccessResponse(
+          "list_web_resources",
+          text,
+          `Found ${resources.length} web resource(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: {
+              type: type || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
+            count: resources.length,
+            items,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_web_resources", error);
       }

@@ -18,7 +18,10 @@ export function registerGetRolePrivileges(
     {
       environment: z.string().optional().describe("Environment name"),
       roleName: z.string().describe("Security role name or role id"),
-      businessUnit: z.string().optional().describe("Optional business unit name for duplicate role names"),
+      businessUnit: z
+        .string()
+        .optional()
+        .describe("Optional business unit name for duplicate role names"),
     },
     async ({ environment, roleName, businessUnit }) => {
       try {
@@ -46,13 +49,18 @@ export function registerGetRolePrivileges(
           ),
         );
 
-        return createToolSuccessResponse("get_role_privileges", lines.join("\n"), `Loaded privileges for role '${details.role.name}' in '${env.name}'.`, {
-          environment: env.name,
-          businessUnit: businessUnit || null,
-          role: details.role,
-          privilegeCount: details.privileges.length,
-          privileges: details.privileges,
-        });
+        return createToolSuccessResponse(
+          "get_role_privileges",
+          lines.join("\n"),
+          `Loaded privileges for role '${details.role.name}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            businessUnit: businessUnit || null,
+            role: details.role,
+            privilegeCount: details.privileges.length,
+            privileges: details.privileges,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("get_role_privileges", error);
       }

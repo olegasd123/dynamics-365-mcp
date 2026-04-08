@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildHealthPayload, createHttpHealthState, loadRuntimeEnv, parseRuntimeOptions } from "../index.js";
+import {
+  buildHealthPayload,
+  createHttpHealthState,
+  loadRuntimeEnv,
+  parseRuntimeOptions,
+} from "../index.js";
 
 describe("index runtime helpers", () => {
   it("parses HTTP runtime options from argv and env", () => {

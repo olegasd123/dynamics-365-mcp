@@ -35,7 +35,9 @@ describe("web resource queries", () => {
       nameFilter: "O'Hara",
     });
 
-    expect(query).toContain("$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon,content");
+    expect(query).toContain(
+      "$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon,content",
+    );
     expect(query).toContain("$filter=webresourcetype eq 3 and contains(name,'O''Hara')");
   });
 });

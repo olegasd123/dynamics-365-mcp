@@ -29,7 +29,7 @@ function parseEnvValue(rawValue: string): string {
   }
 
   if (
-    (rawValue.startsWith("\"") && rawValue.endsWith("\"")) ||
+    (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
     (rawValue.startsWith("'") && rawValue.endsWith("'"))
   ) {
     return rawValue.slice(1, -1);

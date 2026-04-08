@@ -221,12 +221,13 @@ describe("table metadata", () => {
     expect(table.logicalName).toBe("account");
     expect(schema.table.displayName).toBe("Account");
     expect(schema.columns).toHaveLength(4);
-    expect(schema.columns.find((column) => column.logicalName === "preferredcontactmethodcode"))
-      .toMatchObject({
-        choiceKind: "Picklist",
-        optionSetName: "account_preferredcontactmethodcode",
-        optionCount: 2,
-      });
+    expect(
+      schema.columns.find((column) => column.logicalName === "preferredcontactmethodcode"),
+    ).toMatchObject({
+      choiceKind: "Picklist",
+      optionSetName: "account_preferredcontactmethodcode",
+      optionCount: 2,
+    });
     expect(schema.keys).toEqual([
       expect.objectContaining({
         logicalName: "accountnumberkey",

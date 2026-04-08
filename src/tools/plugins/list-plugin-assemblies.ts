@@ -5,10 +5,7 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import {
-  fetchPluginMetadata,
-  filterAssembliesByRegistration,
-} from "./plugin-class-metadata.js";
+import { fetchPluginMetadata, filterAssembliesByRegistration } from "./plugin-class-metadata.js";
 
 export function registerListPluginAssemblies(
   server: McpServer,
@@ -24,10 +21,7 @@ export function registerListPluginAssemblies(
         .enum(["all", "no_steps"])
         .optional()
         .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugin assemblies"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({
       environment,

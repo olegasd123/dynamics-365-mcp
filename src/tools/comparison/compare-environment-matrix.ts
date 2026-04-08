@@ -13,11 +13,7 @@ import {
   compareWorkflowsData,
   type PluginComparisonData,
 } from "./comparison-data.js";
-import {
-  buildMatrixReport,
-  formatMatrixStatus,
-  type MatrixReport,
-} from "./matrix-helpers.js";
+import { buildMatrixReport, formatMatrixStatus, type MatrixReport } from "./matrix-helpers.js";
 
 const COMPONENT_TYPE_LABELS = {
   plugins: "Plugin Assemblies",
@@ -68,7 +64,9 @@ export function registerCompareEnvironmentMatrix(
       componentType: z
         .enum(["plugins", "workflows", "web_resources", "all"])
         .optional()
-        .describe("Component type to compare. 'plugins' means plugin assemblies with steps and images. Default: all"),
+        .describe(
+          "Component type to compare. 'plugins' means plugin assemblies with steps and images. Default: all",
+        ),
       assemblyName: z.string().optional().describe("Filter to one plugin assembly"),
       workflowName: z.string().optional().describe("Filter workflows by name"),
       category: z
@@ -372,13 +370,12 @@ function renderPluginMatrixSections(
       environment: snapshot.environment,
       sourceItems: snapshot.stepSourceItems || [],
       targetItems: snapshot.stepTargetItems || [],
-      result:
-        snapshot.stepResult || {
-          matching: 0,
-          onlyInSource: [],
-          onlyInTarget: [],
-          differences: [],
-        },
+      result: snapshot.stepResult || {
+        matching: 0,
+        onlyInSource: [],
+        onlyInTarget: [],
+        differences: [],
+      },
     })),
     (item) => String(item.key),
     maxRows,
@@ -389,13 +386,12 @@ function renderPluginMatrixSections(
       environment: snapshot.environment,
       sourceItems: snapshot.imageSourceItems || [],
       targetItems: snapshot.imageTargetItems || [],
-      result:
-        snapshot.imageResult || {
-          matching: 0,
-          onlyInSource: [],
-          onlyInTarget: [],
-          differences: [],
-        },
+      result: snapshot.imageResult || {
+        matching: 0,
+        onlyInSource: [],
+        onlyInTarget: [],
+        differences: [],
+      },
     })),
     (item) => String(item.key),
     maxRows,

@@ -44,12 +44,17 @@ export function registerListSecurityRoles(
           ]),
         )}`;
 
-        return createToolSuccessResponse("list_security_roles", text, `Found ${roles.length} security role(s) in '${env.name}'.`, {
-          environment: env.name,
-          nameFilter: nameFilter || null,
-          count: roles.length,
-          items: roles,
-        });
+        return createToolSuccessResponse(
+          "list_security_roles",
+          text,
+          `Found ${roles.length} security role(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            nameFilter: nameFilter || null,
+            count: roles.length,
+            items: roles,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_security_roles", error);
       }

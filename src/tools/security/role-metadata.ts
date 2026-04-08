@@ -196,7 +196,9 @@ async function fetchPrivilegesForRoleIds(
           listRolePrivilegesForRolesQuery(uniqueRoleIds),
         );
 
-  const privilegeIds = [...new Set(rawRolePrivileges.map((item) => String(item.privilegeid || "")).filter(Boolean))];
+  const privilegeIds = [
+    ...new Set(rawRolePrivileges.map((item) => String(item.privilegeid || "")).filter(Boolean)),
+  ];
   const privilegeRecords =
     privilegeIds.length === 0
       ? []
