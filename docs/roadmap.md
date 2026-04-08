@@ -126,7 +126,7 @@ Expected result:
 - Add tools for app modules
 - Add tools for dashboards if supported by current queries
 
-## Milestone 3: Harden HTTP Mode For Real Service Use
+## Milestone 3: Harden HTTP Mode For Real Service Use [Done]
 
 Goal:
 Make HTTP mode stronger for long-running service use.

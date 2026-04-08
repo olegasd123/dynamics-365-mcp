@@ -28,6 +28,7 @@ describe("index runtime helpers", () => {
     const healthState = createHttpHealthState();
     healthState.requestCount = 3;
     healthState.activeRequestCount = 1;
+    healthState.activeSessionCount = 2;
     healthState.errorCount = 1;
     healthState.lastErrorMessage = "Boom";
     healthState.lastErrorAt = "2026-04-06T19:00:00.000Z";
@@ -87,6 +88,10 @@ describe("index runtime helpers", () => {
         active: 1,
         errors: 1,
         lastErrorMessage: "Boom",
+      },
+      sessions: {
+        active: 2,
+        shuttingDown: false,
       },
       auth: {
         persistedDeviceCodeEnvironments: ["dev"],

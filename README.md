@@ -5,6 +5,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 ## Docs
 
 - [Run the MCP after cloning](./docs/run-mcp.md)
+- [HTTP lifecycle](./docs/http-lifecycle.md)
 - [Manual tool test prompts](./docs/prompt-examples.md)
 
 ## Tech Stack
@@ -117,6 +118,8 @@ src/
     odata-helpers.ts                # $select, $filter, $expand builder utilities
     diff.ts                         # Generic diff engine for cross-environment comparison
     formatters.ts                   # Result formatting for MCP text responses
+  http/
+    http-runtime.ts                 # HTTP session store, request routing, and shutdown cleanup
 ```
 
 ## Dynamics 365 Entity Map
