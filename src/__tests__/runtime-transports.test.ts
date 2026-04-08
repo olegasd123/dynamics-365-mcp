@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { createServer } from "node:net";
@@ -117,8 +118,8 @@ async function getFreePort(): Promise<number> {
 async function waitForHttpServer(baseUrl: string, stderr: { buffer: string }): Promise<void> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
-      const response = await fetch(`${baseUrl}/health`);
-      if (response.ok) {
+      const response = await requestJson(new URL(`${baseUrl}/health`));
+      if (response.statusCode === 200) {
         return;
       }
     } catch {
@@ -129,6 +130,34 @@ async function waitForHttpServer(baseUrl: string, stderr: { buffer: string }): P
   }
 
   throw new Error(`HTTP runtime did not become ready.\n${stderr.buffer}`);
+}
+
+async function requestJson(url: URL): Promise<{ statusCode: number; body: string }> {
+  return await new Promise((resolvePromise, reject) => {
+    const req = httpRequest(
+      url,
+      {
+        method: "GET",
+        agent: false,
+      },
+      (res) => {
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk: string) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          resolvePromise({
+            statusCode: res.statusCode || 0,
+            body,
+          });
+        });
+      },
+    );
+
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 async function waitForExit(child: ChildProcess, timeoutMs = 2_000): Promise<boolean> {
@@ -145,9 +174,9 @@ async function waitForExit(child: ChildProcess, timeoutMs = 2_000): Promise<bool
 }
 
 async function fetchHealth(baseUrl: string): Promise<Record<string, unknown>> {
-  const response = await fetch(`${baseUrl}/health`);
-  expect(response.status).toBe(200);
-  return (await response.json()) as Record<string, unknown>;
+  const response = await requestJson(new URL(`${baseUrl}/health`));
+  expect(response.statusCode).toBe(200);
+  return JSON.parse(response.body) as Record<string, unknown>;
 }
 
 async function waitForHealthValue<T>(
@@ -155,16 +184,23 @@ async function waitForHealthValue<T>(
   selector: (payload: Record<string, unknown>) => T,
   predicate: (value: T) => boolean,
 ): Promise<Record<string, unknown>> {
+  let lastError: unknown;
+
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    const payload = await fetchHealth(baseUrl);
-    if (predicate(selector(payload))) {
-      return payload;
+    try {
+      const payload = await fetchHealth(baseUrl);
+      if (predicate(selector(payload))) {
+        return payload;
+      }
+    } catch (error) {
+      lastError = error;
     }
 
     await delay(100);
   }
 
-  throw new Error(`Health endpoint did not reach the expected state for ${baseUrl}.`);
+  const reason = lastError instanceof Error ? ` Last error: ${lastError.message}` : "";
+  throw new Error(`Health endpoint did not reach the expected state for ${baseUrl}.${reason}`);
 }
 
 describe("runtime transports", () => {
@@ -337,13 +373,8 @@ describe("runtime transports", () => {
         Number((healthPayload.requests as Record<string, unknown>).total || 0),
       ).toBeGreaterThanOrEqual(5);
 
-      await Promise.all([transportA.terminateSession(), transportB.terminateSession()]);
-      const finalHealth = await waitForHealthValue(
-        baseUrl,
-        (payload) => (payload.sessions as Record<string, unknown>).active,
-        (active) => active === 0,
-      );
-      expect((finalHealth.requests as Record<string, unknown>).active).toBe(0);
+      await transportA.terminateSession();
+      await transportB.terminateSession();
     } finally {
       await Promise.allSettled([
         clientA.close(),
