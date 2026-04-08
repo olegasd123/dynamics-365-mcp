@@ -182,7 +182,7 @@ Fully replace the current token file storage with OS keychain storage.
 
 Expected result:
 
-- Stop storing auth secrets in the current JSON token cache
+- Stop storing auth secrets in the old JSON file
 - Use OS keychain as the only secret storage
 - Keep sign-in flow simple for users
 - Do not add migration behavior from the old storage
