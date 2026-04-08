@@ -175,7 +175,7 @@ Expected result:
 - Reduce risk from per-request server setup
 - Keep health and error behavior clear
 
-## Milestone 4: Replace Secret Storage With OS Keychain
+## Milestone 4: Replace Secret Storage With OS Keychain [Done]
 
 Goal:
 Fully replace the current token file storage with OS keychain storage.

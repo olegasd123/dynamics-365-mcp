@@ -103,8 +103,8 @@ Optional:
 
 - Add `clientId` if your team has its own public client app.
 - If `clientId` is missing, the server uses a Microsoft public client ID.
-- Device-code tokens are stored in `~/.dynamics-365-mcp/token-cache.json` by default.
-- Set `D365_MCP_TOKEN_CACHE` if you want another token-cache path.
+- Device-code tokens are stored in the OS keychain.
+- macOS uses Keychain Access, Linux uses Secret Service, and Windows uses Credential Manager.
 
 ## 6. Where To Get Tenant ID And Client ID
 
@@ -167,7 +167,7 @@ The server uses `stdio`, so it waits for MCP client input. This is normal.
 
 If you use `deviceCode` auth, the server prints sign-in instructions when a tool needs a token. Open the URL shown in the terminal, enter the code, and finish sign-in.
 
-After the first sign-in, the server stores device-code tokens on disk when the auth response allows it. This means a restart often does not need a new browser sign-in.
+After the first sign-in, the server stores device-code tokens in the OS keychain when the auth response allows it. This means a restart often does not need a new browser sign-in.
 
 Example MCP client config:
 
@@ -206,7 +206,6 @@ The `/health` endpoint returns JSON with:
 The scripts auto-load the repo `.env` file if it exists. This is useful for:
 
 - `D365_MCP_CONFIG`
-- `D365_MCP_TOKEN_CACHE`
 - `D365_MCP_LOG_ENABLED`
 - `D365_MCP_LOG_DIR`
 - `D365_MCP_LOG_MAX_BODY_CHARS`
@@ -228,7 +227,6 @@ Example `.env`:
 
 ```bash
 D365_MCP_CONFIG=~/.dynamics-365-mcp/config.json
-D365_MCP_TOKEN_CACHE=~/.dynamics-365-mcp/token-cache.json
 MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp

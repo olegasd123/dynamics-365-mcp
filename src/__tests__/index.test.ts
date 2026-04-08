@@ -54,7 +54,10 @@ describe("index runtime helpers", () => {
       },
       {
         getHealthSnapshot: () => ({
-          cachePath: "/tmp/token-cache.json",
+          storageType: "osKeychain",
+          storageProvider: "macos-keychain",
+          storageServiceName: "dynamics-365-mcp",
+          storageAvailable: true,
           inMemoryEnvironments: ["dev"],
           persistedDeviceCodeEnvironments: ["dev"],
           pendingEnvironmentCount: 0,

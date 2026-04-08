@@ -26,7 +26,8 @@ src/
     types.ts                        # Environment config interfaces
     environments.ts                 # Config loader (JSON file, connection string envs)
   auth/
-    token-manager.ts                # OAuth2 token flows + per-env token cache
+    token-manager.ts                # OAuth2 token flows + per-env in-memory cache
+    os-keychain.ts                  # OS keychain storage for device-code tokens
   client/
     dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
   tools/
@@ -192,7 +193,11 @@ Use this when the user can sign in in a browser and does not have a client secre
 
 `clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
 
-Device-code tokens are stored in `~/.dynamics-365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
+Device-code tokens are stored in the OS keychain:
+
+- macOS: Keychain Access
+- Linux: Secret Service
+- Windows: Credential Manager
 
 ### Connection String (single env)
 
@@ -663,7 +668,7 @@ Use this when you want one report that combines direct usage and dependency risk
 
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
-3. For `deviceCode` auth, check the persisted token cache on disk
+3. For `deviceCode` auth, check the OS keychain for a saved token
 4. If a valid access token exists, return it
 5. If a stored refresh token exists, try silent refresh before asking the user to sign in again
 6. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
@@ -672,7 +677,7 @@ Use this when you want one report that combines direct usage and dependency risk
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
 7. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
-8. Cache the new access token in memory and save device-code tokens to disk when possible
+8. Cache the new access token in memory and save device-code tokens in the OS keychain when possible
 
 ## Cross-Environment Comparison Design
 
