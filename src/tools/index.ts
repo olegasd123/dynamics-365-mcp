@@ -5,8 +5,11 @@ import type { DynamicsClient } from "../client/dynamics-client.js";
 // Plugin tools
 import { registerListPlugins } from "./plugins/list-plugins.js";
 import { registerListPluginSteps } from "./plugins/list-plugin-steps.js";
-import { registerListPluginImages } from "./plugins/list-plugin-images.js";
 import { registerGetPluginDetails } from "./plugins/get-plugin-details.js";
+import { registerListPluginAssemblies } from "./plugins/list-plugin-assemblies.js";
+import { registerListPluginAssemblySteps } from "./plugins/list-plugin-assembly-steps.js";
+import { registerListPluginAssemblyImages } from "./plugins/list-plugin-assembly-images.js";
+import { registerGetPluginAssemblyDetails } from "./plugins/get-plugin-assembly-details.js";
 
 // Workflow tools
 import { registerListWorkflows } from "./workflows/list-workflows.js";
@@ -53,13 +56,15 @@ import { registerGetRolePrivileges } from "./security/get-role-privileges.js";
 import { registerFindTableUsage } from "./usage/find-table-usage.js";
 import { registerFindColumnUsage } from "./usage/find-column-usage.js";
 import { registerFindWebResourceUsage } from "./usage/find-web-resource-usage.js";
+import { registerAnalyzeCreateTriggers } from "./usage/analyze-create-triggers.js";
+import { registerAnalyzeUpdateTriggers } from "./usage/analyze-update-triggers.js";
 import { registerAnalyzeImpact } from "./impact/analyze-impact.js";
 
 // Health tools
 import { registerEnvironmentHealthReport } from "./health/environment-health-report.js";
 
 // Comparison tools
-import { registerComparePlugins } from "./comparison/compare-plugins.js";
+import { registerComparePluginAssemblies } from "./comparison/compare-plugin-assemblies.js";
 import { registerCompareSolutions } from "./comparison/compare-solutions.js";
 import { registerCompareWorkflows } from "./comparison/compare-workflows.js";
 import { registerCompareWebResources } from "./comparison/compare-web-resources.js";
@@ -78,8 +83,11 @@ export function registerAllTools(
   // Plugin tools
   registerListPlugins(server, config, client);
   registerListPluginSteps(server, config, client);
-  registerListPluginImages(server, config, client);
   registerGetPluginDetails(server, config, client);
+  registerListPluginAssemblies(server, config, client);
+  registerListPluginAssemblySteps(server, config, client);
+  registerListPluginAssemblyImages(server, config, client);
+  registerGetPluginAssemblyDetails(server, config, client);
 
   // Workflow tools
   registerListWorkflows(server, config, client);
@@ -126,13 +134,15 @@ export function registerAllTools(
   registerFindTableUsage(server, config, client);
   registerFindColumnUsage(server, config, client);
   registerFindWebResourceUsage(server, config, client);
+  registerAnalyzeCreateTriggers(server, config, client);
+  registerAnalyzeUpdateTriggers(server, config, client);
   registerAnalyzeImpact(server, config, client);
 
   // Health tools
   registerEnvironmentHealthReport(server, config, client);
 
   // Comparison tools
-  registerComparePlugins(server, config, client);
+  registerComparePluginAssemblies(server, config, client);
   registerCompareSolutions(server, config, client);
   registerCompareWorkflows(server, config, client);
   registerCompareWebResources(server, config, client);

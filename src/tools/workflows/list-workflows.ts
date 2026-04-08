@@ -39,10 +39,7 @@ export function registerListWorkflows(
         .optional()
         .describe("Filter by category"),
       status: z.enum(["draft", "activated", "suspended"]).optional().describe("Filter by status"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, category, status, solution }) => {
       try {

@@ -21,7 +21,9 @@ describe("form queries", () => {
       uniqueName: "contoso_account_main",
     });
 
-    expect(query).toContain("$filter=uniquename eq 'contoso_account_main' and objecttypecode eq 'account'");
+    expect(query).toContain(
+      "$filter=uniquename eq 'contoso_account_main' and objecttypecode eq 'account'",
+    );
     expect(query).toContain("formxml");
   });
 

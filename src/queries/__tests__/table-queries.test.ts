@@ -22,15 +22,14 @@ describe("table queries", () => {
     expect(query).toContain(
       "$select=MetadataId,LogicalName,SchemaName,DisplayName,DisplayCollectionName,Description,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType,IsCustomEntity,IsManaged,IsActivity,IsAuditEnabled,IsValidForAdvancedFind,ChangeTrackingEnabled",
     );
-    expect(query).toContain("$orderby=LogicalName asc");
+    expect(query).not.toContain("$orderby=");
   });
 
   it("adds a name filter for tables", () => {
-    const query = listTablesQuery("account");
+    const query = listTablesQuery();
 
-    expect(query).toContain("contains(LogicalName,'account')");
-    expect(query).toContain("contains(SchemaName,'account')");
-    expect(query).toContain("contains(EntitySetName,'account')");
+    expect(query).not.toContain("$filter=");
+    expect(query).not.toContain("contains(");
   });
 
   it("builds a metadata id filter for targeted table queries", () => {
@@ -38,6 +37,7 @@ describe("table queries", () => {
 
     expect(query).toContain("MetadataId eq 'table-1'");
     expect(query).toContain("MetadataId eq 'table-2'");
+    expect(query).not.toContain("$orderby=");
   });
 
   it("builds table metadata paths", () => {

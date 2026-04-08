@@ -59,12 +59,17 @@ export function registerListCustomApis(
           rows,
         )}`;
 
-        return createToolSuccessResponse("list_custom_apis", text, `Found ${apis.length} custom API(s) in '${env.name}'.`, {
-          environment: env.name,
-          nameFilter: nameFilter || null,
-          count: apis.length,
-          items: apis,
-        });
+        return createToolSuccessResponse(
+          "list_custom_apis",
+          text,
+          `Found ${apis.length} custom API(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            nameFilter: nameFilter || null,
+            count: apis.length,
+            items: apis,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_custom_apis", error);
       }

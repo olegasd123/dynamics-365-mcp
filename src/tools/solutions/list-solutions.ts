@@ -17,10 +17,7 @@ export function registerListSolutions(
     "List Dynamics 365 solutions. Users can later select a solution by display name or unique name.",
     {
       environment: z.string().optional().describe("Environment name"),
-      nameFilter: z
-        .string()
-        .optional()
-        .describe("Optional filter for display name or unique name"),
+      nameFilter: z.string().optional().describe("Optional filter for display name or unique name"),
     },
     async ({ environment, nameFilter }) => {
       try {
@@ -47,12 +44,17 @@ export function registerListSolutions(
         ]);
 
         const text = `## Solutions in '${env.name}'${nameFilter ? ` (filter='${nameFilter}')` : ""}\n\nFound ${solutions.length} solution(s).\n\n${formatTable(headers, rows)}`;
-        return createToolSuccessResponse("list_solutions", text, `Found ${solutions.length} solution(s) in '${env.name}'.`, {
-          environment: env.name,
-          nameFilter: nameFilter || null,
-          count: solutions.length,
-          items: solutions,
-        });
+        return createToolSuccessResponse(
+          "list_solutions",
+          text,
+          `Found ${solutions.length} solution(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            nameFilter: nameFilter || null,
+            count: solutions.length,
+            items: solutions,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_solutions", error);
       }

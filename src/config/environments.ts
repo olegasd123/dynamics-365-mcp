@@ -70,13 +70,19 @@ function loadFromConnectionStringsEnv(): AppConfig | null {
     throw new Error("D365_CONNECTION_STRINGS must be valid JSON");
   }
 
-  if (!payload.environments || !Array.isArray(payload.environments) || payload.environments.length === 0) {
+  if (
+    !payload.environments ||
+    !Array.isArray(payload.environments) ||
+    payload.environments.length === 0
+  ) {
     throw new Error("D365_CONNECTION_STRINGS must contain a non-empty 'environments' array");
   }
 
   const environments = payload.environments.map((env) => {
     if (!env.name || !env.connectionString) {
-      throw new Error("Each D365_CONNECTION_STRINGS environment must contain 'name' and 'connectionString'");
+      throw new Error(
+        "Each D365_CONNECTION_STRINGS environment must contain 'name' and 'connectionString'",
+      );
     }
 
     const parsed = parseConnectionString(env.connectionString);
@@ -99,7 +105,9 @@ function loadFromJsonFile(filePath: string): AppConfig {
 
   const environments: EnvironmentConfig[] = json.environments.map((env: Record<string, string>) => {
     if (!env.name || !env.url || !env.tenantId) {
-      throw new Error(`Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId)`);
+      throw new Error(
+        `Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId)`,
+      );
     }
 
     const authType = env.authType === "deviceCode" ? "deviceCode" : "clientSecret";
@@ -134,7 +142,7 @@ export function loadConfig(): AppConfig {
   }
 
   // Priority 2: Default config file location
-  const defaultPath = resolve(homedir(), ".dynamics365-mcp", "config.json");
+  const defaultPath = resolve(homedir(), ".dynamics-365-mcp", "config.json");
   try {
     return loadFromJsonFile(defaultPath);
   } catch {

@@ -6,10 +6,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { diffCollections } from "../../utils/diff.js";
 import { formatNamedDiffSection } from "./diff-section.js";
-import {
-  buildRelationshipComparisonKey,
-  fetchTableSchema,
-} from "../tables/table-metadata.js";
+import { buildRelationshipComparisonKey, fetchTableSchema } from "../tables/table-metadata.js";
 
 const TABLE_COMPARE_FIELDS = [
   "schemaName",
@@ -80,9 +77,7 @@ export function registerCompareTableSchema(
     {
       sourceEnvironment: z.string().describe("Source environment name"),
       targetEnvironment: z.string().describe("Target environment name"),
-      table: z
-        .string()
-        .describe("Source table logical name, schema name, or display name"),
+      table: z.string().describe("Source table logical name, schema name, or display name"),
       targetTable: z
         .string()
         .optional()

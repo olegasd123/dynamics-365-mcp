@@ -1,5 +1,13 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildHealthPayload, createHttpHealthState, parseRuntimeOptions } from "../index.js";
+import {
+  buildHealthPayload,
+  createHttpHealthState,
+  loadRuntimeEnv,
+  parseRuntimeOptions,
+} from "../index.js";
 
 describe("index runtime helpers", () => {
   it("parses HTTP runtime options from argv and env", () => {
@@ -88,5 +96,33 @@ describe("index runtime helpers", () => {
         pendingRequestCount: 2,
       },
     });
+  });
+
+  it("loads runtime env values from the current working directory .env file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "d365-mcp-env-"));
+    const envFilePath = join(dir, ".env");
+    const env: NodeJS.ProcessEnv = {
+      D365_MCP_LOG_ENABLED: "false",
+    };
+
+    writeFileSync(
+      envFilePath,
+      [
+        "D365_MCP_LOG_ENABLED=true",
+        "D365_MCP_LOG_MAX_BODY_CHARS=123",
+        "export D365_MCP_LOG_DIR=./logs # comment",
+      ].join("\n"),
+    );
+
+    try {
+      const loaded = loadRuntimeEnv(env, dir);
+
+      expect(loaded).toContain(envFilePath);
+      expect(env.D365_MCP_LOG_ENABLED).toBe("false");
+      expect(env.D365_MCP_LOG_MAX_BODY_CHARS).toBe("123");
+      expect(env.D365_MCP_LOG_DIR).toBe("./logs");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

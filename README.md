@@ -1,6 +1,11 @@
 # Dynamics 365 CRM MCP Server
 
-An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugins, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
+An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugin assemblies, plugin classes, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
+
+## Docs
+
+- [Run the MCP after cloning](./docs/run-mcp.md)
+- [Manual tool test prompts](./docs/prompt-examples.md)
 
 ## Tech Stack
 
@@ -55,8 +60,12 @@ src/
     plugins/
       list-plugins.ts
       list-plugin-steps.ts
-      list-plugin-images.ts
       get-plugin-details.ts
+      list-plugin-assemblies.ts
+      list-plugin-assembly-steps.ts
+      list-plugin-assembly-images.ts
+      get-plugin-assembly-details.ts
+      plugin-class-metadata.ts
     workflows/
       list-workflows.ts
       list-actions.ts
@@ -74,7 +83,7 @@ src/
       compare-views.ts
       compare-custom-apis.ts
       compare-security-roles.ts
-      compare-plugins.ts
+      compare-plugin-assemblies.ts
       compare-solutions.ts
       compare-workflows.ts
       compare-web-resources.ts
@@ -86,7 +95,7 @@ src/
     custom-api-queries.ts           # Custom API metadata query builders
     flow-queries.ts                 # Cloud flow query builders on workflow metadata
     security-queries.ts             # Security role and privilege query builders
-    plugin-queries.ts               # OData query builders for plugin entities
+    plugin-queries.ts               # OData query builders for plugin assemblies, types, steps, and images
     workflow-queries.ts             # OData query builders for workflows
     web-resource-queries.ts         # OData query builders for web resources
     solution-queries.ts             # OData query builders for solutions and solution components
@@ -120,7 +129,7 @@ webresource (webresourceset)
 
 ### JSON Config File
 
-Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics365-mcp/config.json`.
+Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.json`.
 
 ```json
 {
@@ -167,7 +176,7 @@ Use this when the user can sign in in a browser and does not have a client secre
 
 `clientId` is optional for `deviceCode`. If it is missing, the server uses a Microsoft public client ID as a fallback. This is fine for local tests, but a real public client app is better for team use.
 
-Device-code tokens are stored in `~/.dynamics365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
+Device-code tokens are stored in `~/.dynamics-365-mcp/token-cache.json` by default. Set `D365_MCP_TOKEN_CACHE` if you want another path.
 
 ### Connection String (single env)
 
@@ -217,7 +226,7 @@ The server also supports HTTP mode for service scripts. Use this when you want a
 ### Start On macOS Or Linux
 
 ```bash
-./scripts/mcp-service.sh start 3003 ~/.dynamics365-mcp/config.json
+./scripts/mcp-service.sh start 3003 ~/.dynamics-365-mcp/config.json
 ```
 
 Stop:
@@ -229,13 +238,13 @@ Stop:
 Restart:
 
 ```bash
-./scripts/mcp-service.sh restart 3003 ~/.dynamics365-mcp/config.json
+./scripts/mcp-service.sh restart 3003 ~/.dynamics-365-mcp/config.json
 ```
 
 ### Start On Windows
 
 ```bat
-scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics365-mcp\config.json
+scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
 Stop:
@@ -247,10 +256,10 @@ scripts\mcp-service.bat stop 3003
 Restart:
 
 ```bat
-scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
+scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
-The scripts store PID files in `run/` and logs in `logs/`.
+The scripts store PID files in `~/.dynamics-365-mcp/run/` and service logs in `~/.dynamics-365-mcp/logs/` by default.
 
 The scripts also auto-load the repo `.env` file if it exists. This is useful for values like `D365_MCP_CONFIG`, `MCP_PORT`, `MCP_HOST`, `MCP_PATH`, and `NODE_BIN`.
 
@@ -266,40 +275,45 @@ Priority order:
 
 ### Metadata Query Tools
 
-| Tool                        | Description                                                   | Key Parameters                                          |
-| --------------------------- | ------------------------------------------------------------- | ------------------------------------------------------- |
-| `list_tables`               | List Dataverse tables with main schema flags                  | `environment`, `nameFilter`, `solution`                 |
-| `get_table_schema`          | Show columns, alternate keys, and relationships for one table | `environment`, `table`, `solution`                      |
-| `list_table_columns`        | List table columns and choice details                         | `environment`, `table`, `solution`                      |
-| `list_table_relationships`  | List table relationships                                      | `environment`, `table`, `solution`                      |
-| `list_forms`                | List model-driven forms                                       | `environment`, `table`, `type`, `solution`              |
-| `get_form_details`          | Show one form with normalized XML summary                     | `environment`, `formName`, `table`, `solution`          |
-| `list_views`                | List system or personal views                                 | `environment`, `table`, `scope`, `solution`             |
-| `get_view_details`          | Show one view with normalized query summary                   | `environment`, `viewName`, `table`, `scope`             |
-| `get_view_fetchxml`         | Return normalized FetchXML for one view                       | `environment`, `viewName`, `table`, `scope`             |
-| `list_custom_apis`          | List Dataverse Custom APIs                                    | `environment`, `nameFilter`                             |
-| `get_custom_api_details`    | Show Custom API request and response metadata                 | `environment`, `apiName`                                |
-| `list_cloud_flows`          | List cloud flows from workflow metadata                       | `environment`, `status`, `solution`                     |
-| `get_flow_details`          | Show one cloud flow with parsed trigger/action summary        | `environment`, `flowName`, `solution`                   |
-| `list_security_roles`       | List security roles                                           | `environment`, `nameFilter`                             |
-| `get_role_privileges`       | Show privileges for one role                                  | `environment`, `roleName`, `businessUnit`               |
-| `find_table_usage`          | Find where one table is used                                  | `environment`, `table`                                  |
-| `find_column_usage`         | Find where one column is used                                 | `environment`, `column`, `table`                        |
-| `find_web_resource_usage`   | Find where one web resource is used                           | `environment`, `name`                                   |
-| `analyze_impact`            | Build one impact report for a component or solution           | `environment`, `componentType`, `name`                  |
-| `environment_health_report` | Build a release-health summary                                | `environment`, `solution`                               |
-| `list_plugins`              | List plugin assemblies; optionally filter orphaned (no steps) | `environment`, `filter`                                 |
-| `list_plugin_steps`         | List registered steps for a plugin                            | `environment`, `pluginName`                             |
-| `list_plugin_images`        | List pre/post images on plugin steps                          | `environment`, `pluginName`, `stepName`                 |
-| `get_plugin_details`        | Deep info: assembly → types → steps → images                  | `environment`, `pluginName`                             |
-| `list_solutions`            | List solutions by display name and unique name                | `environment`, `nameFilter`                             |
-| `get_solution_details`      | Show solution summary and supported ALM component groups      | `environment`, `solution`                               |
-| `get_solution_dependencies` | Show dependency links for supported solution components       | `environment`, `solution`, `direction`, `componentType` |
-| `list_workflows`            | List workflows/processes with status                          | `environment`, `category`, `status`                     |
-| `list_actions`              | List workflow-based custom actions                            | `environment`                                           |
-| `get_workflow_details`      | Full workflow definition                                      | `environment`, `workflowName` / `uniqueName`            |
-| `list_web_resources`        | List web resources by type                                    | `environment`, `type`, `nameFilter`                     |
-| `get_web_resource_content`  | Fetch decoded web resource content                            | `environment`, `name`                                   |
+| Tool                          | Description                                                               | Key Parameters                                          |
+| ----------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `list_tables`                 | List Dataverse tables with main schema flags                              | `environment`, `nameFilter`, `solution`                 |
+| `get_table_schema`            | Show columns, alternate keys, and relationships for one table             | `environment`, `table`, `solution`                      |
+| `list_table_columns`          | List table columns and choice details                                     | `environment`, `table`, `solution`                      |
+| `list_table_relationships`    | List table relationships                                                  | `environment`, `table`, `solution`                      |
+| `list_forms`                  | List model-driven forms                                                   | `environment`, `table`, `type`, `solution`              |
+| `get_form_details`            | Show one form with normalized XML summary                                 | `environment`, `formName`, `table`, `solution`          |
+| `list_views`                  | List system or personal views                                             | `environment`, `table`, `scope`, `solution`             |
+| `get_view_details`            | Show one view with normalized query summary                               | `environment`, `viewName`, `table`, `scope`             |
+| `get_view_fetchxml`           | Return normalized FetchXML for one view                                   | `environment`, `viewName`, `table`, `scope`             |
+| `list_custom_apis`            | List Dataverse Custom APIs                                                | `environment`, `nameFilter`                             |
+| `get_custom_api_details`      | Show Custom API request and response metadata                             | `environment`, `apiName`                                |
+| `list_cloud_flows`            | List cloud flows from workflow metadata                                   | `environment`, `status`, `solution`                     |
+| `get_flow_details`            | Show one cloud flow with parsed trigger/action summary                    | `environment`, `flowName`, `solution`                   |
+| `list_security_roles`         | List security roles                                                       | `environment`, `nameFilter`                             |
+| `get_role_privileges`         | Show privileges for one role                                              | `environment`, `roleName`, `businessUnit`               |
+| `find_table_usage`            | Find where one table is used                                              | `environment`, `table`                                  |
+| `find_column_usage`           | Find where one column is used                                             | `environment`, `column`, `table`                        |
+| `find_web_resource_usage`     | Find where one web resource is used                                       | `environment`, `name`                                   |
+| `analyze_create_triggers`     | Analyze direct create triggers for a table create                         | `environment`, `table`, `providedAttributes`            |
+| `analyze_update_triggers`     | Analyze direct update triggers for a table change                         | `environment`, `table`, `changedAttributes`             |
+| `analyze_impact`              | Build one impact report for a component or solution                       | `environment`, `componentType`, `name`                  |
+| `environment_health_report`   | Build a release-health summary                                            | `environment`, `solution`                               |
+| `list_plugins`                | List plugin classes; optionally filter orphaned (no steps)                | `environment`, `filter`, `solution`                     |
+| `list_plugin_steps`           | List registered steps for one plugin class                                | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `get_plugin_details`          | Deep info for one plugin class with steps and images                      | `environment`, `pluginName`, `assemblyName`, `solution` |
+| `list_plugin_assemblies`      | List plugin assemblies; optionally filter orphaned (no steps)             | `environment`, `filter`, `solution`                     |
+| `list_plugin_assembly_steps`  | List registered steps for one plugin assembly                             | `environment`, `assemblyName`                           |
+| `list_plugin_assembly_images` | List pre/post images on steps for one plugin assembly                     | `environment`, `assemblyName`, `stepName`, `message`    |
+| `get_plugin_assembly_details` | Deep info: assembly → plugin classes/workflow activities → steps → images | `environment`, `assemblyName`                           |
+| `list_solutions`              | List solutions by display name and unique name                            | `environment`, `nameFilter`                             |
+| `get_solution_details`        | Show solution summary and supported ALM component groups                  | `environment`, `solution`                               |
+| `get_solution_dependencies`   | Show dependency links for supported solution components                   | `environment`, `solution`, `direction`, `componentType` |
+| `list_workflows`              | List workflows/processes with status                                      | `environment`, `category`, `status`                     |
+| `list_actions`                | List workflow-based custom actions                                        | `environment`                                           |
+| `get_workflow_details`        | Full workflow definition                                                  | `environment`, `workflowName` / `uniqueName`            |
+| `list_web_resources`          | List web resources by type                                                | `environment`, `type`, `nameFilter`                     |
+| `get_web_resource_content`    | Fetch decoded web resource content                                        | `environment`, `name`                                   |
 
 ### Cross-Environment Comparison Tools
 
@@ -310,7 +324,7 @@ Priority order:
 | `compare_views`              | Compare views across envs                      | `sourceEnvironment`, `targetEnvironment`, `table`, `scope`, `solution` |
 | `compare_custom_apis`        | Compare Custom APIs across envs                | `sourceEnvironment`, `targetEnvironment`, `apiName`                    |
 | `compare_security_roles`     | Compare security roles across envs             | `sourceEnvironment`, `targetEnvironment`, `roleName`                   |
-| `compare_plugins`            | Compare plugin registrations across envs       | `sourceEnvironment`, `targetEnvironment`, `pluginName`                 |
+| `compare_plugin_assemblies`  | Compare plugin assemblies across envs          | `sourceEnvironment`, `targetEnvironment`, `assemblyName`               |
 | `compare_solutions`          | Compare supported solution components          | `sourceEnvironment`, `targetEnvironment`, `solution`                   |
 | `compare_workflows`          | Compare workflow state/definitions             | `sourceEnvironment`, `targetEnvironment`, `category`, `workflowName`   |
 | `compare_web_resources`      | Compare web resource content                   | `sourceEnvironment`, `targetEnvironment`, `type`, `nameFilter`         |
@@ -321,6 +335,7 @@ Priority order:
 Users can now work with a solution by display name or unique name.
 
 - `list_plugins` supports `solution`
+- `list_plugin_assemblies` supports `solution`
 - `list_workflows` supports `solution`
 - `list_actions` supports `solution`
 - `list_web_resources` supports `solution`
@@ -337,6 +352,14 @@ Users can now work with a solution by display name or unique name.
 - `get_flow_details` supports `solution`
 
 The server resolves the solution first, then filters supported solution components from that solution.
+
+### Plugin Boundary
+
+- `list_plugins`, `list_plugin_steps`, and `get_plugin_details` return plugin classes only.
+- These tools exclude workflow activities. A type is treated as workflow activity when Dataverse marks `isworkflowactivity=true` or fills workflow-only fields like `workflowactivitygroupname` or `customworkflowactivityinfo`.
+- `list_plugin_assemblies`, `list_plugin_assembly_steps`, `list_plugin_assembly_images`, and `get_plugin_assembly_details` work at plugin assembly level.
+- Use `get_plugin_assembly_details` when you need the full assembly view, including workflow activities.
+- Dataverse can store other handlers as plugin types. Until a separate tool exists, those handlers can still appear in plugin-class results when they are not marked as workflow activities.
 
 ### Supported Solution Coverage
 
@@ -374,7 +397,8 @@ This tool uses Dataverse dependency functions instead of guessing links from nam
 
 Use `analyze_impact` when you want one report for likely change impact.
 
-- Supported targets: table, column, plugin, workflow, flow, web resource, and solution
+- Supported targets: table, column, plugin assembly, workflow, flow, web resource, and solution
+- The `analyze_impact` tool still uses `componentType: "plugin"` for plugin assembly impact
 - The report reuses current usage and dependency logic where possible
 - The summary shows risk level, total references, dependency count, and likely affected areas
 - Detailed sections are added only when data exists, like forms, views, plugin steps, cloud flows, or dependencies
@@ -390,7 +414,7 @@ See [docs/performance-notes.md](docs/performance-notes.md) for the protected tes
 
 All comparison tools return three categories: **only in source**, **only in target**, **differences** (with field-level before/after).
 
-`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugins it shows drift on three levels:
+`compare_environment_matrix` adds a drift matrix view. It keeps the old pairwise tools for deep checks, and adds a summary table for many environments like `dev`, `test`, `pre-prod`, `prod`. For plugin assemblies it shows drift on three levels:
 
 - plugin assemblies
 - plugin steps
@@ -400,7 +424,7 @@ All comparison tools return three categories: **only in source**, **only in targ
 
 Pairwise comparison tools are best for deep checks between two environments.
 
-- Use `compare_plugins`, `compare_workflows`, or `compare_web_resources` when you already know the two environments you want to compare.
+- Use `compare_plugin_assemblies`, `compare_workflows`, or `compare_web_resources` when you already know the two environments you want to compare.
 - Use `compare_environment_matrix` when you want one baseline, usually `prod`, and many targets like `dev`, `test`, and `pre-prod`.
 
 Matrix status values:
@@ -446,7 +470,7 @@ Error shape:
 The `data` payload depends on the tool, but it follows the same idea:
 
 - list tools usually return fields like `environment`, `filters`, `count`, and `items`
-- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin`, or `solution`
+- detail tools usually return one main object like `table`, `view`, `form`, `flow`, `plugin class`, `plugin assembly`, or `solution`
 - compare tools usually return environment names, filters, and one or more diff objects
 - error results always use the shared `error.name` and `error.message` fields
 
@@ -454,24 +478,97 @@ This means an MCP client or another agent can read the text for people, or use `
 
 ## Examples
 
-### Compare One Plugin Across Two Environments
+### List Plugin Classes In One Solution
 
-Use this when you want a detailed plugin diff, including steps and images.
+Use this when you want `IPlugin` classes (plugin types), not assemblies or `CodeActivity` workflow classes.
 
 ```json
 {
-  "tool": "compare_plugins",
+  "tool": "list_plugins",
+  "arguments": {
+    "environment": "dev",
+    "solution": "Contoso Core",
+    "filter": "no_steps"
+  }
+}
+```
+
+### List Plugin Assemblies In One Solution
+
+Use this when you want DLL-level registration, not plugin classes.
+
+```json
+{
+  "tool": "list_plugin_assemblies",
+  "arguments": {
+    "environment": "dev",
+    "solution": "Contoso Core",
+    "filter": "no_steps"
+  }
+}
+```
+
+### List Steps For One Plugin Class
+
+Use this when you already know the plugin class and want only its registered steps.
+
+```json
+{
+  "tool": "list_plugin_steps",
+  "arguments": {
+    "environment": "dev",
+    "pluginName": "Contoso.Plugins.AccountPlugin",
+    "assemblyName": "Contoso.Plugins"
+  }
+}
+```
+
+### Get One Plugin Class
+
+Use this when you want one plugin class with its registered steps and images.
+
+```json
+{
+  "tool": "get_plugin_details",
+  "arguments": {
+    "environment": "dev",
+    "pluginName": "Contoso.Plugins.AccountPlugin"
+  }
+}
+```
+
+### Inspect One Plugin Assembly With Workflow Activities
+
+Use this when you want the full assembly view, including workflow activities stored in the same assembly.
+
+```json
+{
+  "tool": "get_plugin_assembly_details",
+  "arguments": {
+    "environment": "dev",
+    "assemblyName": "Contoso.Plugins"
+  }
+}
+```
+
+### Compare One Plugin Assembly Across Two Environments
+
+Use this when you want a detailed plugin assembly diff, including steps and images.
+
+```json
+{
+  "tool": "compare_plugin_assemblies",
   "arguments": {
     "sourceEnvironment": "dev",
     "targetEnvironment": "prod",
-    "pluginName": "Contoso.Plugins"
+    "assemblyName": "Contoso.Plugins"
   }
 }
 ```
 
 ### Compare Many Environments Against Prod
 
-Use this when you want one drift report for many environments.
+Use this when you want one drift report for many environments across plugin assemblies, workflows, and web resources.
 
 ```json
 {
@@ -484,9 +581,9 @@ Use this when you want one drift report for many environments.
 }
 ```
 
-### Compare Plugin Drift On All Plugin Levels
+### Compare Plugin Assembly Drift On All Registration Levels
 
-Use this when you want to see plugin assembly, step, and image drift for one plugin.
+Use this when you want to see plugin assembly, step, and image drift for one plugin assembly.
 
 ```json
 {
@@ -495,7 +592,7 @@ Use this when you want to see plugin assembly, step, and image drift for one plu
     "baselineEnvironment": "prod",
     "targetEnvironments": ["dev", "test"],
     "componentType": "plugins",
-    "pluginName": "Contoso.Plugins"
+    "assemblyName": "Contoso.Plugins"
   }
 }
 ```
@@ -531,9 +628,9 @@ Use `uniqueName` when possible. It is safer than display name.
 }
 ```
 
-### Analyze Impact For One Plugin
+### Analyze Impact For One Plugin Assembly
 
-Use this when you want one report that combines direct usage and dependency risk.
+Use this when you want one report that combines direct usage and dependency risk for one plugin assembly. The input still uses `componentType: "plugin"`.
 
 ```json
 {
@@ -576,6 +673,22 @@ Use this when you want one report that combines direct usage and dependency risk
 - **Transient failures**: Retry `408`, `429`, `500`, `502`, `503`, `504`, plus selected timeout and network errors with backoff
 - **Rate limits**: Respect `Retry-After` when Dataverse returns it
 - **Timeouts and network errors**: Use `DynamicsRequestError` with clear environment and request URL details
+
+## Optional Request Logs
+
+Set `D365_MCP_LOG_ENABLED=true` to write request logs to `~/.dynamics-365-mcp/logs/DDMMYYYY`.
+
+Each tool call writes one log file. The file can include:
+
+- tool input
+- Dataverse request and response data
+- formatted `createToolSuccessResponse` / `createToolErrorResponse` output
+- errors seen during that tool call
+
+Optional settings:
+
+- `D365_MCP_LOG_DIR=~/.dynamics-365-mcp/logs`
+- `D365_MCP_LOG_MAX_BODY_CHARS=0`
 
 ## Notes
 

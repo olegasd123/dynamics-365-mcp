@@ -37,16 +37,21 @@ export function registerGetViewFetchXml(
 
         const normalizedFetchXml = normalizeXml(view.fetchxml);
         const text = `## View FetchXML: ${view.name}\n\n\`\`\`xml\n${normalizedFetchXml}\n\`\`\``;
-        return createToolSuccessResponse("get_view_fetchxml", text, `Loaded FetchXML for view '${view.name}' in '${env.name}'.`, {
-          environment: env.name,
-          filters: { table: table || null, scope: scope || null, solution: solution || null },
-          view: {
-            name: view.name,
-            scope: view.scope,
-            table: view.returnedtypecode,
-            fetchXml: normalizedFetchXml,
+        return createToolSuccessResponse(
+          "get_view_fetchxml",
+          text,
+          `Loaded FetchXML for view '${view.name}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: { table: table || null, scope: scope || null, solution: solution || null },
+            view: {
+              name: view.name,
+              scope: view.scope,
+              table: view.returnedtypecode,
+              fetchXml: normalizedFetchXml,
+            },
           },
-        });
+        );
       } catch (error) {
         return createToolErrorResponse("get_view_fetchxml", error);
       }

@@ -36,10 +36,16 @@ export function registerCompareWorkflows(
     },
     async ({ sourceEnvironment, targetEnvironment, category, workflowName }) => {
       try {
-        const { result } = await compareWorkflowsData(config, client, sourceEnvironment, targetEnvironment, {
-          category: category as WorkflowCategory | undefined,
-          workflowName,
-        });
+        const { result } = await compareWorkflowsData(
+          config,
+          client,
+          sourceEnvironment,
+          targetEnvironment,
+          {
+            category: category as WorkflowCategory | undefined,
+            workflowName,
+          },
+        );
 
         // Enhance diff output with human-readable labels
         for (const diff of result.differences) {

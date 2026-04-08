@@ -74,7 +74,11 @@ function hashText(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
-function extractOrderedAttributeValues(xml: string, tagName: string, attributeName: string): string[] {
+function extractOrderedAttributeValues(
+  xml: string,
+  tagName: string,
+  attributeName: string,
+): string[] {
   const tagRegex = new RegExp(`<${escapeRegExp(tagName)}\\b([^>]*)>`, "gi");
   const values: string[] = [];
   const seen = new Set<string>();

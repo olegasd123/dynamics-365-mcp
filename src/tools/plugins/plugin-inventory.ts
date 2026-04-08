@@ -12,13 +12,20 @@ import {
 
 const BULK_QUERY_CHUNK_SIZE = 25;
 
-interface PluginTypeRecord {
+export interface PluginTypeRecord extends Record<string, unknown> {
+  key: string;
   assemblyId: string;
   assemblyName: string;
   pluginTypeId: string;
-  pluginTypeName: string;
-  pluginTypeFullName: string;
+  name: string;
+  fullName: string;
+  friendlyName: string;
+  isWorkflowActivity: boolean;
+  workflowActivityGroupName: string;
+  customWorkflowActivityInfo: string;
 }
+
+export type PluginClassRecord = PluginTypeRecord;
 
 export interface PluginStepRecord extends Record<string, unknown> {
   key: string;
@@ -53,17 +60,71 @@ export async function fetchPluginSteps(
   client: DynamicsClient,
   assemblies: Record<string, unknown>[],
 ): Promise<PluginStepRecord[]> {
+  const pluginTypes = await fetchPluginTypesForAssemblies(env, client, assemblies);
+  return fetchPluginStepsForTypes(env, client, pluginTypes);
+}
+
+export async function fetchPluginClasses(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  assemblies: Record<string, unknown>[],
+  options?: {
+    includeWorkflowActivities?: boolean;
+  },
+): Promise<PluginClassRecord[]> {
+  const includeWorkflowActivities = options?.includeWorkflowActivities ?? false;
+  const pluginTypes = await fetchPluginTypesForAssemblies(env, client, assemblies);
+
+  return pluginTypes
+    .filter((type) => includeWorkflowActivities || !type.isWorkflowActivity)
+    .sort((left, right) => {
+      const assemblyCompare = left.assemblyName.localeCompare(right.assemblyName);
+      if (assemblyCompare !== 0) {
+        return assemblyCompare;
+      }
+      return left.fullName.localeCompare(right.fullName);
+    });
+}
+
+export async function fetchPluginInventory(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  assemblies: Record<string, unknown>[],
+): Promise<{
+  steps: PluginStepRecord[];
+  images: PluginImageRecord[];
+}> {
+  const pluginTypes = await fetchPluginTypesForAssemblies(env, client, assemblies);
+  const steps = await fetchPluginStepsForTypes(env, client, pluginTypes);
+
+  if (steps.length === 0) {
+    return { steps, images: [] };
+  }
+
+  return {
+    steps,
+    images: await fetchPluginImagesForSteps(env, client, steps),
+  };
+}
+
+export async function fetchPluginTypesForAssemblies(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  assemblies: Record<string, unknown>[],
+): Promise<PluginTypeRecord[]> {
   if (assemblies.length === 0) {
     return [];
   }
 
   const assemblyMap = new Map(
-    assemblies.map((assembly) => [String(assembly.pluginassemblyid || ""), String(assembly.name || "")]),
+    assemblies.map((assembly) => [
+      String(assembly.pluginassemblyid || ""),
+      String(assembly.name || ""),
+    ]),
   );
   const assemblyIds = assemblies
     .map((assembly) => String(assembly.pluginassemblyid || ""))
     .filter(Boolean);
-
   const pluginTypes = (
     await Promise.all(
       chunkValues(assemblyIds).map((chunk) =>
@@ -76,14 +137,20 @@ export async function fetchPluginSteps(
     )
   ).flat();
 
+  return pluginTypes.map((type) => normalizePluginType(type, assemblyMap));
+}
+
+export async function fetchPluginStepsForTypes(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  pluginTypes: PluginTypeRecord[],
+): Promise<PluginStepRecord[]> {
   if (pluginTypes.length === 0) {
     return [];
   }
 
-  const typeRecords = pluginTypes.map((type) => normalizePluginType(type, assemblyMap));
-  const typeMap = new Map(typeRecords.map((type) => [type.pluginTypeId, type]));
-  const pluginTypeIds = typeRecords.map((type) => type.pluginTypeId).filter(Boolean);
-
+  const typeMap = new Map(pluginTypes.map((type) => [type.pluginTypeId, type]));
+  const pluginTypeIds = pluginTypes.map((type) => type.pluginTypeId).filter(Boolean);
   const steps = (
     await Promise.all(
       chunkValues(pluginTypeIds).map((chunk) =>
@@ -101,18 +168,13 @@ export async function fetchPluginSteps(
     .filter((step): step is PluginStepRecord => step !== null);
 }
 
-export async function fetchPluginInventory(
+export async function fetchPluginImagesForSteps(
   env: EnvironmentConfig,
   client: DynamicsClient,
-  assemblies: Record<string, unknown>[],
-): Promise<{
-  steps: PluginStepRecord[];
-  images: PluginImageRecord[];
-}> {
-  const steps = await fetchPluginSteps(env, client, assemblies);
-
+  steps: PluginStepRecord[],
+): Promise<PluginImageRecord[]> {
   if (steps.length === 0) {
-    return { steps, images: [] };
+    return [];
   }
 
   const stepMap = new Map(steps.map((step) => [step.sdkmessageprocessingstepid, step]));
@@ -129,14 +191,14 @@ export async function fetchPluginInventory(
     )
   ).flat();
 
-  return {
-    steps,
-    images: images
-      .map((image) =>
-        normalizePluginImage(stepMap.get(String(image._sdkmessageprocessingstepid_value || "")), image),
-      )
-      .filter((image): image is PluginImageRecord => image !== null),
-  };
+  return images
+    .map((image) =>
+      normalizePluginImage(
+        stepMap.get(String(image._sdkmessageprocessingstepid_value || "")),
+        image,
+      ),
+    )
+    .filter((image): image is PluginImageRecord => image !== null);
 }
 
 export async function fetchPluginStepsByIds(
@@ -168,15 +230,13 @@ export async function fetchPluginStepsByIds(
     return [];
   }
 
-  const pluginTypeIds = [...new Set(steps.map((step) => String(step._eventhandler_value || "")).filter(Boolean))];
+  const pluginTypeIds = [
+    ...new Set(steps.map((step) => String(step._eventhandler_value || "")).filter(Boolean)),
+  ];
   const pluginTypes = (
     await Promise.all(
       chunkValues(pluginTypeIds).map((chunk) =>
-        client.query<Record<string, unknown>>(
-          env,
-          "plugintypes",
-          listPluginTypesByIdsQuery(chunk),
-        ),
+        client.query<Record<string, unknown>>(env, "plugintypes", listPluginTypesByIdsQuery(chunk)),
       ),
     )
   )
@@ -188,7 +248,9 @@ export async function fetchPluginStepsByIds(
   }
 
   const assemblyIds = [
-    ...new Set(pluginTypes.map((type) => String(type._pluginassemblyid_value || "")).filter(Boolean)),
+    ...new Set(
+      pluginTypes.map((type) => String(type._pluginassemblyid_value || "")).filter(Boolean),
+    ),
   ];
   const assemblies = (
     await Promise.all(
@@ -205,7 +267,10 @@ export async function fetchPluginStepsByIds(
     .filter((assembly) => assemblyIds.includes(String(assembly.pluginassemblyid || "")));
 
   const assemblyMap = new Map(
-    assemblies.map((assembly) => [String(assembly.pluginassemblyid || ""), String(assembly.name || "")]),
+    assemblies.map((assembly) => [
+      String(assembly.pluginassemblyid || ""),
+      String(assembly.name || ""),
+    ]),
   );
   const typeRecords = pluginTypes.map((type) => normalizePluginType(type, assemblyMap));
   const typeMap = new Map(typeRecords.map((type) => [type.pluginTypeId, type]));
@@ -238,7 +303,9 @@ export async function fetchPluginImagesByIds(
     )
   )
     .flat()
-    .filter((image) => uniqueImageIds.includes(String(image.sdkmessageprocessingstepimageid || "")));
+    .filter((image) =>
+      uniqueImageIds.includes(String(image.sdkmessageprocessingstepimageid || "")),
+    );
 
   if (images.length === 0) {
     return [];
@@ -253,7 +320,10 @@ export async function fetchPluginImagesByIds(
 
   return images
     .map((image) =>
-      normalizePluginImage(stepMap.get(String(image._sdkmessageprocessingstepid_value || "")), image),
+      normalizePluginImage(
+        stepMap.get(String(image._sdkmessageprocessingstepid_value || "")),
+        image,
+      ),
     )
     .filter((image): image is PluginImageRecord => image !== null);
 }
@@ -263,13 +333,25 @@ function normalizePluginType(
   assemblyMap: Map<string, string>,
 ): PluginTypeRecord {
   const assemblyId = String(type._pluginassemblyid_value || "");
+  const workflowActivityGroupName = String(type.workflowactivitygroupname || "").trim();
+  const customWorkflowActivityInfo = String(type.customworkflowactivityinfo || "").trim();
 
   return {
+    key: [assemblyMap.get(assemblyId) || "(unknown assembly)", String(type.typename || "")].join(
+      " | ",
+    ),
     assemblyId,
     assemblyName: assemblyMap.get(assemblyId) || "(unknown assembly)",
     pluginTypeId: String(type.plugintypeid || ""),
-    pluginTypeName: String(type.name || ""),
-    pluginTypeFullName: String(type.typename || ""),
+    name: String(type.name || ""),
+    fullName: String(type.typename || ""),
+    friendlyName: String(type.friendlyname || ""),
+    isWorkflowActivity:
+      Boolean(type.isworkflowactivity) ||
+      workflowActivityGroupName.length > 0 ||
+      customWorkflowActivityInfo.length > 0,
+    workflowActivityGroupName,
+    customWorkflowActivityInfo,
   };
 }
 
@@ -291,7 +373,7 @@ function normalizePluginStep(
   const name = String(step.name || "");
   const key = [
     typeRecord.assemblyName,
-    typeRecord.pluginTypeFullName,
+    typeRecord.fullName,
     messageName,
     primaryEntity,
     stage,
@@ -306,8 +388,8 @@ function normalizePluginStep(
     assemblyId: typeRecord.assemblyId,
     assemblyName: typeRecord.assemblyName,
     pluginTypeId: typeRecord.pluginTypeId,
-    pluginTypeName: typeRecord.pluginTypeName,
-    pluginTypeFullName: typeRecord.pluginTypeFullName,
+    pluginTypeName: typeRecord.name,
+    pluginTypeFullName: typeRecord.fullName,
     name,
     messageName,
     primaryEntity,

@@ -1,11 +1,13 @@
 import type { AppConfig, EnvironmentConfig } from "../../config/types.js";
 
 export const EXPECTED_TOOL_NAMES = [
+  "analyze_create_triggers",
   "analyze_impact",
+  "analyze_update_triggers",
   "compare_custom_apis",
   "compare_environment_matrix",
   "compare_forms",
-  "compare_plugins",
+  "compare_plugin_assemblies",
   "compare_security_roles",
   "compare_solutions",
   "compare_table_schema",
@@ -19,6 +21,7 @@ export const EXPECTED_TOOL_NAMES = [
   "get_custom_api_details",
   "get_flow_details",
   "get_form_details",
+  "get_plugin_assembly_details",
   "get_plugin_details",
   "get_role_privileges",
   "get_solution_dependencies",
@@ -32,7 +35,9 @@ export const EXPECTED_TOOL_NAMES = [
   "list_cloud_flows",
   "list_custom_apis",
   "list_forms",
-  "list_plugin_images",
+  "list_plugin_assemblies",
+  "list_plugin_assembly_images",
+  "list_plugin_assembly_steps",
   "list_plugin_steps",
   "list_plugins",
   "list_security_roles",
@@ -45,13 +50,18 @@ export const EXPECTED_TOOL_NAMES = [
   "list_workflows",
 ] as const;
 
+export const REMOVED_LEGACY_TOOL_NAMES = ["compare_plugins", "list_plugin_images"] as const;
+
 export interface ToolResponse {
   content: Array<{ type: "text"; text: string }>;
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }
 
-export type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResponse>;
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  extra?: Record<string, unknown>,
+) => Promise<ToolResponse>;
 
 export class FakeServer {
   private readonly handlers = new Map<string, ToolHandler>();

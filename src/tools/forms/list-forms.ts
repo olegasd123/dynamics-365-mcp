@@ -13,11 +13,7 @@ const STATE_LABELS: Record<number, string> = {
   1: "Active",
 };
 
-export function registerListForms(
-  server: McpServer,
-  config: AppConfig,
-  client: DynamicsClient,
-) {
+export function registerListForms(server: McpServer, config: AppConfig, client: DynamicsClient) {
   server.tool(
     "list_forms",
     "List model-driven app forms. Supports main, quick create, and card forms.",
@@ -42,7 +38,12 @@ export function registerListForms(
           const text = `No forms found in '${env.name}' with the specified filters.`;
           return createToolSuccessResponse("list_forms", text, text, {
             environment: env.name,
-            filters: { table: table || null, type: type || null, nameFilter: nameFilter || null, solution: solution || null },
+            filters: {
+              table: table || null,
+              type: type || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
             count: 0,
             items: [],
           });
@@ -72,12 +73,22 @@ export function registerListForms(
           ["Table", "Type", "Name", "Unique Name", "Default", "State", "Managed", "Modified"],
           rows,
         )}`;
-        return createToolSuccessResponse("list_forms", text, `Found ${forms.length} form(s) in '${env.name}'.`, {
-          environment: env.name,
-          filters: { table: table || null, type: type || null, nameFilter: nameFilter || null, solution: solution || null },
-          count: forms.length,
-          items: forms,
-        });
+        return createToolSuccessResponse(
+          "list_forms",
+          text,
+          `Found ${forms.length} form(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: {
+              table: table || null,
+              type: type || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
+            count: forms.length,
+            items: forms,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_forms", error);
       }

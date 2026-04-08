@@ -3,10 +3,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { getPluginAssemblyByNameQuery } from "../../queries/plugin-queries.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import { fetchPluginSteps } from "./plugin-inventory.js";
+import { fetchPluginMetadata, resolvePluginClass } from "./plugin-class-metadata.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -26,69 +25,69 @@ export function registerListPluginSteps(
 ) {
   server.tool(
     "list_plugin_steps",
-    "List registered steps (message processing steps) for a plugin assembly in Dynamics 365.",
+    "List registered steps (message processing steps) for one plugin class in Dynamics 365. Workflow activities (CodeActivity) are excluded.",
     {
       environment: z.string().optional().describe("Environment name"),
-      pluginName: z.string().describe("Name of the plugin assembly"),
+      pluginName: z.string().describe("Plugin class name or full type name"),
+      assemblyName: z
+        .string()
+        .optional()
+        .describe("Optional plugin assembly name to narrow matches"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
-    async ({ environment, pluginName }) => {
+    async ({ environment, pluginName, assemblyName, solution }) => {
       try {
         const env = getEnvironment(config, environment);
-        const assemblies = await client.query<Record<string, unknown>>(
-          env,
-          "pluginassemblies",
-          getPluginAssemblyByNameQuery(pluginName, ["pluginassemblyid", "name"]),
-        );
-
-        if (assemblies.length === 0) {
-          const text = `Plugin assembly '${pluginName}' not found in '${env.name}'.`;
-          return createToolSuccessResponse("list_plugin_steps", text, text, {
-            environment: env.name,
-            found: false,
-            pluginName,
-          });
-        }
-
-        const steps = await fetchPluginSteps(env, client, assemblies);
+        const inventory = await fetchPluginMetadata(env, client, {
+          solution,
+          includeSteps: true,
+          includeImages: false,
+        });
+        const plugin = resolvePluginClass(inventory.pluginClasses, pluginName, assemblyName);
+        const steps = inventory.steps.filter((step) => step.pluginTypeId === plugin.pluginTypeId);
 
         if (steps.length === 0) {
-          const text = `No steps found for plugin '${pluginName}' in '${env.name}'.`;
+          const text = `No steps found for plugin '${plugin.fullName}' in '${env.name}'.`;
           return createToolSuccessResponse("list_plugin_steps", text, text, {
             environment: env.name,
             found: true,
-            pluginName,
+            pluginName: plugin.fullName,
+            assemblyName: plugin.assemblyName,
             count: 0,
             items: [],
           });
         }
 
         const headers = ["Step Name", "Message", "Entity", "Stage", "Mode", "Status", "Rank"];
-        const rows = steps.map((s) => {
-          return [
-            String(s.name || ""),
-            String(s.messageName || ""),
-            String(s.primaryEntity || "none"),
-            STAGE_LABELS[s.stage as number] || String(s.stage),
-            MODE_LABELS[s.mode as number] || String(s.mode),
-            s.statecode === 0 ? "Enabled" : "Disabled",
-            String(s.rank || ""),
-          ];
-        });
-
+        const rows = steps.map((step) => [
+          String(step.name || ""),
+          String(step.messageName || ""),
+          String(step.primaryEntity || "none"),
+          STAGE_LABELS[step.stage as number] || String(step.stage),
+          MODE_LABELS[step.mode as number] || String(step.mode),
+          step.statecode === 0 ? "Enabled" : "Disabled",
+          String(step.rank || ""),
+        ]);
         const items = steps.map((step) => ({
           ...step,
           stageLabel: STAGE_LABELS[step.stage as number] || String(step.stage),
           modeLabel: MODE_LABELS[step.mode as number] || String(step.mode),
           statusLabel: step.statecode === 0 ? "Enabled" : "Disabled",
         }));
-        const text = `## Plugin Steps for '${pluginName}' in '${env.name}'\n\nFound ${steps.length} step(s).\n\n${formatTable(headers, rows)}`;
-        return createToolSuccessResponse("list_plugin_steps", text, `Found ${steps.length} plugin step(s) for '${pluginName}' in '${env.name}'.`, {
-          environment: env.name,
-          found: true,
-          pluginName,
-          count: steps.length,
-          items,
-        });
+        const text = `## Plugin Steps for '${plugin.fullName}' in '${env.name}'\n\n- **Assembly**: ${plugin.assemblyName}\n\nFound ${steps.length} step(s).\n\n${formatTable(headers, rows)}`;
+
+        return createToolSuccessResponse(
+          "list_plugin_steps",
+          text,
+          `Found ${steps.length} step(s) for plugin '${plugin.fullName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            found: true,
+            plugin: plugin,
+            count: steps.length,
+            items,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_plugin_steps", error);
       }

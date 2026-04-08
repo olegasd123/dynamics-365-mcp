@@ -7,10 +7,10 @@ import {
 } from "../../__tests__/tool-test-helpers.js";
 
 describe("list_plugin_steps tool", () => {
-  it("returns plugin steps through the bulk inventory path", async () => {
+  it("lists steps for one plugin class", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
-    const { client, calls } = createRecordingClient({
+    const { client } = createRecordingClient({
       dev: {
         pluginassemblies: [{ pluginassemblyid: "asm-1", name: "Core.Plugins" }],
         plugintypes: [
@@ -18,12 +18,14 @@ describe("list_plugin_steps tool", () => {
             plugintypeid: "type-1",
             name: "AccountPlugin",
             typename: "Core.Plugins.AccountPlugin",
+            isworkflowactivity: false,
             _pluginassemblyid_value: "asm-1",
           },
           {
             plugintypeid: "type-2",
             name: "ContactPlugin",
             typename: "Core.Plugins.ContactPlugin",
+            isworkflowactivity: false,
             _pluginassemblyid_value: "asm-1",
           },
         ],
@@ -51,80 +53,69 @@ describe("list_plugin_steps tool", () => {
             sdkmessagefilterid: { primaryobjecttypecode: "contact" },
           },
         ],
+        sdkmessageprocessingstepimages: [],
       },
     });
 
     registerListPluginSteps(server as never, config, client);
 
     const response = await server.getHandler("list_plugin_steps")({
-      pluginName: "Core.Plugins",
+      pluginName: "AccountPlugin",
     });
 
     expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain("Found 2 step(s).");
+    expect(response.content[0].text).toContain("Core.Plugins.AccountPlugin");
     expect(response.content[0].text).toContain("Account Create");
-    expect(response.content[0].text).toContain("Contact Update");
-    expect(response.content[0].text).toContain("Asynchronous");
-    expect(calls.map((call) => call.entitySet)).toEqual([
-      "pluginassemblies",
-      "plugintypes",
-      "sdkmessageprocessingsteps",
-    ]);
-  });
-
-  it("returns an error when the environment does not exist", async () => {
-    const server = new FakeServer();
-    const config = createTestConfig(["dev"]);
-    const { client } = createRecordingClient({ dev: {} });
-
-    registerListPluginSteps(server as never, config, client);
-
-    const response = await server.getHandler("list_plugin_steps")({
-      environment: "prod",
-      pluginName: "Core.Plugins",
+    expect(response.content[0].text).not.toContain("Contact Update");
+    expect(response.structuredContent).toMatchObject({
+      tool: "list_plugin_steps",
+      ok: true,
+      data: {
+        count: 1,
+        plugin: {
+          fullName: "Core.Plugins.AccountPlugin",
+          assemblyName: "Core.Plugins",
+        },
+      },
     });
-
-    expect(response.isError).toBe(true);
-    expect(response.content[0].text).toContain("Environment 'prod' not found");
   });
 
-  it("returns a not found message when the plugin assembly does not exist", async () => {
+  it("returns an error when the plugin name is ambiguous", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
-        pluginassemblies: [],
+        pluginassemblies: [
+          { pluginassemblyid: "asm-1", name: "Core.Plugins" },
+          { pluginassemblyid: "asm-2", name: "Other.Plugins" },
+        ],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "SharedPlugin",
+            typename: "Core.Plugins.SharedPlugin",
+            isworkflowactivity: false,
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-2",
+            name: "SharedPlugin",
+            typename: "Other.Plugins.SharedPlugin",
+            isworkflowactivity: false,
+            _pluginassemblyid_value: "asm-2",
+          },
+        ],
+        sdkmessageprocessingsteps: [],
       },
     });
 
     registerListPluginSteps(server as never, config, client);
 
     const response = await server.getHandler("list_plugin_steps")({
-      pluginName: "Missing.Plugin",
-    });
-
-    expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain("Plugin assembly 'Missing.Plugin' not found in 'dev'.");
-  });
-
-  it("returns an error when the client query fails", async () => {
-    const server = new FakeServer();
-    const config = createTestConfig(["dev"]);
-    const client = {
-      async query(): Promise<never[]> {
-        throw new Error("Dynamics API error [dev] (500): Plugin query failed");
-      },
-    } as never;
-
-    registerListPluginSteps(server as never, config, client);
-
-    const response = await server.getHandler("list_plugin_steps")({
-      pluginName: "Core.Plugins",
+      pluginName: "SharedPlugin",
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content[0].text).toContain(
-      "Dynamics API error [dev] (500): Plugin query failed",
-    );
+    expect(response.content[0].text).toContain("ambiguous");
   });
 });

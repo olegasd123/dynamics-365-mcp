@@ -46,8 +46,28 @@ if "%NODE_BIN%"=="" (
   set "NODE_BIN=%NODE_BIN%"
 )
 
-set "RUN_DIR=%ROOT_DIR%\run"
-set "LOG_DIR=%ROOT_DIR%\logs"
+if "%D365_MCP_HOME%"=="" (
+  if "%USERPROFILE%"=="" (
+    set "APP_HOME=%ROOT_DIR%\.dynamics-365-mcp"
+  ) else (
+    set "APP_HOME=%USERPROFILE%\.dynamics-365-mcp"
+  )
+) else (
+  set "APP_HOME=%D365_MCP_HOME%"
+)
+
+if "%D365_MCP_RUN_DIR%"=="" (
+  set "RUN_DIR=%APP_HOME%\run"
+) else (
+  set "RUN_DIR=%D365_MCP_RUN_DIR%"
+)
+
+if "%D365_MCP_SERVICE_LOG_DIR%"=="" (
+  set "LOG_DIR=%APP_HOME%\logs"
+) else (
+  set "LOG_DIR=%D365_MCP_SERVICE_LOG_DIR%"
+)
+
 set "PID_FILE=%RUN_DIR%\dynamics-365-mcp-%PORT%.pid"
 set "LOG_FILE=%LOG_DIR%\dynamics-365-mcp-%PORT%.log"
 set "ENTRY_FILE=%ROOT_DIR%\dist\index.js"

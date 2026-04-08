@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { TokenManager } from "../../auth/token-manager.js";
 import { DynamicsClient, DynamicsRequestError } from "../dynamics-client.js";
 
 const originalFetch = global.fetch;
@@ -18,6 +19,17 @@ function createODataResponse(payload: unknown): Response {
   });
 }
 
+function createImmediateTimeoutSpy() {
+  return vi.spyOn(global, "setTimeout").mockImplementation(((callback: TimerHandler) => {
+    if (typeof callback === "function") {
+      callback();
+    }
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout);
+}
+
+type TokenManagerStub = Pick<TokenManager, "getToken" | "clearCache">;
+
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
@@ -30,10 +42,11 @@ describe("DynamicsClient", () => {
       .mockResolvedValue(createODataResponse([{ accountid: "1", name: "Account" }]));
     global.fetch = fetchMock;
 
-    const tokenManager = {
+    const tokenManager: TokenManagerStub = {
       getToken: vi.fn().mockResolvedValue("token-1"),
-    } as never;
-    const client = new DynamicsClient(tokenManager);
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
 
     const first = await client.query(env, "accounts", "$select=name");
     const second = await client.query(env, "accounts", "$select=name");
@@ -52,10 +65,11 @@ describe("DynamicsClient", () => {
     const fetchMock = vi.fn<typeof fetch>().mockReturnValue(responsePromise);
     global.fetch = fetchMock;
 
-    const tokenManager = {
+    const tokenManager: TokenManagerStub = {
       getToken: vi.fn().mockResolvedValue("token-1"),
-    } as never;
-    const client = new DynamicsClient(tokenManager);
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
 
     const first = client.query(env, "accounts", "$select=name");
     const second = client.query(env, "accounts", "$select=name");
@@ -78,11 +92,11 @@ describe("DynamicsClient", () => {
       .mockResolvedValueOnce(createODataResponse([{ accountid: "1", name: "Account" }]));
     global.fetch = fetchMock;
 
-    const tokenManager = {
+    const tokenManager: TokenManagerStub = {
       getToken: vi.fn().mockResolvedValueOnce("token-1").mockResolvedValueOnce("token-2"),
       clearCache: vi.fn(),
-    } as never;
-    const client = new DynamicsClient(tokenManager);
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
 
     await expect(
       client.query(env, "accounts", "$select=name", { bypassCache: true }),
@@ -100,21 +114,14 @@ describe("DynamicsClient", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response("Busy", { status: 503 }))
       .mockResolvedValueOnce(createODataResponse([{ accountid: "1", name: "Account" }]));
-    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      callback: TimerHandler,
-    ) => {
-      if (typeof callback === "function") {
-        callback();
-      }
-      return 0 as NodeJS.Timeout;
-    }) as typeof setTimeout);
+    const timeoutSpy = createImmediateTimeoutSpy();
     global.fetch = fetchMock;
 
-    const tokenManager = {
+    const tokenManager: TokenManagerStub = {
       getToken: vi.fn().mockResolvedValue("token-1"),
       clearCache: vi.fn(),
-    } as never;
-    const client = new DynamicsClient(tokenManager);
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
 
     await expect(
       client.query(env, "accounts", "$select=name", { bypassCache: true }),
@@ -127,21 +134,14 @@ describe("DynamicsClient", () => {
   it("wraps timeout failures with a clear request error", async () => {
     const abortError = new Error("The operation was aborted.");
     abortError.name = "AbortError";
-    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      callback: TimerHandler,
-    ) => {
-      if (typeof callback === "function") {
-        callback();
-      }
-      return 0 as NodeJS.Timeout;
-    }) as typeof setTimeout);
+    const timeoutSpy = createImmediateTimeoutSpy();
     global.fetch = vi.fn<typeof fetch>().mockRejectedValue(abortError);
 
-    const tokenManager = {
+    const tokenManager: TokenManagerStub = {
       getToken: vi.fn().mockResolvedValue("token-1"),
       clearCache: vi.fn(),
-    } as never;
-    const client = new DynamicsClient(tokenManager);
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
 
     await expect(
       client.query(env, "accounts", "$select=name", { bypassCache: true }),

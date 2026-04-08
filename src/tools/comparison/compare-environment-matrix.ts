@@ -8,19 +8,15 @@ import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
-  comparePluginsData,
+  comparePluginAssembliesData,
   compareWebResourcesData,
   compareWorkflowsData,
   type PluginComparisonData,
 } from "./comparison-data.js";
-import {
-  buildMatrixReport,
-  formatMatrixStatus,
-  type MatrixReport,
-} from "./matrix-helpers.js";
+import { buildMatrixReport, formatMatrixStatus, type MatrixReport } from "./matrix-helpers.js";
 
 const COMPONENT_TYPE_LABELS = {
-  plugins: "Plugins",
+  plugins: "Plugin Assemblies",
   workflows: "Workflows",
   web_resources: "Web Resources",
 } as const;
@@ -40,7 +36,7 @@ interface ComponentSection {
 }
 
 interface MatrixFilters {
-  pluginName?: string;
+  assemblyName?: string;
   workflowName?: string;
   category?: WorkflowCategory;
   type?: WebResourceType;
@@ -55,7 +51,7 @@ export function registerCompareEnvironmentMatrix(
 ) {
   server.tool(
     "compare_environment_matrix",
-    "Compare one baseline environment against many target environments and show a drift matrix for plugins, workflows, or web resources.",
+    "Compare one baseline environment against many target environments and show a drift matrix for plugin assemblies with their steps and images, workflows, or web resources.",
     {
       baselineEnvironment: z
         .string()
@@ -68,8 +64,10 @@ export function registerCompareEnvironmentMatrix(
       componentType: z
         .enum(["plugins", "workflows", "web_resources", "all"])
         .optional()
-        .describe("Component type to compare. Default: all"),
-      pluginName: z.string().optional().describe("Filter to one plugin assembly"),
+        .describe(
+          "Component type to compare. 'plugins' means plugin assemblies with steps and images. Default: all",
+        ),
+      assemblyName: z.string().optional().describe("Filter to one plugin assembly"),
       workflowName: z.string().optional().describe("Filter workflows by name"),
       category: z
         .enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"])
@@ -96,7 +94,7 @@ export function registerCompareEnvironmentMatrix(
       baselineEnvironment,
       targetEnvironments,
       componentType,
-      pluginName,
+      assemblyName,
       workflowName,
       category,
       type,
@@ -123,7 +121,7 @@ export function registerCompareEnvironmentMatrix(
 
         const selectedComponents = resolveComponentTypes(componentType);
         const filters: MatrixFilters = {
-          pluginName,
+          assemblyName,
           workflowName,
           category: category as WorkflowCategory | undefined,
           type: type as WebResourceType | undefined,
@@ -175,7 +173,7 @@ export function registerCompareEnvironmentMatrix(
             targetEnvironments: resolvedTargetNames,
             componentTypes: selectedComponents,
             filters: {
-              pluginName: pluginName || null,
+              assemblyName: assemblyName || null,
               workflowName: workflowName || null,
               category: category || null,
               type: type || null,
@@ -214,8 +212,8 @@ async function buildComponentSection(
         await Promise.all(
           targetNames.map(async (targetName) => ({
             environment: targetName,
-            ...(await comparePluginsData(config, client, baselineName, targetName, {
-              pluginName: filters.pluginName,
+            ...(await comparePluginAssembliesData(config, client, baselineName, targetName, {
+              assemblyName: filters.assemblyName,
               includeChildComponents: true,
             })),
           })),
@@ -372,13 +370,12 @@ function renderPluginMatrixSections(
       environment: snapshot.environment,
       sourceItems: snapshot.stepSourceItems || [],
       targetItems: snapshot.stepTargetItems || [],
-      result:
-        snapshot.stepResult || {
-          matching: 0,
-          onlyInSource: [],
-          onlyInTarget: [],
-          differences: [],
-        },
+      result: snapshot.stepResult || {
+        matching: 0,
+        onlyInSource: [],
+        onlyInTarget: [],
+        differences: [],
+      },
     })),
     (item) => String(item.key),
     maxRows,
@@ -389,13 +386,12 @@ function renderPluginMatrixSections(
       environment: snapshot.environment,
       sourceItems: snapshot.imageSourceItems || [],
       targetItems: snapshot.imageTargetItems || [],
-      result:
-        snapshot.imageResult || {
-          matching: 0,
-          onlyInSource: [],
-          onlyInTarget: [],
-          differences: [],
-        },
+      result: snapshot.imageResult || {
+        matching: 0,
+        onlyInSource: [],
+        onlyInTarget: [],
+        differences: [],
+      },
     })),
     (item) => String(item.key),
     maxRows,
@@ -405,7 +401,7 @@ function renderPluginMatrixSections(
     componentType: "plugins",
     title: COMPONENT_TYPE_LABELS.plugins,
     text: [
-      "### Plugins",
+      "### Plugin Assemblies And Registrations",
       "",
       renderMatrixSection("Plugin Assemblies", baselineName, targetNames, assemblyReport),
       "",
@@ -456,8 +452,8 @@ function resolveComponentTypes(
 function describeFilters(filters: MatrixFilters): string[] {
   const parts: string[] = [];
 
-  if (filters.pluginName) {
-    parts.push(`plugin=${filters.pluginName}`);
+  if (filters.assemblyName) {
+    parts.push(`plugin assembly=${filters.assemblyName}`);
   }
   if (filters.workflowName) {
     parts.push(`workflow=${filters.workflowName}`);

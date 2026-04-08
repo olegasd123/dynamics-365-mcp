@@ -1,11 +1,6 @@
 import type { DiffResult } from "../../utils/diff.js";
 
-export type MatrixStatus =
-  | "same"
-  | "different"
-  | "only_in_baseline"
-  | "only_in_target"
-  | "absent";
+export type MatrixStatus = "same" | "different" | "only_in_baseline" | "only_in_target" | "absent";
 
 export interface MatrixSummary {
   environment: string;
@@ -136,7 +131,9 @@ function prepareSnapshot<T extends Record<string, unknown>>(
   };
 }
 
-function collectAllKeys<T extends Record<string, unknown>>(snapshots: PreparedSnapshot<T>[]): string[] {
+function collectAllKeys<T extends Record<string, unknown>>(
+  snapshots: PreparedSnapshot<T>[],
+): string[] {
   const keys = new Set<string>();
 
   for (const snapshot of snapshots) {

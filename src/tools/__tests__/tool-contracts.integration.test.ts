@@ -5,8 +5,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerAllTools } from "../index.js";
 import {
   EXPECTED_TOOL_NAMES,
+  REMOVED_LEGACY_TOOL_NAMES,
   createRecordingClient,
   createTestConfig,
+  type ToolResponse,
 } from "./tool-test-helpers.js";
 
 async function createConnectedToolClient(
@@ -59,6 +61,59 @@ describe("tool contracts", () => {
         nameFilter: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.analyze_create_triggers.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        providedAttributes: expect.any(Object),
+      });
+      expect(toolsByName.analyze_update_triggers.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        changedAttributes: expect.any(Object),
+      });
+      expect(toolsByName.list_plugin_assembly_steps.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        assemblyName: expect.any(Object),
+      });
+      expect(toolsByName.list_plugin_assembly_images.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        assemblyName: expect.any(Object),
+        stepName: expect.any(Object),
+        message: expect.any(Object),
+      });
+      expect(toolsByName.list_plugins.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        filter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_plugin_steps.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_plugin_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_plugin_assembly_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        assemblyName: expect.any(Object),
+      });
+      expect(toolsByName.compare_plugin_assemblies.inputSchema.properties).toMatchObject({
+        sourceEnvironment: expect.any(Object),
+        targetEnvironment: expect.any(Object),
+        assemblyName: expect.any(Object),
+      });
+      expect(toolsByName.list_plugins.description).toContain("plugin classes");
+      expect(toolsByName.list_plugin_steps.description).toContain("plugin class");
+      expect(toolsByName.get_plugin_details.description).toContain("plugin class");
+      expect(toolsByName.list_plugin_assemblies.description).toContain("plugin assemblies");
+      expect(toolsByName.list_plugin_assembly_steps.description).toContain("plugin assembly");
+      expect(toolsByName.get_plugin_assembly_details.description).toContain("plugin assembly");
+      expect(toolsByName.compare_plugin_assemblies.description).toContain("plugin assemblies");
       expect(toolsByName.compare_custom_apis.inputSchema.required).toEqual([
         "sourceEnvironment",
         "targetEnvironment",
@@ -69,6 +124,9 @@ describe("tool contracts", () => {
         direction: expect.any(Object),
         componentType: expect.any(Object),
       });
+      expect(REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName))).toBe(
+        true,
+      );
     } finally {
       await harness.close();
     }
@@ -162,18 +220,18 @@ describe("tool contracts", () => {
     );
 
     try {
-      const listTablesResult = await harness.client.callTool({
+      const listTablesResult = (await harness.client.callTool({
         name: "list_tables",
         arguments: {},
-      });
-      const compareApisResult = await harness.client.callTool({
+      })) as ToolResponse;
+      const compareApisResult = (await harness.client.callTool({
         name: "compare_custom_apis",
         arguments: {
           sourceEnvironment: "prod",
           targetEnvironment: "dev",
           apiName: "Do Thing",
         },
-      });
+      })) as ToolResponse;
 
       expect(listTablesResult.structuredContent).toMatchObject({
         version: "1",

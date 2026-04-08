@@ -10,7 +10,9 @@ describe("security queries", () => {
   it("builds the roles query", () => {
     const query = listSecurityRolesQuery("Admin");
 
-    expect(query).toContain("$select=roleid,name,_businessunitid_value,_parentrootroleid_value,_roletemplateid_value,ismanaged,modifiedon");
+    expect(query).toContain(
+      "$select=roleid,name,_businessunitid_value,_parentrootroleid_value,_roletemplateid_value,ismanaged,modifiedon",
+    );
     expect(query).toContain("$filter=contains(name,'Admin')");
   });
 

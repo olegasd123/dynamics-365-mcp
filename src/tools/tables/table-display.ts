@@ -1,8 +1,4 @@
-import type {
-  TableColumnRecord,
-  TableRelationshipRecord,
-  TableRecord,
-} from "./table-metadata.js";
+import type { TableColumnRecord, TableRelationshipRecord, TableRecord } from "./table-metadata.js";
 
 export function formatYesNo(value: boolean): string {
   return value ? "Yes" : "No";
@@ -47,9 +43,7 @@ export function buildColumnDetails(column: TableColumnRecord): string {
   return parts.join(" | ");
 }
 
-export function buildRelationshipRelatedTable(
-  relationship: TableRelationshipRecord,
-): string {
+export function buildRelationshipRelatedTable(relationship: TableRelationshipRecord): string {
   return relationship.relatedTable;
 }
 

@@ -157,12 +157,21 @@ export async function listTables(
   const rawTables = await client.query<Record<string, unknown>>(
     env,
     "EntityDefinitions",
-    listTablesQuery(options?.nameFilter),
+    listTablesQuery(),
   );
+  let tables = rawTables.map(normalizeTable);
 
-  return rawTables
-    .map(normalizeTable)
-    .sort((left, right) => left.logicalName.localeCompare(right.logicalName));
+  if (options?.nameFilter) {
+    const needle = options.nameFilter.toLowerCase();
+    tables = tables.filter(
+      (table) =>
+        table.logicalName.toLowerCase().includes(needle) ||
+        table.schemaName.toLowerCase().includes(needle) ||
+        table.entitySetName.toLowerCase().includes(needle),
+    );
+  }
+
+  return tables.sort((left, right) => left.logicalName.localeCompare(right.logicalName));
 }
 
 export async function resolveTable(

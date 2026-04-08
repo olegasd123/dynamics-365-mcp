@@ -30,16 +30,22 @@ describe("plugin queries", () => {
   });
 
   it("builds the plugin types query", () => {
-    expect(listPluginTypesQuery("assembly-1")).toContain(
-      "$filter=pluginassemblyid/pluginassemblyid eq 'assembly-1'",
-    );
+    const query = listPluginTypesQuery("assembly-1");
+
+    expect(query).toContain("$filter=pluginassemblyid/pluginassemblyid eq 'assembly-1'");
+    expect(query).toContain("workflowactivitygroupname");
+    expect(query).toContain("customworkflowactivityinfo");
   });
 
   it("builds the bulk plugin types query", () => {
     const query = listPluginTypesForAssembliesQuery(["assembly-1", "assembly-2"]);
 
-    expect(query).toContain("$filter=_pluginassemblyid_value eq 'assembly-1' or _pluginassemblyid_value eq 'assembly-2'");
+    expect(query).toContain(
+      "$filter=_pluginassemblyid_value eq 'assembly-1' or _pluginassemblyid_value eq 'assembly-2'",
+    );
     expect(query).toContain("_pluginassemblyid_value");
+    expect(query).toContain("workflowactivitygroupname");
+    expect(query).toContain("customworkflowactivityinfo");
   });
 
   it("builds the plugin steps query", () => {
@@ -54,7 +60,9 @@ describe("plugin queries", () => {
   it("builds the bulk plugin steps query", () => {
     const query = listPluginStepsForPluginTypesQuery(["type-1", "type-2"]);
 
-    expect(query).toContain("$filter=_eventhandler_value eq 'type-1' or _eventhandler_value eq 'type-2'");
+    expect(query).toContain(
+      "$filter=_eventhandler_value eq 'type-1' or _eventhandler_value eq 'type-2'",
+    );
     expect(query).toContain("_eventhandler_value");
   });
 

@@ -57,14 +57,19 @@ export function registerCompareCustomApis(
           }),
         );
 
-        return createToolSuccessResponse("compare_custom_apis", lines.join("\n"), `Compared custom APIs between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
-          sourceEnvironment,
-          targetEnvironment,
-          apiName: apiName || null,
-          apiComparison: comparison.result,
-          requestParameterComparison: comparison.requestParameterResult,
-          responsePropertyComparison: comparison.responsePropertyResult,
-        });
+        return createToolSuccessResponse(
+          "compare_custom_apis",
+          lines.join("\n"),
+          `Compared custom APIs between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            apiName: apiName || null,
+            apiComparison: comparison.result,
+            requestParameterComparison: comparison.requestParameterResult,
+            responsePropertyComparison: comparison.responsePropertyResult,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("compare_custom_apis", error);
       }

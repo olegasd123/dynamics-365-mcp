@@ -37,15 +37,29 @@ This creates the MCP server entry file in `dist/index.js`.
 
 ## 5. Create The Config File
 
+This config file should not go inside the repo root or the `dist` folder.
+
+Keep it outside the project in a user folder, because it can contain secrets.
+
+Examples:
+
+- macOS: `/Users/your-name/.dynamics-365-mcp/config.json`
+- Linux: `/home/your-name/.dynamics-365-mcp/config.json`
+- Windows: `C:\Users\your-name\.dynamics-365-mcp\config.json`
+
 Create this folder:
 
 ```bash
-mkdir -p ~/.dynamics365-mcp
+mkdir -p ~/.dynamics-365-mcp
 ```
 
 Create this file:
 
-`~/.dynamics365-mcp/config.json`
+`~/.dynamics-365-mcp/config.json`
+
+On Windows, the same idea is:
+
+`C:\Users\your-name\.dynamics-365-mcp\config.json`
 
 ### Option A: Client Secret Auth
 
@@ -89,7 +103,7 @@ Optional:
 
 - Add `clientId` if your team has its own public client app.
 - If `clientId` is missing, the server uses a Microsoft public client ID.
-- Device-code tokens are stored in `~/.dynamics365-mcp/token-cache.json` by default.
+- Device-code tokens are stored in `~/.dynamics-365-mcp/token-cache.json` by default.
 - Set `D365_MCP_TOKEN_CACHE` if you want another token-cache path.
 
 ## 6. Where To Get Tenant ID And Client ID
@@ -193,6 +207,12 @@ The scripts auto-load the repo `.env` file if it exists. This is useful for:
 
 - `D365_MCP_CONFIG`
 - `D365_MCP_TOKEN_CACHE`
+- `D365_MCP_LOG_ENABLED`
+- `D365_MCP_LOG_DIR`
+- `D365_MCP_LOG_MAX_BODY_CHARS`
+- `D365_MCP_HOME`
+- `D365_MCP_RUN_DIR`
+- `D365_MCP_SERVICE_LOG_DIR`
 - `MCP_PORT`
 - `MCP_HOST`
 - `MCP_PATH`
@@ -207,23 +227,38 @@ Priority order:
 Example `.env`:
 
 ```bash
-D365_MCP_CONFIG=~/.dynamics365-mcp/config.json
-D365_MCP_TOKEN_CACHE=~/.dynamics365-mcp/token-cache.json
+D365_MCP_CONFIG=~/.dynamics-365-mcp/config.json
+D365_MCP_TOKEN_CACHE=~/.dynamics-365-mcp/token-cache.json
 MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp
+D365_MCP_LOG_ENABLED=false
+D365_MCP_LOG_DIR=~/.dynamics-365-mcp/logs
+D365_MCP_LOG_MAX_BODY_CHARS=0
 ```
+
+If request logs are enabled, the server writes one file per MCP tool call:
+
+- folder: `~/.dynamics-365-mcp/logs/DDMMYYYY`
+- file: `HHMMSSmmm-tool-name-...-req-<id>.txt`
+
+Each file can include:
+
+- tool input
+- Dataverse request and response data
+- formatted tool success or error response
+- runtime errors seen during that tool call
 
 macOS / Linux:
 
 ```bash
-./scripts/mcp-service.sh start 3003 ~/.dynamics365-mcp/config.json
+./scripts/mcp-service.sh start 3003 ~/.dynamics-365-mcp/config.json
 ```
 
 Windows:
 
 ```bat
-scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics365-mcp\config.json
+scripts\mcp-service.bat start 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
 Stop:
@@ -239,11 +274,11 @@ scripts\mcp-service.bat stop 3003
 Restart:
 
 ```bash
-./scripts/mcp-service.sh restart 3003 ~/.dynamics365-mcp/config.json
+./scripts/mcp-service.sh restart 3003 ~/.dynamics-365-mcp/config.json
 ```
 
 ```bat
-scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics365-mcp\config.json
+scripts\mcp-service.bat restart 3003 C:\Users\you\.dynamics-365-mcp\config.json
 ```
 
 If your MCP client supports HTTP MCP servers, use the MCP endpoint URL:
@@ -302,7 +337,7 @@ npm run dev
 
 ### `No Dynamics 365 configuration found`
 
-Check that `~/.dynamics365-mcp/config.json` exists and has valid JSON.
+Check that `~/.dynamics-365-mcp/config.json` exists and has valid JSON.
 
 ### Auth fails
 

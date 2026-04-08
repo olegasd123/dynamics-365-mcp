@@ -22,13 +22,8 @@ export function registerListTableRelationships(
     "List Dataverse table relationships for one table.",
     {
       environment: z.string().optional().describe("Environment name"),
-      table: z
-        .string()
-        .describe("Table logical name, schema name, or display name"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      table: z.string().describe("Table logical name, schema name, or display name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, table, solution }) => {
       try {
@@ -65,13 +60,18 @@ export function registerListTableRelationships(
           relatedTable: buildRelationshipRelatedTable(relationship),
           details: buildRelationshipDetails(relationship),
         }));
-        return createToolSuccessResponse("list_table_relationships", text, `Found ${result.relationships.length} relationship(s) for table '${result.table.logicalName}' in '${env.name}'.`, {
-          environment: env.name,
-          solution: solution || null,
-          table: result.table,
-          count: result.relationships.length,
-          items,
-        });
+        return createToolSuccessResponse(
+          "list_table_relationships",
+          text,
+          `Found ${result.relationships.length} relationship(s) for table '${result.table.logicalName}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            solution: solution || null,
+            table: result.table,
+            count: result.relationships.length,
+            items,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_table_relationships", error);
       }

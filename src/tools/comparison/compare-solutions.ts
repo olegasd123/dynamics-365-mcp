@@ -87,8 +87,12 @@ export function registerCompareSolutions(
 
         const lines: string[] = [];
         lines.push("## Solution Comparison");
-        lines.push(`- **Source**: ${sourceEnvironment} :: ${sourceInventory.solution.friendlyname}`);
-        lines.push(`- **Target**: ${targetEnvironment} :: ${targetInventory.solution.friendlyname}`);
+        lines.push(
+          `- **Source**: ${sourceEnvironment} :: ${sourceInventory.solution.friendlyname}`,
+        );
+        lines.push(
+          `- **Target**: ${targetEnvironment} :: ${targetInventory.solution.friendlyname}`,
+        );
         lines.push(
           `- **Solutions**: ${sourceInventory.solution.uniquename} -> ${targetInventory.solution.uniquename}`,
         );
@@ -163,19 +167,24 @@ export function registerCompareSolutions(
           }),
         );
 
-        return createToolSuccessResponse("compare_solutions", lines.join("\n"), `Compared solution '${solution}' between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
-          sourceEnvironment,
-          targetEnvironment,
-          solution,
-          targetSolution: targetSolution || null,
-          pluginComparison: pluginDiff,
-          formComparison: formDiff,
-          viewComparison: viewDiff,
-          pluginStepComparison: pluginStepDiff,
-          pluginImageComparison: pluginImageDiff,
-          workflowComparison: workflowDiff,
-          webResourceComparison: webResourceDiff,
-        });
+        return createToolSuccessResponse(
+          "compare_solutions",
+          lines.join("\n"),
+          `Compared solution '${solution}' between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            solution,
+            targetSolution: targetSolution || null,
+            pluginComparison: pluginDiff,
+            formComparison: formDiff,
+            viewComparison: viewDiff,
+            pluginStepComparison: pluginStepDiff,
+            pluginImageComparison: pluginImageDiff,
+            workflowComparison: workflowDiff,
+            webResourceComparison: webResourceDiff,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("compare_solutions", error);
       }

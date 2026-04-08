@@ -12,9 +12,7 @@ describe("compare_solutions tool", () => {
     const config = createTestConfig(["dev", "prod"]);
     const { client } = createRecordingClient({
       dev: {
-        solutions: [
-          { solutionid: "sol-dev", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
+        solutions: [{ solutionid: "sol-dev", friendlyname: "Core", uniquename: "contoso_core" }],
         solutioncomponents: [
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
           { solutioncomponentid: "sc-2", objectid: "wf-1", componenttype: 29 },
@@ -98,9 +96,7 @@ describe("compare_solutions tool", () => {
         ],
       },
       prod: {
-        solutions: [
-          { solutionid: "sol-prod", friendlyname: "Core", uniquename: "contoso_core" },
-        ],
+        solutions: [{ solutionid: "sol-prod", friendlyname: "Core", uniquename: "contoso_core" }],
         solutioncomponents: [
           { solutioncomponentid: "sc-1", objectid: "asm-1", componenttype: 91 },
           { solutioncomponentid: "sc-2", objectid: "wf-1", componenttype: 29 },

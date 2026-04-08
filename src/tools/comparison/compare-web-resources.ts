@@ -30,18 +30,33 @@ export function registerCompareWebResources(
     },
     async ({ sourceEnvironment, targetEnvironment, type, nameFilter, compareContent }) => {
       try {
-        const { result } = await compareWebResourcesData(config, client, sourceEnvironment, targetEnvironment, {
-          type: type as WebResourceType | undefined,
-          nameFilter,
-          compareContent,
-        });
-        const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-        return createToolSuccessResponse("compare_web_resources", text, `Compared web resources between '${sourceEnvironment}' and '${targetEnvironment}'.`, {
+        const { result } = await compareWebResourcesData(
+          config,
+          client,
           sourceEnvironment,
           targetEnvironment,
-          filters: { type: type || null, nameFilter: nameFilter || null, compareContent: compareContent || false },
-          comparison: result,
-        });
+          {
+            type: type as WebResourceType | undefined,
+            nameFilter,
+            compareContent,
+          },
+        );
+        const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
+        return createToolSuccessResponse(
+          "compare_web_resources",
+          text,
+          `Compared web resources between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+          {
+            sourceEnvironment,
+            targetEnvironment,
+            filters: {
+              type: type || null,
+              nameFilter: nameFilter || null,
+              compareContent: compareContent || false,
+            },
+            comparison: result,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("compare_web_resources", error);
       }

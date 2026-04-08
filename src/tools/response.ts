@@ -1,3 +1,5 @@
+import { requestLogger } from "../logging/request-logger.js";
+
 interface ToolTextContent {
   type: "text";
   text: string;
@@ -36,7 +38,7 @@ export function createToolSuccessResponse<TData extends Record<string, unknown>>
   summary: string,
   data: TData,
 ): ToolResponse<TData> {
-  return {
+  const response: ToolResponse<TData> = {
     content: [{ type: "text", text }],
     structuredContent: {
       version: "1",
@@ -46,6 +48,9 @@ export function createToolSuccessResponse<TData extends Record<string, unknown>>
       data,
     },
   };
+
+  requestLogger.logToolResponse(tool, response);
+  return response;
 }
 
 export function createToolErrorResponse(
@@ -53,11 +58,9 @@ export function createToolErrorResponse(
   error: unknown,
 ): ToolResponse<Record<string, unknown>> {
   const normalizedError =
-    error instanceof Error
-      ? error
-      : new Error(typeof error === "string" ? error : String(error));
+    error instanceof Error ? error : new Error(typeof error === "string" ? error : String(error));
 
-  return {
+  const response: ToolResponse<Record<string, unknown>> = {
     content: [{ type: "text", text: `Error: ${normalizedError.message}` }],
     structuredContent: {
       version: "1",
@@ -70,4 +73,8 @@ export function createToolErrorResponse(
     },
     isError: true,
   };
+
+  requestLogger.logToolResponse(tool, response);
+  requestLogger.logError(`tool-response:${tool}`, normalizedError);
+  return response;
 }

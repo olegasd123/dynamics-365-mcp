@@ -37,6 +37,15 @@ function createTempCachePath(): string {
   return join(dir, "token-cache.json");
 }
 
+function createImmediateTimeoutSpy() {
+  return vi.spyOn(global, "setTimeout").mockImplementation(((callback: TimerHandler) => {
+    if (typeof callback === "function") {
+      callback();
+    }
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout);
+}
+
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
@@ -101,14 +110,7 @@ describe("TokenManager", () => {
   it("supports device code auth without a client secret", async () => {
     const cachePath = createTempCachePath();
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      callback: TimerHandler,
-    ) => {
-      if (typeof callback === "function") {
-        callback();
-      }
-      return 0 as NodeJS.Timeout;
-    }) as typeof setTimeout);
+    const timeoutSpy = createImmediateTimeoutSpy();
 
     const fetchMock = vi
       .fn<typeof fetch>()
@@ -152,14 +154,7 @@ describe("TokenManager", () => {
   it("persists device code tokens and reuses them after restart", async () => {
     const cachePath = createTempCachePath();
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      callback: TimerHandler,
-    ) => {
-      if (typeof callback === "function") {
-        callback();
-      }
-      return 0 as NodeJS.Timeout;
-    }) as typeof setTimeout);
+    const timeoutSpy = createImmediateTimeoutSpy();
 
     global.fetch = vi
       .fn<typeof fetch>()
@@ -190,7 +185,8 @@ describe("TokenManager", () => {
     ).resolves.toBe("interactive-token");
 
     const secondManager = new TokenManager(cachePath);
-    global.fetch = vi.fn<typeof fetch>();
+    const fetchMock = vi.fn<typeof fetch>();
+    global.fetch = fetchMock;
 
     await expect(
       secondManager.getToken({
@@ -201,7 +197,7 @@ describe("TokenManager", () => {
       }),
     ).resolves.toBe("interactive-token");
 
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(stderrSpy).toHaveBeenCalled();
     timeoutSpy.mockRestore();
   });
@@ -211,14 +207,7 @@ describe("TokenManager", () => {
     const nowSpy = vi.spyOn(Date, "now");
     const now = 1_700_000_000_000;
     nowSpy.mockReturnValue(now);
-    const timeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      callback: TimerHandler,
-    ) => {
-      if (typeof callback === "function") {
-        callback();
-      }
-      return 0 as NodeJS.Timeout;
-    }) as typeof setTimeout);
+    const timeoutSpy = createImmediateTimeoutSpy();
 
     global.fetch = vi
       .fn<typeof fetch>()
@@ -247,13 +236,14 @@ describe("TokenManager", () => {
     });
 
     nowSpy.mockReturnValue(now + 61_000);
-    global.fetch = vi.fn<typeof fetch>().mockResolvedValueOnce(
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
       createJsonResponse({
         access_token: "refreshed-token",
         refresh_token: "refresh-token-2",
         expires_in: 3600,
       }),
     );
+    global.fetch = fetchMock;
 
     const secondManager = new TokenManager(cachePath);
     await expect(
@@ -265,8 +255,8 @@ describe("TokenManager", () => {
       }),
     ).resolves.toBe("refreshed-token");
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch.mock.calls[0]?.[1]?.body).toContain("grant_type=refresh_token");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain("grant_type=refresh_token");
     timeoutSpy.mockRestore();
   });
 });

@@ -18,7 +18,10 @@ export function registerListCloudFlows(
     "List cloud flows stored in Dataverse workflow metadata.",
     {
       environment: z.string().optional().describe("Environment name"),
-      status: z.enum(["draft", "activated", "suspended"]).optional().describe("Optional status filter"),
+      status: z
+        .enum(["draft", "activated", "suspended"])
+        .optional()
+        .describe("Optional status filter"),
       nameFilter: z.string().optional().describe("Optional name or unique name filter"),
       solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
@@ -35,7 +38,11 @@ export function registerListCloudFlows(
           const text = `No cloud flows found in '${env.name}'.`;
           return createToolSuccessResponse("list_cloud_flows", text, text, {
             environment: env.name,
-            filters: { status: status || null, nameFilter: nameFilter || null, solution: solution || null },
+            filters: {
+              status: status || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
             count: 0,
             items: [],
           });
@@ -64,12 +71,21 @@ export function registerListCloudFlows(
           rows,
         )}`;
 
-        return createToolSuccessResponse("list_cloud_flows", text, `Found ${flows.length} cloud flow(s) in '${env.name}'.`, {
-          environment: env.name,
-          filters: { status: status || null, nameFilter: nameFilter || null, solution: solution || null },
-          count: flows.length,
-          items: flows,
-        });
+        return createToolSuccessResponse(
+          "list_cloud_flows",
+          text,
+          `Found ${flows.length} cloud flow(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            filters: {
+              status: status || null,
+              nameFilter: nameFilter || null,
+              solution: solution || null,
+            },
+            count: flows.length,
+            items: flows,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_cloud_flows", error);
       }

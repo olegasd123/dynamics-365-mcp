@@ -20,10 +20,7 @@ export function registerListActions(server: McpServer, config: AppConfig, client
     "List custom actions registered in Dynamics 365.",
     {
       environment: z.string().optional().describe("Environment name"),
-      solution: z
-        .string()
-        .optional()
-        .describe("Optional solution display name or unique name"),
+      solution: z.string().optional().describe("Optional solution display name or unique name"),
     },
     async ({ environment, solution }) => {
       try {
@@ -66,12 +63,17 @@ export function registerListActions(server: McpServer, config: AppConfig, client
           stateLabel: STATE_LABELS[action.statecode as number] || String(action.statecode),
         }));
         const text = `## Custom Actions in '${env.name}'${solution ? ` (solution='${solution}')` : ""}\n\nFound ${actions.length} action(s).\n\n${formatTable(headers, rows)}`;
-        return createToolSuccessResponse("list_actions", text, `Found ${actions.length} custom action(s) in '${env.name}'.`, {
-          environment: env.name,
-          solution: solution || null,
-          count: actions.length,
-          items,
-        });
+        return createToolSuccessResponse(
+          "list_actions",
+          text,
+          `Found ${actions.length} custom action(s) in '${env.name}'.`,
+          {
+            environment: env.name,
+            solution: solution || null,
+            count: actions.length,
+            items,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("list_actions", error);
       }

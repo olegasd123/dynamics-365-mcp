@@ -33,26 +33,15 @@ const PERSONAL_VIEW_SELECT = [
   "modifiedon",
 ];
 
-const VIEW_DETAILS_SELECT = [
-  ...VIEW_SELECT,
-  "fetchxml",
-  "layoutxml",
-];
+const VIEW_DETAILS_SELECT = [...VIEW_SELECT, "fetchxml", "layoutxml"];
 
-const PERSONAL_VIEW_DETAILS_SELECT = [
-  ...PERSONAL_VIEW_SELECT,
-  "fetchxml",
-  "layoutxml",
-];
+const PERSONAL_VIEW_DETAILS_SELECT = [...PERSONAL_VIEW_SELECT, "fetchxml", "layoutxml"];
 
 function buildOrStringFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");
 }
 
-function buildViewFilter(options?: {
-  table?: string;
-  nameFilter?: string;
-}): string | undefined {
+function buildViewFilter(options?: { table?: string; nameFilter?: string }): string | undefined {
   const filters: string[] = [];
 
   if (options?.table) {
@@ -65,10 +54,7 @@ function buildViewFilter(options?: {
   return filters.length > 0 ? filters.join(" and ") : undefined;
 }
 
-export function listSavedViewsQuery(options?: {
-  table?: string;
-  nameFilter?: string;
-}): string {
+export function listSavedViewsQuery(options?: { table?: string; nameFilter?: string }): string {
   return buildQueryString({
     select: VIEW_SELECT,
     filter: buildViewFilter(options),
@@ -76,10 +62,7 @@ export function listSavedViewsQuery(options?: {
   });
 }
 
-export function listPersonalViewsQuery(options?: {
-  table?: string;
-  nameFilter?: string;
-}): string {
+export function listPersonalViewsQuery(options?: { table?: string; nameFilter?: string }): string {
   return buildQueryString({
     select: PERSONAL_VIEW_SELECT,
     filter: buildViewFilter(options),

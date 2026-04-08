@@ -142,8 +142,7 @@ export async function resolveCustomApi(
   const partialMatches = uniqueApis(
     apis.filter(
       (api) =>
-        api.uniquename.toLowerCase().includes(needle) ||
-        api.name.toLowerCase().includes(needle),
+        api.uniquename.toLowerCase().includes(needle) || api.name.toLowerCase().includes(needle),
     ),
   );
   if (partialMatches.length === 1) {

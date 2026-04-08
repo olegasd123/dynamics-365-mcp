@@ -57,27 +57,37 @@ export function registerGetWebResourceContent(
         if (TEXT_TYPES.has(resourceType)) {
           const decoded = Buffer.from(base64Content, "base64").toString("utf-8");
           const text = `## ${resource.name}\n\n\`\`\`\n${decoded}\n\`\`\``;
-          return createToolSuccessResponse("get_web_resource_content", text, `Loaded text content for web resource '${String(resource.name || resourceName)}' in '${env.name}'.`, {
-            environment: env.name,
-            found: true,
-            name: String(resource.name || resourceName),
-            resourceType,
-            isText: true,
-            content: decoded,
-          });
+          return createToolSuccessResponse(
+            "get_web_resource_content",
+            text,
+            `Loaded text content for web resource '${String(resource.name || resourceName)}' in '${env.name}'.`,
+            {
+              environment: env.name,
+              found: true,
+              name: String(resource.name || resourceName),
+              resourceType,
+              isText: true,
+              content: decoded,
+            },
+          );
         }
 
         // Binary content — return metadata and base64 size
         const sizeKb = Math.round((base64Content.length * 3) / 4 / 1024);
         const text = `## ${resource.name}\n\nBinary web resource (type: ${resourceType}), size: ~${sizeKb} KB.\nBase64 content available but not decoded (binary format).`;
-        return createToolSuccessResponse("get_web_resource_content", text, `Loaded binary metadata for web resource '${String(resource.name || resourceName)}' in '${env.name}'.`, {
-          environment: env.name,
-          found: true,
-          name: String(resource.name || resourceName),
-          resourceType,
-          isText: false,
-          sizeKb,
-        });
+        return createToolSuccessResponse(
+          "get_web_resource_content",
+          text,
+          `Loaded binary metadata for web resource '${String(resource.name || resourceName)}' in '${env.name}'.`,
+          {
+            environment: env.name,
+            found: true,
+            name: String(resource.name || resourceName),
+            resourceType,
+            isText: false,
+            sizeKb,
+          },
+        );
       } catch (error) {
         return createToolErrorResponse("get_web_resource_content", error);
       }
