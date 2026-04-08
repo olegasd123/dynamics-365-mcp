@@ -4,6 +4,11 @@ This file gives one prompt for each CRM tool in this MCP server.
 
 Use these prompts when you want to test the tools by hand from an MCP client or chat UI.
 
+Note:
+
+- This file is about manual chat prompts that call tools.
+- The server also publishes MCP prompts and resources for first-run guidance.
+
 ## Placeholders
 
 Replace these values before you run a prompt:

@@ -12,6 +12,8 @@ import { TokenManager } from "./auth/token-manager.js";
 import { DynamicsClient } from "./client/dynamics-client.js";
 import { instrumentServerToolLogging, requestLogger } from "./logging/request-logger.js";
 import { registerAllTools } from "./tools/index.js";
+import { registerAllPrompts } from "./prompts/index.js";
+import { registerAllResources } from "./resources/index.js";
 import {
   createHttpHealthState,
   HttpRuntime,
@@ -40,6 +42,8 @@ function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClie
 
   instrumentServerToolLogging(server);
   registerAllTools(server, config, client);
+  registerAllPrompts(server, config);
+  registerAllResources(server, config);
   return server;
 }
 

@@ -28,6 +28,10 @@ src/
   auth/
     token-manager.ts                # OAuth2 token flows + per-env in-memory cache
     os-keychain.ts                  # OS keychain storage for device-code tokens
+  prompts/
+    index.ts                        # MCP prompts for common Dynamics 365 tasks
+  resources/
+    index.ts                        # MCP resources for guides and reusable context
   client/
     dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
   tools/
@@ -243,6 +247,29 @@ The server also supports HTTP mode for service scripts. Use this when you want a
 - Health endpoint: `/health`
 - Default host: `127.0.0.1`
 - Default port: `3003`
+
+## Built-in MCP Prompts
+
+The server also exposes MCP prompts for common tasks:
+
+- `discover_metadata`
+- `review_solution`
+- `compare_solution`
+- `investigate_table_change`
+
+These prompts guide the client toward the right tool flow. They are useful when the user knows the task but not the exact tool names yet.
+
+## Built-in MCP Resources
+
+The server also exposes MCP resources for reusable context:
+
+- `d365://guides/getting-started`
+- `d365://reference/environments`
+- `d365://reference/prompts`
+- `d365://reference/tool-groups`
+- `d365://environments/{environment}/starter`
+
+These resources help first-run discovery and give clients stable reference material without calling a tool first.
 
 ### Start On macOS Or Linux
 
