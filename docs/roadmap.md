@@ -62,6 +62,8 @@ Expected result:
 
 ## Milestone 2: Expose ALM Objects As First-Class Tools
 
+Status: Done
+
 Goal:
 Add direct MCP tools for ALM objects that are already used in internal logic.
 

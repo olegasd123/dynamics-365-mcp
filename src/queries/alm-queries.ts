@@ -1,4 +1,4 @@
-import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
+import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
 
 function buildOrFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");
@@ -43,9 +43,14 @@ const APP_MODULE_SELECT = [
   "statecode",
 ];
 
-export function listEnvironmentVariableDefinitionsQuery(): string {
+export function listEnvironmentVariableDefinitionsQuery(nameFilter?: string): string {
+  const filter = nameFilter
+    ? `(${odataContains("schemaname", nameFilter)} or ${odataContains("displayname", nameFilter)})`
+    : undefined;
+
   return buildQueryString({
     select: ENVIRONMENT_VARIABLE_DEFINITION_SELECT,
+    filter,
     orderby: "schemaname asc",
   });
 }
@@ -65,6 +70,14 @@ export function listEnvironmentVariableValuesQuery(): string {
   });
 }
 
+export function listEnvironmentVariableValuesForDefinitionsQuery(definitionIds: string[]): string {
+  return buildQueryString({
+    select: ENVIRONMENT_VARIABLE_VALUE_SELECT,
+    filter: buildOrFilter("_environmentvariabledefinitionid_value", definitionIds),
+    orderby: "modifiedon desc",
+  });
+}
+
 export function listEnvironmentVariableValuesByIdsQuery(ids: string[]): string {
   return buildQueryString({
     select: ENVIRONMENT_VARIABLE_VALUE_SELECT,
@@ -73,9 +86,14 @@ export function listEnvironmentVariableValuesByIdsQuery(ids: string[]): string {
   });
 }
 
-export function listConnectionReferencesQuery(): string {
+export function listConnectionReferencesQuery(nameFilter?: string): string {
+  const filter = nameFilter
+    ? `(${odataContains("displayname", nameFilter)} or ${odataContains("connectionreferencelogicalname", nameFilter)})`
+    : undefined;
+
   return buildQueryString({
     select: CONNECTION_REFERENCE_SELECT,
+    filter,
     orderby: "displayname asc",
   });
 }
@@ -88,9 +106,14 @@ export function listConnectionReferencesByIdsQuery(ids: string[]): string {
   });
 }
 
-export function listAppModulesQuery(): string {
+export function listAppModulesQuery(nameFilter?: string): string {
+  const filter = nameFilter
+    ? `(${odataContains("name", nameFilter)} or ${odataContains("uniquename", nameFilter)})`
+    : undefined;
+
   return buildQueryString({
     select: APP_MODULE_SELECT,
+    filter,
     orderby: "name asc",
   });
 }

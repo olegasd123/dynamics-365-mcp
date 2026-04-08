@@ -19,6 +19,18 @@ import {
   type PluginStepRecord,
 } from "../plugins/plugin-inventory.js";
 import {
+  normalizeAppModule,
+  normalizeConnectionReference,
+  normalizeDashboard,
+  normalizeEnvironmentVariableDefinition,
+  normalizeEnvironmentVariableValue,
+  type AppModuleRecord,
+  type ConnectionReferenceRecord,
+  type DashboardRecord,
+  type EnvironmentVariableDefinitionRecord,
+  type EnvironmentVariableValueRecord,
+} from "../alm/alm-shared.js";
+import {
   listColumnsByMetadataIds,
   listTables,
   listTablesByMetadataIds,
@@ -83,53 +95,13 @@ export interface SolutionComponentRecord extends Record<string, unknown> {
   rootcomponentbehavior?: number;
 }
 
-export interface EnvironmentVariableDefinitionRecord extends Record<string, unknown> {
-  environmentvariabledefinitionid: string;
-  schemaname: string;
-  displayname: string;
-  type: number;
-  defaultvalue: string;
-  valueschema: string;
-  ismanaged: boolean;
-  modifiedon: string;
-}
-
-export interface EnvironmentVariableValueRecord extends Record<string, unknown> {
-  environmentvariablevalueid: string;
-  environmentvariabledefinitionid: string;
-  value: string;
-  ismanaged: boolean;
-  modifiedon: string;
-}
-
-export interface ConnectionReferenceRecord extends Record<string, unknown> {
-  connectionreferenceid: string;
-  connectionreferencelogicalname: string;
-  displayname: string;
-  connectorid: string;
-  connectionid: string;
-  ismanaged: boolean;
-  modifiedon: string;
-  statecode: number;
-}
-
-export interface AppModuleRecord extends Record<string, unknown> {
-  appmoduleid: string;
-  name: string;
-  uniquename: string;
-  ismanaged: boolean;
-  modifiedon: string;
-  statecode: number;
-}
-
-export interface DashboardRecord extends Record<string, unknown> {
-  formid: string;
-  name: string;
-  objecttypecode: string;
-  type: number;
-  ismanaged: boolean;
-  modifiedon: string;
-}
+export type {
+  AppModuleRecord,
+  ConnectionReferenceRecord,
+  DashboardRecord,
+  EnvironmentVariableDefinitionRecord,
+  EnvironmentVariableValueRecord,
+} from "../alm/alm-shared.js";
 
 export interface SolutionComponentSets {
   solution: SolutionRecord;
@@ -469,73 +441,6 @@ function normalizeSolutionComponent(component: Record<string, unknown>): Solutio
       component.rootcomponentbehavior === undefined
         ? undefined
         : Number(component.rootcomponentbehavior),
-  };
-}
-
-function normalizeEnvironmentVariableDefinition(
-  record: Record<string, unknown>,
-): EnvironmentVariableDefinitionRecord {
-  return {
-    ...record,
-    environmentvariabledefinitionid: String(record.environmentvariabledefinitionid || ""),
-    schemaname: String(record.schemaname || ""),
-    displayname: String(record.displayname || ""),
-    type: Number(record.type || 0),
-    defaultvalue: String(record.defaultvalue || ""),
-    valueschema: String(record.valueschema || ""),
-    ismanaged: Boolean(record.ismanaged),
-    modifiedon: String(record.modifiedon || ""),
-  };
-}
-
-function normalizeEnvironmentVariableValue(
-  record: Record<string, unknown>,
-): EnvironmentVariableValueRecord {
-  return {
-    ...record,
-    environmentvariablevalueid: String(record.environmentvariablevalueid || ""),
-    environmentvariabledefinitionid: String(record._environmentvariabledefinitionid_value || ""),
-    value: String(record.value || ""),
-    ismanaged: Boolean(record.ismanaged),
-    modifiedon: String(record.modifiedon || ""),
-  };
-}
-
-function normalizeConnectionReference(record: Record<string, unknown>): ConnectionReferenceRecord {
-  return {
-    ...record,
-    connectionreferenceid: String(record.connectionreferenceid || ""),
-    connectionreferencelogicalname: String(record.connectionreferencelogicalname || ""),
-    displayname: String(record.displayname || ""),
-    connectorid: String(record.connectorid || ""),
-    connectionid: String(record.connectionid || ""),
-    ismanaged: Boolean(record.ismanaged),
-    modifiedon: String(record.modifiedon || ""),
-    statecode: Number(record.statecode || 0),
-  };
-}
-
-function normalizeAppModule(record: Record<string, unknown>): AppModuleRecord {
-  return {
-    ...record,
-    appmoduleid: String(record.appmoduleid || ""),
-    name: String(record.name || ""),
-    uniquename: String(record.uniquename || ""),
-    ismanaged: Boolean(record.ismanaged),
-    modifiedon: String(record.modifiedon || ""),
-    statecode: Number(record.statecode || 0),
-  };
-}
-
-function normalizeDashboard(record: Record<string, unknown>): DashboardRecord {
-  return {
-    ...record,
-    formid: String(record.formid || ""),
-    name: String(record.name || ""),
-    objecttypecode: String(record.objecttypecode || ""),
-    type: Number(record.type || 0),
-    ismanaged: Boolean(record.ismanaged),
-    modifiedon: String(record.modifiedon || ""),
   };
 }
 

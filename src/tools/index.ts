@@ -2,6 +2,16 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../config/types.js";
 import type { DynamicsClient } from "../client/dynamics-client.js";
 
+// ALM tools
+import { registerListEnvironmentVariables } from "./alm/list-environment-variables.js";
+import { registerGetEnvironmentVariableDetails } from "./alm/get-environment-variable-details.js";
+import { registerListConnectionReferences } from "./alm/list-connection-references.js";
+import { registerGetConnectionReferenceDetails } from "./alm/get-connection-reference-details.js";
+import { registerListAppModules } from "./alm/list-app-modules.js";
+import { registerGetAppModuleDetails } from "./alm/get-app-module-details.js";
+import { registerListDashboards } from "./alm/list-dashboards.js";
+import { registerGetDashboardDetails } from "./alm/get-dashboard-details.js";
+
 // Discovery tools
 import { registerFindMetadata } from "./discovery/find-metadata.js";
 
@@ -83,6 +93,16 @@ export function registerAllTools(
   config: AppConfig,
   client: DynamicsClient,
 ): void {
+  // ALM tools
+  registerListEnvironmentVariables(server, config, client);
+  registerGetEnvironmentVariableDetails(server, config, client);
+  registerListConnectionReferences(server, config, client);
+  registerGetConnectionReferenceDetails(server, config, client);
+  registerListAppModules(server, config, client);
+  registerGetAppModuleDetails(server, config, client);
+  registerListDashboards(server, config, client);
+  registerGetDashboardDetails(server, config, client);
+
   // Discovery tools
   registerFindMetadata(server, config, client);
 

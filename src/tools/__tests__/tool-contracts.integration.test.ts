@@ -67,6 +67,46 @@ describe("tool contracts", () => {
         componentType: expect.any(Object),
         limit: expect.any(Object),
       });
+      expect(toolsByName.list_environment_variables.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_environment_variable_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        variableName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_connection_references.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_connection_reference_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        referenceName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_app_modules.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_app_module_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        appName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_dashboards.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_dashboard_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        dashboardName: expect.any(Object),
+        solution: expect.any(Object),
+      });
       expect(toolsByName.analyze_create_triggers.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         table: expect.any(Object),

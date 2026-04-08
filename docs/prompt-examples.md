@@ -29,6 +29,10 @@ Replace these values before you run a prompt:
 - `<ROLE>`: security role name
 - `<BUSINESS_UNIT>`: business unit name
 - `<WEB_RESOURCE>`: web resource name like `new_/scripts/main.js`
+- `<ENV_VAR>`: environment variable schema name or display name
+- `<CONNECTION_REFERENCE>`: connection reference display name or logical name
+- `<APP_MODULE>`: app module name or unique name
+- `<DASHBOARD>`: dashboard name
 
 Tip:
 
@@ -83,6 +87,32 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 - `get_web_resource_content`
   `In <ENV>, get the content of web resource <WEB_RESOURCE>.`
+
+## ALM Objects
+
+- `list_environment_variables`
+  `In <ENV>, list environment variables from solution <SOLUTION> where the schema name matches 'contoso'. Show current values when available.`
+
+- `get_environment_variable_details`
+  `In <ENV>, show full details for environment variable <ENV_VAR> from solution <SOLUTION>. Include default value and current value records.`
+
+- `list_connection_references`
+  `In <ENV>, list connection references from solution <SOLUTION> that match 'office'. Show connector and connection status.`
+
+- `get_connection_reference_details`
+  `In <ENV>, show full details for connection reference <CONNECTION_REFERENCE> from solution <SOLUTION>. Include connector id, connection id, and missing link status.`
+
+- `list_app_modules`
+  `In <ENV>, list app modules from solution <SOLUTION> that match 'Sales'.`
+
+- `get_app_module_details`
+  `In <ENV>, show full details for app module <APP_MODULE> from solution <SOLUTION>.`
+
+- `list_dashboards`
+  `In <ENV>, list dashboards from solution <SOLUTION> that match 'Sales'.`
+
+- `get_dashboard_details`
+  `In <ENV>, show full details for dashboard <DASHBOARD> from solution <SOLUTION>.`
 
 ## Solutions
 
@@ -237,7 +267,11 @@ This prompt list covers these tools:
 - `find_table_usage`
 - `find_metadata`
 - `find_web_resource_usage`
+- `get_app_module_details`
+- `get_connection_reference_details`
 - `get_custom_api_details`
+- `get_dashboard_details`
+- `get_environment_variable_details`
 - `get_flow_details`
 - `get_form_details`
 - `get_plugin_details`
@@ -251,8 +285,12 @@ This prompt list covers these tools:
 - `get_web_resource_content`
 - `get_workflow_details`
 - `list_actions`
+- `list_app_modules`
 - `list_cloud_flows`
+- `list_connection_references`
 - `list_custom_apis`
+- `list_dashboards`
+- `list_environment_variables`
 - `list_forms`
 - `list_plugin_steps`
 - `list_plugins`

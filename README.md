@@ -1,6 +1,6 @@
 # Dynamics 365 CRM MCP Server
 
-An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. Supports querying tables, plugin assemblies, plugin classes, workflows, actions, web resources, and comparing configurations across multiple environments (dev, test, pre-prod, prod, etc.).
+An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. It supports tables, forms, views, workflows, actions, cloud flows, web resources, solutions, ALM objects, plugins, and cross-environment comparison across multiple environments (dev, test, pre-prod, prod, etc.).
 
 ## Docs
 
@@ -30,11 +30,22 @@ src/
     dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
   tools/
     index.ts                        # Tool registration barrel
+    alm/
+      list-environment-variables.ts
+      get-environment-variable-details.ts
+      list-connection-references.ts
+      get-connection-reference-details.ts
+      list-app-modules.ts
+      get-app-module-details.ts
+      list-dashboards.ts
+      get-dashboard-details.ts
     tables/
       list-tables.ts
       get-table-schema.ts
       list-table-columns.ts
       list-table-relationships.ts
+    discovery/
+      find-metadata.ts
     forms/
       list-forms.ts
       get-form-details.ts
@@ -94,6 +105,8 @@ src/
     view-queries.ts                 # View metadata query builders
     custom-api-queries.ts           # Custom API metadata query builders
     flow-queries.ts                 # Cloud flow query builders on workflow metadata
+    alm-queries.ts                  # Environment variables, connection references, and app module query builders
+    dashboard-queries.ts            # Dashboard query builders on system forms
     security-queries.ts             # Security role and privilege query builders
     plugin-queries.ts               # OData query builders for plugin assemblies, types, steps, and images
     workflow-queries.ts             # OData query builders for workflows
