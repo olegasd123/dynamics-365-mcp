@@ -14,6 +14,7 @@ import { instrumentServerToolLogging, requestLogger } from "./logging/request-lo
 import { registerAllTools } from "./tools/index.js";
 import { registerAllPrompts } from "./prompts/index.js";
 import { registerAllResources } from "./resources/index.js";
+import { installToolCallCompatibility } from "./tool-call-compatibility.js";
 import {
   createHttpHealthState,
   HttpRuntime,
@@ -42,6 +43,7 @@ function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClie
 
   instrumentServerToolLogging(server);
   registerAllTools(server, config, client);
+  installToolCallCompatibility(server);
   registerAllPrompts(server, config);
   registerAllResources(server, config);
   return server;

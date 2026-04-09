@@ -113,7 +113,7 @@ describe("request logger", () => {
     expect(loggerState.config.logsDir).toBe(join(homedir(), ".dynamics-365-mcp", "logs"));
   });
 
-  it("registers a commentary compatibility alias for tools", async () => {
+  it("wraps only the canonical tool handler", async () => {
     const server = new FakeServer();
     instrumentServerToolLogging(server as never);
 
@@ -124,12 +124,11 @@ describe("request logger", () => {
     );
 
     const canonicalHandler = server.getHandler("demo_tool");
-    const compatibilityHandler = server.getHandler("demo_toolcommentary");
-
     const canonicalResponse = await canonicalHandler({});
-    const compatibilityResponse = await compatibilityHandler({});
 
     expect(canonicalResponse.content[0].text).toBe("Done");
-    expect(compatibilityResponse.content[0].text).toBe("Done");
+    expect(() => server.getHandler("demo_toolcommentary")).toThrow(
+      "Tool 'demo_toolcommentary' is not registered",
+    );
   });
 });

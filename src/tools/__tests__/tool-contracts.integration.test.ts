@@ -3,6 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerAllTools } from "../index.js";
+import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
   EXPECTED_TOOL_NAMES,
   REMOVED_LEGACY_TOOL_NAMES,
@@ -22,6 +23,7 @@ async function createConnectedToolClient(
   const config = createTestConfig(environmentNames);
   const { client: dynamicsClient } = createRecordingClient(datasets);
   registerAllTools(server, config, dynamicsClient);
+  installToolCallCompatibility(server);
 
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({
@@ -334,6 +336,40 @@ describe("tool contracts", () => {
           message: "Environment 'missing' not found. Available: dev",
         },
       });
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("maps legacy commentary tool calls to the canonical tool name before dispatch", async () => {
+    const harness = await createConnectedToolClient(
+      {
+        dev: {
+          EntityDefinitions: [],
+        },
+      },
+      ["dev"],
+    );
+
+    try {
+      const result = await harness.client.callTool({
+        name: "list_tablescommentary",
+        arguments: {
+          environment: "dev",
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        tool: "list_tables",
+        ok: true,
+        data: {
+          environment: "dev",
+          count: 0,
+          items: [],
+        },
+      });
+      expect(result.content[0]?.text).toContain("No tables found");
     } finally {
       await harness.close();
     }

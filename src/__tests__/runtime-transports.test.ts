@@ -225,11 +225,8 @@ describe("runtime transports", () => {
       const toolNames = result.tools
         .map((tool) => tool.name)
         .sort((left, right) => left.localeCompare(right));
-      const canonicalToolNames = toolNames.filter((name) => !name.endsWith("commentary"));
 
-      expect(canonicalToolNames).toEqual(EXPECTED_TOOL_NAMES);
-      expect(toolNames).toContain("list_tablescommentary");
-      expect(toolNames).toContain("analyze_update_triggerscommentary");
+      expect(toolNames).toEqual(EXPECTED_TOOL_NAMES);
     } catch (error) {
       throw new Error(
         `Stdio runtime smoke test failed: ${error instanceof Error ? error.message : String(error)}\n${stderr.buffer}`,
@@ -293,11 +290,8 @@ describe("runtime transports", () => {
       const toolNames = result.tools
         .map((tool) => tool.name)
         .sort((left, right) => left.localeCompare(right));
-      const canonicalToolNames = toolNames.filter((name) => !name.endsWith("commentary"));
 
-      expect(canonicalToolNames).toEqual(EXPECTED_TOOL_NAMES);
-      expect(toolNames).toContain("list_tablescommentary");
-      expect(toolNames).toContain("analyze_update_triggerscommentary");
+      expect(toolNames).toEqual(EXPECTED_TOOL_NAMES);
 
       const connectedHealth = await waitForHealthValue(
         baseUrl,
