@@ -60,7 +60,12 @@ describe("list_plugins tool", () => {
       ok: true,
       data: {
         environment: "dev",
-        count: 1,
+        limit: 50,
+        cursor: null,
+        returnedCount: 1,
+        totalCount: 1,
+        hasMore: false,
+        nextCursor: null,
       },
     });
   });
@@ -119,5 +124,60 @@ describe("list_plugins tool", () => {
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("OrphanPlugin");
     expect(response.content[0].text).not.toContain("OtherPlugin");
+  });
+
+  it("supports paging for plugin classes", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        pluginassemblies: [{ pluginassemblyid: "asm-1", name: "Core.Plugins" }],
+        plugintypes: [
+          {
+            plugintypeid: "type-1",
+            name: "AccountPlugin",
+            typename: "Core.Plugins.AccountPlugin",
+            isworkflowactivity: false,
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-2",
+            name: "ContactPlugin",
+            typename: "Core.Plugins.ContactPlugin",
+            isworkflowactivity: false,
+            _pluginassemblyid_value: "asm-1",
+          },
+          {
+            plugintypeid: "type-3",
+            name: "LeadPlugin",
+            typename: "Core.Plugins.LeadPlugin",
+            isworkflowactivity: false,
+            _pluginassemblyid_value: "asm-1",
+          },
+        ],
+        sdkmessageprocessingsteps: [],
+        sdkmessageprocessingstepimages: [],
+      },
+    });
+
+    registerListPlugins(server as never, config, client);
+
+    const response = await server.getHandler("list_plugins")({ limit: 2 });
+    const payload = response.structuredContent as {
+      data: {
+        returnedCount: number;
+        totalCount: number;
+        hasMore: boolean;
+        nextCursor: string | null;
+        items: Array<{ name: string }>;
+      };
+    };
+
+    expect(response.content[0].text).toContain("Showing 2 of 3 plugin classes.");
+    expect(payload.data.returnedCount).toBe(2);
+    expect(payload.data.totalCount).toBe(3);
+    expect(payload.data.hasMore).toBe(true);
+    expect(payload.data.nextCursor).toBe("2");
+    expect(payload.data.items.map((item) => item.name)).toEqual(["AccountPlugin", "ContactPlugin"]);
   });
 });

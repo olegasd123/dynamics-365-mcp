@@ -4,7 +4,14 @@ import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { ViewScope } from "../../queries/view-queries.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
+import {
+  LIST_CURSOR_SCHEMA,
+  LIST_LIMIT_SCHEMA,
+  buildPaginatedListData,
+  buildPaginatedListSummary,
+  createToolErrorResponse,
+  createToolSuccessResponse,
+} from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listViews } from "./view-metadata.js";
 
@@ -26,33 +33,39 @@ export function registerListViews(server: McpServer, config: AppConfig, client: 
         .string()
         .optional()
         .describe("Optional solution display name or unique name. Applied to system views only."),
+      limit: LIST_LIMIT_SCHEMA,
+      cursor: LIST_CURSOR_SCHEMA,
     },
-    async ({ environment, table, scope, nameFilter, solution }) => {
+    async ({ environment, table, scope, nameFilter, solution, limit, cursor }) => {
       try {
         const env = getEnvironment(config, environment);
+        const filters = {
+          table: table || null,
+          scope: scope || null,
+          nameFilter: nameFilter || null,
+          solution: solution || null,
+        };
         const views = await listViews(env, client, {
           table,
           scope: scope as ViewScope | undefined,
           nameFilter,
           solution,
         });
+        const page = buildPaginatedListData(
+          views,
+          { environment: env.name, filters },
+          {
+            limit,
+            cursor,
+          },
+        );
 
-        if (views.length === 0) {
+        if (page.totalCount === 0) {
           const text = `No views found in '${env.name}' with the specified filters.`;
-          return createToolSuccessResponse("list_views", text, text, {
-            environment: env.name,
-            filters: {
-              table: table || null,
-              scope: scope || null,
-              nameFilter: nameFilter || null,
-              solution: solution || null,
-            },
-            count: 0,
-            items: [],
-          });
+          return createToolSuccessResponse("list_views", text, text, page);
         }
 
-        const rows = views.map((view) => [
+        const rows = page.items.map((view) => [
           view.returnedtypecode,
           view.scope,
           view.name,
@@ -71,26 +84,28 @@ export function registerListViews(server: McpServer, config: AppConfig, client: 
         ]
           .filter(Boolean)
           .join(", ");
+        const pageSummary = buildPaginatedListSummary({
+          cursor: page.cursor,
+          returnedCount: page.returnedCount,
+          totalCount: page.totalCount,
+          hasMore: page.hasMore,
+          nextCursor: page.nextCursor,
+          itemLabelSingular: "view",
+          itemLabelPlural: "views",
+          narrowHint: page.hasMore
+            ? "Use table, scope, nameFilter, or solution to narrow the result."
+            : undefined,
+        });
 
-        const text = `## Views in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\nFound ${views.length} view(s).\n\n${formatTable(
+        const text = `## Views in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\n${pageSummary}\n\n${formatTable(
           ["Table", "Scope", "Name", "Type", "Default", "Quick Find", "State", "Modified"],
           rows,
         )}`;
         return createToolSuccessResponse(
           "list_views",
           text,
-          `Found ${views.length} view(s) in '${env.name}'.`,
-          {
-            environment: env.name,
-            filters: {
-              table: table || null,
-              scope: scope || null,
-              nameFilter: nameFilter || null,
-              solution: solution || null,
-            },
-            count: views.length,
-            items: views,
-          },
+          `${pageSummary} Environment: '${env.name}'.`,
+          page,
         );
       } catch (error) {
         return createToolErrorResponse("list_views", error);

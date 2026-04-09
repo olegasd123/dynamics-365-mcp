@@ -79,7 +79,7 @@ Make HTTP mode safer for long-running local or team use.
 - `src/__tests__/runtime-transports.test.ts`
 - `docs/http-lifecycle.md`
 
-## Milestone 3: Tool Output Limits And Paging
+## [done] Milestone 3: Tool Output Limits And Paging
 
 ### Goal
 

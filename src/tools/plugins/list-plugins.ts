@@ -3,7 +3,14 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
+import {
+  LIST_CURSOR_SCHEMA,
+  LIST_LIMIT_SCHEMA,
+  buildPaginatedListData,
+  buildPaginatedListSummary,
+  createToolErrorResponse,
+  createToolSuccessResponse,
+} from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
   countStepsByPluginTypeId,
@@ -22,8 +29,10 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
         .optional()
         .describe("Filter: 'all' (default) or 'no_steps' for orphaned plugin classes"),
       solution: z.string().optional().describe("Optional solution display name or unique name"),
+      limit: LIST_LIMIT_SCHEMA,
+      cursor: LIST_CURSOR_SCHEMA,
     },
-    async ({ environment, filter, solution }) => {
+    async ({ environment, filter, solution, limit, cursor }) => {
       try {
         const env = getEnvironment(config, environment);
         const inventory = await fetchPluginMetadata(env, client, {
@@ -37,53 +46,67 @@ export function registerListPlugins(server: McpServer, config: AppConfig, client
           inventory.steps,
           filter,
         );
+        const items = plugins
+          .map((plugin) => ({
+            ...plugin,
+            stepCount: stepCountByPluginId.get(plugin.pluginTypeId) || 0,
+          }))
+          .sort(
+            (left, right) =>
+              left.assemblyName.localeCompare(right.assemblyName) ||
+              left.fullName.localeCompare(right.fullName),
+          );
+        const page = buildPaginatedListData(
+          items,
+          {
+            environment: env.name,
+            filters: {
+              filter: filter || "all",
+              solution: solution || null,
+            },
+          },
+          { limit, cursor },
+        );
 
-        if (plugins.length === 0) {
+        if (page.totalCount === 0) {
           const text =
             filter === "no_steps"
               ? `No orphaned plugin classes found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`
               : `No plugin classes found in '${env.name}'${solution ? ` for solution '${solution}'.` : "."}`;
 
-          return createToolSuccessResponse("list_plugins", text, text, {
-            environment: env.name,
-            filter: filter || "all",
-            solution: solution || null,
-            count: 0,
-            items: [],
-          });
+          return createToolSuccessResponse("list_plugins", text, text, page);
         }
 
         const headers = ["Plugin", "Full Name", "Assembly", "Steps"];
-        const rows = plugins.map((plugin) => [
+        const rows = page.items.map((plugin) => [
           plugin.name,
           plugin.fullName,
           plugin.assemblyName,
           String(stepCountByPluginId.get(plugin.pluginTypeId) || 0),
         ]);
-        const items = plugins.map((plugin) => ({
-          ...plugin,
-          stepCount: stepCountByPluginId.get(plugin.pluginTypeId) || 0,
-        }));
         const suffix = [
           filter === "no_steps" ? "orphaned - no steps" : "",
           solution ? `solution='${solution}'` : "",
         ]
           .filter(Boolean)
           .join(", ");
-        const pluginLabel = plugins.length === 1 ? "plugin class" : "plugin classes";
-        const text = `## Plugins in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\nFound ${plugins.length} ${pluginLabel}.\n\n${formatTable(headers, rows)}`;
+        const pageSummary = buildPaginatedListSummary({
+          cursor: page.cursor,
+          returnedCount: page.returnedCount,
+          totalCount: page.totalCount,
+          hasMore: page.hasMore,
+          nextCursor: page.nextCursor,
+          itemLabelSingular: "plugin class",
+          itemLabelPlural: "plugin classes",
+          narrowHint: page.hasMore ? "Use filter or solution to narrow the result." : undefined,
+        });
+        const text = `## Plugins in '${env.name}'${suffix ? ` (${suffix})` : ""}\n\n${pageSummary}\n\n${formatTable(headers, rows)}`;
 
         return createToolSuccessResponse(
           "list_plugins",
           text,
-          `Found ${plugins.length} ${pluginLabel} in '${env.name}'.`,
-          {
-            environment: env.name,
-            filter: filter || "all",
-            solution: solution || null,
-            count: plugins.length,
-            items,
-          },
+          `${pageSummary} Environment: '${env.name}'.`,
+          page,
         );
       } catch (error) {
         return createToolErrorResponse("list_plugins", error);

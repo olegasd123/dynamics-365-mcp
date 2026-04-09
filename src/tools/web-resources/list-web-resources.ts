@@ -5,7 +5,14 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
+import {
+  LIST_CURSOR_SCHEMA,
+  LIST_LIMIT_SCHEMA,
+  buildPaginatedListData,
+  buildPaginatedListSummary,
+  createToolErrorResponse,
+  createToolSuccessResponse,
+} from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 
@@ -40,8 +47,10 @@ export function registerListWebResources(
         .describe("Filter by web resource type"),
       nameFilter: z.string().optional().describe("Filter by name (contains match)"),
       solution: z.string().optional().describe("Optional solution display name or unique name"),
+      limit: LIST_LIMIT_SCHEMA,
+      cursor: LIST_CURSOR_SCHEMA,
     },
-    async ({ environment, type, nameFilter, solution }) => {
+    async ({ environment, type, nameFilter, solution, limit, cursor }) => {
       try {
         const env = getEnvironment(config, environment);
         let resources = await client.query<Record<string, unknown>>(
@@ -59,28 +68,42 @@ export function registerListWebResources(
             solutionComponents.webResourceIds.has(String(resource.webresourceid || "")),
           );
         }
-
-        if (resources.length === 0) {
-          const text = `No web resources found in '${env.name}' with the specified filters.`;
-          return createToolSuccessResponse("list_web_resources", text, text, {
+        const items = resources
+          .map((resource) => ({
+            ...resource,
+            name: String(resource.name || ""),
+            displayname: String(resource.displayname || ""),
+            ismanaged: Boolean(resource.ismanaged),
+            modifiedon: String(resource.modifiedon || ""),
+            typeLabel:
+              TYPE_LABELS[resource.webresourcetype as number] || String(resource.webresourcetype),
+          }))
+          .sort((left, right) => left.name.localeCompare(right.name));
+        const page = buildPaginatedListData(
+          items,
+          {
             environment: env.name,
             filters: {
               type: type || null,
               nameFilter: nameFilter || null,
               solution: solution || null,
             },
-            count: 0,
-            items: [],
-          });
+          },
+          { limit, cursor },
+        );
+
+        if (page.totalCount === 0) {
+          const text = `No web resources found in '${env.name}' with the specified filters.`;
+          return createToolSuccessResponse("list_web_resources", text, text, page);
         }
 
         const headers = ["Name", "Display Name", "Type", "Managed", "Modified"];
-        const rows = resources.map((r) => [
-          String(r.name || ""),
-          String(r.displayname || ""),
-          TYPE_LABELS[r.webresourcetype as number] || String(r.webresourcetype),
-          r.ismanaged ? "Yes" : "No",
-          String(r.modifiedon || "").slice(0, 10),
+        const rows = page.items.map((resource) => [
+          String(resource.name || ""),
+          String(resource.displayname || ""),
+          String(resource.typeLabel || ""),
+          resource.ismanaged ? "Yes" : "No",
+          String(resource.modifiedon || "").slice(0, 10),
         ]);
 
         const filterDesc = [
@@ -90,27 +113,24 @@ export function registerListWebResources(
         ]
           .filter(Boolean)
           .join(", ");
-
-        const items = resources.map((resource) => ({
-          ...resource,
-          typeLabel:
-            TYPE_LABELS[resource.webresourcetype as number] || String(resource.webresourcetype),
-        }));
-        const text = `## Web Resources in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\nFound ${resources.length} resource(s).\n\n${formatTable(headers, rows)}`;
+        const pageSummary = buildPaginatedListSummary({
+          cursor: page.cursor,
+          returnedCount: page.returnedCount,
+          totalCount: page.totalCount,
+          hasMore: page.hasMore,
+          nextCursor: page.nextCursor,
+          itemLabelSingular: "web resource",
+          itemLabelPlural: "web resources",
+          narrowHint: page.hasMore
+            ? "Use type, nameFilter, or solution to narrow the result."
+            : undefined,
+        });
+        const text = `## Web Resources in '${env.name}'${filterDesc ? ` (${filterDesc})` : ""}\n\n${pageSummary}\n\n${formatTable(headers, rows)}`;
         return createToolSuccessResponse(
           "list_web_resources",
           text,
-          `Found ${resources.length} web resource(s) in '${env.name}'.`,
-          {
-            environment: env.name,
-            filters: {
-              type: type || null,
-              nameFilter: nameFilter || null,
-              solution: solution || null,
-            },
-            count: resources.length,
-            items,
-          },
+          `${pageSummary} Environment: '${env.name}'.`,
+          page,
         );
       } catch (error) {
         return createToolErrorResponse("list_web_resources", error);

@@ -62,6 +62,8 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         nameFilter: expect.any(Object),
         solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
       });
       expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -133,6 +135,39 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         filter: expect.any(Object),
         solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_views.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        scope: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_solutions.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_workflows.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        category: expect.any(Object),
+        status: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_web_resources.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        type: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
       });
       expect(toolsByName.list_plugin_steps.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -285,10 +320,15 @@ describe("tool contracts", () => {
         version: "1",
         tool: "list_tables",
         ok: true,
-        summary: "Found 1 table(s) in 'dev'.",
+        summary: "Found 1 table. Environment: 'dev'.",
         data: {
           environment: "dev",
-          count: 1,
+          limit: 50,
+          cursor: null,
+          returnedCount: 1,
+          totalCount: 1,
+          hasMore: false,
+          nextCursor: null,
         },
       });
       expect(listTablesResult.content[0]?.type).toBe("text");
@@ -365,7 +405,12 @@ describe("tool contracts", () => {
         ok: true,
         data: {
           environment: "dev",
-          count: 0,
+          limit: 50,
+          cursor: null,
+          returnedCount: 0,
+          totalCount: 0,
+          hasMore: false,
+          nextCursor: null,
           items: [],
         },
       });

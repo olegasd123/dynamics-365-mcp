@@ -49,5 +49,16 @@ describe("list_workflows solution filter", () => {
     expect(response.isError).toBeUndefined();
     expect(text).toContain("Account Sync");
     expect(text).not.toContain("Contact Sync");
+    expect(response.structuredContent).toMatchObject({
+      tool: "list_workflows",
+      ok: true,
+      data: {
+        environment: "dev",
+        returnedCount: 1,
+        totalCount: 1,
+        hasMore: false,
+        nextCursor: null,
+      },
+    });
   });
 });

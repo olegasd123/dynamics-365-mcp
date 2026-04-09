@@ -45,5 +45,16 @@ describe("list_web_resources solution filter", () => {
     expect(response.isError).toBeUndefined();
     expect(text).toContain("contoso_/scripts/app.js");
     expect(text).not.toContain("contoso_/scripts/admin.js");
+    expect(response.structuredContent).toMatchObject({
+      tool: "list_web_resources",
+      ok: true,
+      data: {
+        environment: "dev",
+        returnedCount: 1,
+        totalCount: 1,
+        hasMore: false,
+        nextCursor: null,
+      },
+    });
   });
 });
