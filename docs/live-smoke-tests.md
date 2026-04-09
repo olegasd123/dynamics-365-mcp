@@ -47,6 +47,8 @@ Optional:
 - clears the response cache before each tool
 - records `query`, `queryPath`, and `getPath` calls
 - prints which CRM requests each tool used
+- keeps going after tool failures
+- prints one full failure list at the end
 
 ## Notes
 

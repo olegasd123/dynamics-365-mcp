@@ -65,6 +65,13 @@ interface ToolRunSummary {
   requests: RecordedRequest[];
 }
 
+interface ToolRunFailure {
+  toolName: ToolName;
+  arguments: Record<string, unknown>;
+  error: string;
+  requests: RecordedRequest[];
+}
+
 interface LiveToolCase {
   buildArgs: (fixtures: LiveFixtures) => Record<string, unknown>;
 }
@@ -604,6 +611,28 @@ function logCoverageSummary(results: ToolRunSummary[]) {
   }
 }
 
+function logFailureSummary(failures: ToolRunFailure[]) {
+  if (failures.length === 0) {
+    return;
+  }
+
+  console.info("");
+  console.info("[live] Failures");
+
+  for (const failure of failures) {
+    console.info(`[live] ${failure.toolName}`);
+    console.info(`[live]   arguments: ${JSON.stringify(failure.arguments)}`);
+    console.info(`[live]   error: ${failure.error}`);
+    if (failure.requests.length === 0) {
+      console.info("[live]   requests: none");
+      continue;
+    }
+    for (const request of failure.requests) {
+      console.info(`[live]   request: ${formatRecordedRequest(request)}`);
+    }
+  }
+}
+
 const describeLive = LIVE_FLAG ? describe : describe.skip;
 
 describeLive("live tool smoke tests", () => {
@@ -621,6 +650,7 @@ describeLive("live tool smoke tests", () => {
       const recorder = installRequestRecorder(client);
       const harness = await createConnectedLiveClient(client);
       const results: ToolRunSummary[] = [];
+      const failures: ToolRunFailure[] = [];
 
       try {
         for (const [index, toolName] of EXPECTED_TOOL_NAMES.entries()) {
@@ -628,45 +658,83 @@ describeLive("live tool smoke tests", () => {
           recorder.reset();
 
           const args = LIVE_TOOL_CASES[toolName].buildArgs(fixtures);
-          const response = (await harness.client.callTool({
-            name: toolName,
-            arguments: args,
-          })) as ToolResponse;
-          const requests = recorder.getAll();
-          const error = getToolResponseError(response);
+          try {
+            const response = (await harness.client.callTool({
+              name: toolName,
+              arguments: args,
+            })) as ToolResponse;
+            const requests = recorder.getAll();
+            const error = getToolResponseError(response);
 
-          if (error) {
-            throw new Error(
-              [
-                `Tool '${toolName}' failed.`,
-                `Arguments: ${JSON.stringify(args)}`,
-                `Error: ${error}`,
-                "Recorded CRM requests:",
-                ...requests.map((request) => `- ${formatRecordedRequest(request)}`),
-              ].join("\n"),
+            if (error) {
+              failures.push({
+                toolName,
+                arguments: args,
+                error,
+                requests,
+              });
+              console.info(
+                `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`,
+              );
+              continue;
+            }
+
+            if (requests.length === 0) {
+              failures.push({
+                toolName,
+                arguments: args,
+                error: "Tool completed without any recorded CRM request.",
+                requests,
+              });
+              console.info(
+                `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`,
+              );
+              continue;
+            }
+
+            results.push({
+              toolName,
+              requestCount: requests.length,
+              requests,
+            });
+
+            console.info(
+              `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} ok (${requests.length} request(s))`,
             );
+          } catch (error) {
+            const requests = recorder.getAll();
+            failures.push({
+              toolName,
+              arguments: args,
+              error: error instanceof Error ? error.message : String(error),
+              requests,
+            });
+            console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
           }
-
-          expect(
-            requests.length,
-            `Tool '${toolName}' completed without any recorded CRM request.`,
-          ).toBeGreaterThan(0);
-
-          results.push({
-            toolName,
-            requestCount: requests.length,
-            requests,
-          });
-
-          console.info(
-            `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} ok (${requests.length} request(s))`,
-          );
         }
       } finally {
         await harness.close();
       }
 
       logCoverageSummary(results);
+      logFailureSummary(failures);
+
+      expect(
+        failures,
+        failures
+          .map((failure) =>
+            [
+              `Tool '${failure.toolName}' failed.`,
+              `Arguments: ${JSON.stringify(failure.arguments)}`,
+              `Error: ${failure.error}`,
+              "Recorded CRM requests:",
+              ...(failure.requests.length === 0
+                ? ["- none"]
+                : failure.requests.map((request) => `- ${formatRecordedRequest(request)}`)),
+            ].join("\n"),
+          )
+          .join("\n\n"),
+      ).toEqual([]);
     },
     20 * 60 * 1000,
   );
