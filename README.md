@@ -7,6 +7,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - [Run the MCP after cloning](./docs/run-mcp.md)
 - [HTTP lifecycle](./docs/http-lifecycle.md)
 - [Manual tool test prompts](./docs/prompt-examples.md)
+- [Development roadmap](./docs/roadmap.md)
 
 ## Tech Stack
 
