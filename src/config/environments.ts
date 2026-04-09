@@ -13,6 +13,8 @@ interface ConnectionStringsEnvPayload {
   defaultEnvironment?: string;
 }
 
+const CONFIG_HELP_DOC = "docs/run-mcp.md";
+
 function parseConnectionString(connStr: string): EnvironmentConfig {
   const parts = new Map<string, string>();
   for (const segment of connStr.split(";")) {
@@ -163,7 +165,7 @@ export function loadConfig(): AppConfig {
   }
 
   throw new Error(
-    "No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRINGS, or D365_CONNECTION_STRING. See .env.example for details.",
+    `No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRINGS, or D365_CONNECTION_STRING. See ${CONFIG_HELP_DOC} for setup examples.`,
   );
 }
 

@@ -163,6 +163,16 @@ describe("MCP prompts and resources", () => {
       expect(gettingStarted.contents[0].text).toContain("Dynamics 365 MCP Starter");
       expect(gettingStarted.contents[0].text).toContain("discover_metadata");
 
+      const toolGroups = await harness.client.readResource({
+        uri: "d365://reference/tool-groups",
+      });
+      if (!("text" in toolGroups.contents[0])) {
+        throw new Error("Expected text resource content");
+      }
+      expect(toolGroups.contents[0].text).toContain("## Solutions And ALM");
+      expect(toolGroups.contents[0].text).toContain("`list_environment_variables`");
+      expect(toolGroups.contents[0].text).toContain("`compare_environment_matrix`");
+
       const environmentStarter = await harness.client.readResource({
         uri: "d365://environments/dev/starter",
       });

@@ -6,6 +6,7 @@ import {
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../config/types.js";
 import { EXPECTED_PROMPT_NAMES } from "../prompts/index.js";
+import { buildToolGroupsResourceSection } from "../tools/readme-docs.js";
 
 export const STATIC_RESOURCE_URIS = [
   "d365://guides/getting-started",
@@ -83,29 +84,7 @@ function buildPromptReferenceResource(): string {
 }
 
 function buildToolGroupsResource(): string {
-  return [
-    "# Tool Groups",
-    "",
-    "## Discovery",
-    "- `find_metadata`",
-    "",
-    "## Solutions And ALM",
-    "- `list_solutions`, `get_solution_details`, `get_solution_dependencies`",
-    "- `list_environment_variables`, `list_connection_references`, `list_app_modules`, `list_dashboards`",
-    "",
-    "## Schema And UI",
-    "- `list_tables`, `get_table_schema`, `list_table_columns`, `list_table_relationships`",
-    "- `list_forms`, `get_form_details`, `list_views`, `get_view_details`, `get_view_fetchxml`",
-    "",
-    "## Automation And Runtime",
-    "- `list_workflows`, `list_actions`, `list_cloud_flows`, `get_flow_details`",
-    "- `list_custom_apis`, `get_custom_api_details`",
-    "- `list_plugins`, `list_plugin_assemblies`, `get_plugin_details`, `get_plugin_assembly_details`",
-    "",
-    "## Usage And Comparison",
-    "- `find_table_usage`, `find_column_usage`, `find_web_resource_usage`, `analyze_impact`",
-    "- `compare_solutions`, `compare_table_schema`, `compare_views`, `compare_workflows`, `compare_plugin_assemblies`",
-  ].join("\n");
+  return buildToolGroupsResourceSection();
 }
 
 function buildEnvironmentStarterResource(config: AppConfig, environmentName: string): string {
