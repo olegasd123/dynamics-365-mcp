@@ -56,6 +56,16 @@ describe("MCP prompts and resources", () => {
         "query",
         "componentType",
       ]);
+      expect(
+        prompts.prompts
+          .find((prompt) => prompt.name === "release_gate_check")
+          ?.arguments?.map((argument) => argument.name),
+      ).toEqual(["environment", "solution", "compareWith"]);
+      expect(
+        prompts.prompts
+          .find((prompt) => prompt.name === "analyze_environment_drift")
+          ?.arguments?.map((argument) => argument.name),
+      ).toEqual(["baselineEnvironment", "targetEnvironments", "componentType"]);
 
       const completion = await harness.client.complete({
         ref: {
@@ -100,6 +110,49 @@ describe("MCP prompts and resources", () => {
       }
       expect(prompt.messages[0].content.text).toContain("get_solution_details");
       expect(prompt.messages[0].content.text).toContain("dependencies");
+
+      const releasePrompt = await harness.client.getPrompt({
+        name: "release_gate_check",
+        arguments: {
+          environment: "prod",
+          solution: "ContosoCore",
+          compareWith: "test",
+        },
+      });
+      if (releasePrompt.messages[0]?.content.type !== "text") {
+        throw new Error("Expected a text content block");
+      }
+      expect(releasePrompt.messages[0].content.text).toContain("environment_health_report");
+      expect(releasePrompt.messages[0].content.text).toContain("compare_solutions");
+
+      const pluginPrompt = await harness.client.getPrompt({
+        name: "investigate_plugin_failure",
+        arguments: {
+          environment: "dev",
+          pluginName: "Contoso.Plugins.AccountPlugin",
+          assemblyName: "Contoso.Plugins",
+          symptom: "step does not fire on update",
+        },
+      });
+      if (pluginPrompt.messages[0]?.content.type !== "text") {
+        throw new Error("Expected a text content block");
+      }
+      expect(pluginPrompt.messages[0].content.text).toContain("get_plugin_details");
+      expect(pluginPrompt.messages[0].content.text).toContain("list_plugin_steps");
+
+      const driftPrompt = await harness.client.getPrompt({
+        name: "analyze_environment_drift",
+        arguments: {
+          baselineEnvironment: "prod",
+          targetEnvironments: "dev, test",
+          componentType: "plugins",
+        },
+      });
+      if (driftPrompt.messages[0]?.content.type !== "text") {
+        throw new Error("Expected a text content block");
+      }
+      expect(driftPrompt.messages[0].content.text).toContain("compare_environment_matrix");
+      expect(driftPrompt.messages[0].content.text).toContain("compare_plugin_assemblies");
     } finally {
       await harness.close();
     }
@@ -162,6 +215,8 @@ describe("MCP prompts and resources", () => {
       }
       expect(gettingStarted.contents[0].text).toContain("Dynamics 365 MCP Starter");
       expect(gettingStarted.contents[0].text).toContain("discover_metadata");
+      expect(gettingStarted.contents[0].text).toContain("release_gate_check");
+      expect(gettingStarted.contents[0].text).toContain("## By Role");
 
       const toolGroups = await harness.client.readResource({
         uri: "d365://reference/tool-groups",
@@ -173,6 +228,43 @@ describe("MCP prompts and resources", () => {
       expect(toolGroups.contents[0].text).toContain("`list_environment_variables`");
       expect(toolGroups.contents[0].text).toContain("`compare_environment_matrix`");
 
+      const promptReference = await harness.client.readResource({
+        uri: "d365://reference/prompts",
+      });
+      if (!("text" in promptReference.contents[0])) {
+        throw new Error("Expected text resource content");
+      }
+      expect(promptReference.contents[0].text).toContain("`investigate_plugin_failure`");
+      expect(promptReference.contents[0].text).toContain("`trace_flow_dependency`");
+
+      const taskRouting = await harness.client.readResource({
+        uri: "d365://reference/task-routing",
+      });
+      if (!("text" in taskRouting.contents[0])) {
+        throw new Error("Expected text resource content");
+      }
+      expect(taskRouting.contents[0].text).toContain("## Common Tasks");
+      expect(taskRouting.contents[0].text).toContain("`release_gate_check`");
+      expect(taskRouting.contents[0].text).toContain("`review_security_role`");
+
+      const releaseChecklist = await harness.client.readResource({
+        uri: "d365://reference/release-checklist",
+      });
+      if (!("text" in releaseChecklist.contents[0])) {
+        throw new Error("Expected text resource content");
+      }
+      expect(releaseChecklist.contents[0].text).toContain("# Release Checklist");
+      expect(releaseChecklist.contents[0].text).toContain("`environment_health_report`");
+
+      const pluginTroubleshooting = await harness.client.readResource({
+        uri: "d365://reference/plugin-troubleshooting",
+      });
+      if (!("text" in pluginTroubleshooting.contents[0])) {
+        throw new Error("Expected text resource content");
+      }
+      expect(pluginTroubleshooting.contents[0].text).toContain("# Plugin Troubleshooting");
+      expect(pluginTroubleshooting.contents[0].text).toContain("`get_plugin_assembly_details`");
+
       const environmentStarter = await harness.client.readResource({
         uri: "d365://environments/dev/starter",
       });
@@ -180,7 +272,8 @@ describe("MCP prompts and resources", () => {
         throw new Error("Expected text resource content");
       }
       expect(environmentStarter.contents[0].text).toContain("Starter For dev");
-      expect(environmentStarter.contents[0].text).toContain("review_solution");
+      expect(environmentStarter.contents[0].text).toContain("release_gate_check");
+      expect(environmentStarter.contents[0].text).toContain("## Quick Paths By Task");
       expect(environmentStarter.contents[0].text).toContain(
         "Compare solution ContosoCore between dev and prod.",
       );

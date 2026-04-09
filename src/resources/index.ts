@@ -5,7 +5,7 @@ import {
   type McpServer,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../config/types.js";
-import { EXPECTED_PROMPT_NAMES } from "../prompts/index.js";
+import { EXPECTED_PROMPT_NAMES, PROMPT_REFERENCE_ITEMS } from "../prompts/index.js";
 import { buildToolGroupsResourceSection } from "../tools/readme-docs.js";
 
 export const STATIC_RESOURCE_URIS = [
@@ -13,6 +13,9 @@ export const STATIC_RESOURCE_URIS = [
   "d365://reference/environments",
   "d365://reference/prompts",
   "d365://reference/tool-groups",
+  "d365://reference/task-routing",
+  "d365://reference/release-checklist",
+  "d365://reference/plugin-troubleshooting",
 ] as const;
 
 export const ENVIRONMENT_STARTER_TEMPLATE_URI = "d365://environments/{environment}/starter";
@@ -37,7 +40,7 @@ function buildGettingStartedResource(config: AppConfig): string {
   return [
     "# Dynamics 365 MCP Starter",
     "",
-    "Use this server when you need to inspect Dynamics 365 metadata, compare environments, or trace usage risk.",
+    "Use this server when you need to inspect Dynamics 365 metadata, compare environments, or trace release risk.",
     "",
     "## Configured Environments",
     environmentList,
@@ -47,13 +50,20 @@ function buildGettingStartedResource(config: AppConfig): string {
     "## Best First Steps",
     "- Use the `discover_metadata` prompt if you know a name but not the right tool yet.",
     "- Use the `review_solution` prompt to inspect one solution.",
-    "- Use the `compare_solution` prompt to compare one solution across environments.",
-    "- Read `d365://reference/tool-groups` to see the main tool areas.",
+    "- Use the `release_gate_check` prompt before a release check.",
+    "- Read `d365://reference/task-routing` to map common tasks to the right prompt or tool.",
+    "",
+    "## By Role",
+    "- Maker: `discover_metadata`, `investigate_table_change`, `trace_flow_dependency`",
+    "- Release manager: `release_gate_check`, `analyze_environment_drift`, `compare_solution`",
+    "- Support or ops: `investigate_plugin_failure`, `environment_health_report`",
+    "- Security reviewer: `review_security_role`",
     "",
     "## Useful Entry Tools",
     "- `find_metadata` for broad discovery",
     "- `list_solutions` before a solution deep dive",
     "- `environment_health_report` for a wide environment check",
+    "- `compare_environment_matrix` for multi-environment drift",
   ].join("\n");
 }
 
@@ -74,10 +84,7 @@ function buildPromptReferenceResource(): string {
   return [
     "# Built-in MCP Prompts",
     "",
-    "- `discover_metadata`: start broad when you know only a name or text fragment",
-    "- `review_solution`: inspect one solution and summarize risks",
-    "- `compare_solution`: compare one solution between two environments",
-    "- `investigate_table_change`: check usage and trigger risk before a change",
+    ...PROMPT_REFERENCE_ITEMS.map((item) => `- \`${item.name}\`: ${item.summary}`),
     "",
     "These prompts are conversation starters. They guide the client toward the right tool sequence.",
   ].join("\n");
@@ -85,6 +92,75 @@ function buildPromptReferenceResource(): string {
 
 function buildToolGroupsResource(): string {
   return buildToolGroupsResourceSection();
+}
+
+function buildTaskRoutingResource(): string {
+  return [
+    "# Task Routing",
+    "",
+    "Use this guide when you know the task, but not the best prompt or tool.",
+    "",
+    "## Common Tasks",
+    "- Release check before import or deploy: prompt `release_gate_check`, first tool `environment_health_report`, follow-up `get_solution_dependencies` or `compare_solutions`",
+    "- Plugin step does not fire: prompt `investigate_plugin_failure`, first tool `get_plugin_details`, follow-up `list_plugin_steps`",
+    "- Need drift view across dev, test, and prod: prompt `analyze_environment_drift`, first tool `compare_environment_matrix`, follow-up one pairwise compare tool",
+    "- Need to review a security role: prompt `review_security_role`, first tool `list_security_roles`, follow-up `get_role_privileges`",
+    "- Need to trace a cloud flow problem: prompt `trace_flow_dependency`, first tool `get_flow_details`, follow-up `get_solution_dependencies` or `list_connection_references`",
+    "- Need to inspect an unknown name: prompt `discover_metadata`, first tool `find_metadata`, follow-up a detail tool for the strongest match",
+    "",
+    "## By Role",
+    "- Maker: start with `discover_metadata`, then move to form, view, table, or flow detail tools",
+    "- Release manager: start with `release_gate_check` or `analyze_environment_drift`",
+    "- Plugin developer: start with `investigate_plugin_failure`",
+    "- Security reviewer: start with `review_security_role`",
+    "- Support analyst: start with `environment_health_report` for wide risk, then narrow with one domain prompt",
+  ].join("\n");
+}
+
+function buildReleaseChecklistResource(): string {
+  return [
+    "# Release Checklist",
+    "",
+    "Use this list before you import or ship a Dynamics 365 release.",
+    "",
+    "1. Run the `release_gate_check` prompt for the target environment.",
+    "2. Review `environment_health_report` for blockers like disabled steps, inactive flows, risky connection references, and missing variable values.",
+    "3. If the release is solution-scoped, inspect `get_solution_details` and `get_solution_dependencies`.",
+    "4. If you compare against another environment, use `compare_solutions` or `compare_environment_matrix` next.",
+    "5. If drift is found, use one deep compare tool like `compare_plugin_assemblies`, `compare_workflows`, or `compare_web_resources`.",
+    "6. Stop the release when blockers are still open or when missing components point outside the planned solution.",
+    "",
+    "## Good Follow-up Questions",
+    "- Which blockers are real release stops?",
+    "- Which drift items are expected?",
+    "- Which missing dependencies need another solution or environment variable value?",
+  ].join("\n");
+}
+
+function buildPluginTroubleshootingResource(): string {
+  return [
+    "# Plugin Troubleshooting",
+    "",
+    "Use this guide when a plugin class or assembly does not behave as expected.",
+    "",
+    "## Quick Paths",
+    "- Plugin class does not run: `investigate_plugin_failure` prompt, then `get_plugin_details`, then `list_plugin_steps`",
+    "- Need DLL-wide view: `get_plugin_assembly_details`",
+    "- Need image details: `list_plugin_assembly_images`",
+    "- Need step list by assembly: `list_plugin_assembly_steps`",
+    "- Need cross-environment check: `compare_plugin_assemblies`",
+    "",
+    "## What To Look For",
+    "- Wrong message, entity, stage, or mode",
+    "- Disabled step",
+    "- Missing filtering attributes",
+    "- Missing or wrong pre-image or post-image",
+    "- Handler exists in one environment but not another",
+    "",
+    "## Boundary Reminder",
+    "- Plugin class tools cover `IPlugin` classes.",
+    "- Assembly detail also shows workflow activities stored in the same assembly.",
+  ].join("\n");
 }
 
 function buildEnvironmentStarterResource(config: AppConfig, environmentName: string): string {
@@ -102,12 +178,17 @@ function buildEnvironmentStarterResource(config: AppConfig, environmentName: str
     "## Good First Prompts",
     `- \`discover_metadata\` with environment \`${environmentName}\``,
     `- \`review_solution\` with environment \`${environmentName}\``,
-    `- \`investigate_table_change\` with environment \`${environmentName}\``,
+    `- \`release_gate_check\` with environment \`${environmentName}\``,
     "",
     "## Good First Tool Calls",
     `- \`find_metadata\` in \`${environmentName}\``,
     `- \`list_solutions\` in \`${environmentName}\``,
     `- \`environment_health_report\` in \`${environmentName}\``,
+    "",
+    "## Quick Paths By Task",
+    `- Release risk in ${environmentName}: \`release_gate_check\`, then \`environment_health_report\``,
+    `- Plugin issue in ${environmentName}: \`investigate_plugin_failure\`, then \`get_plugin_details\``,
+    `- Flow dependency in ${environmentName}: \`trace_flow_dependency\`, then \`get_flow_details\``,
     "",
     "## Example Questions",
     `- In ${environmentName}, find metadata that matches 'account'.`,
@@ -167,6 +248,39 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
       mimeType: "text/markdown",
     },
     async (uri) => markdownResource(uri.toString(), buildToolGroupsResource()),
+  );
+
+  server.registerResource(
+    "task-routing",
+    STATIC_RESOURCE_URIS[4],
+    {
+      title: "Task Routing",
+      description: "Map common Dynamics 365 tasks and roles to the right prompts and tools.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => markdownResource(uri.toString(), buildTaskRoutingResource()),
+  );
+
+  server.registerResource(
+    "release-checklist",
+    STATIC_RESOURCE_URIS[5],
+    {
+      title: "Release Checklist",
+      description: "A short release-readiness path for solution and environment checks.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => markdownResource(uri.toString(), buildReleaseChecklistResource()),
+  );
+
+  server.registerResource(
+    "plugin-troubleshooting",
+    STATIC_RESOURCE_URIS[6],
+    {
+      title: "Plugin Troubleshooting",
+      description: "Common plugin failure paths and the best tools to inspect them.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => markdownResource(uri.toString(), buildPluginTroubleshootingResource()),
   );
 
   const completeEnvironment: CompleteResourceTemplateCallback = (value) =>

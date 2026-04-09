@@ -9,6 +9,49 @@ Note:
 - This file is about manual chat prompts that call tools.
 - The server also publishes MCP prompts and resources for first-run guidance.
 
+## Built-in MCP Prompt Examples
+
+Use these when your MCP client supports prompt picks.
+
+- `discover_metadata`
+  `Run the built-in prompt discover_metadata for environment <ENV> and query account. Keep the answer short and use the best follow-up detail tool.`
+
+- `review_solution`
+  `Run the built-in prompt review_solution for environment <ENV> and solution <SOLUTION>. Focus on dependencies.`
+
+- `compare_solution`
+  `Run the built-in prompt compare_solution between <SOURCE_ENV> and <TARGET_ENV> for solution <SOLUTION>.`
+
+- `investigate_table_change`
+  `Run the built-in prompt investigate_table_change for environment <ENV>, table <TABLE>, and column <COLUMN>.`
+
+- `release_gate_check`
+  `Run the built-in prompt release_gate_check for environment <ENV> and solution <SOLUTION>. Compare with <TARGET_ENV> if needed.`
+
+- `investigate_plugin_failure`
+  `Run the built-in prompt investigate_plugin_failure for environment <ENV>, plugin class <PLUGIN_CLASS>, assembly <PLUGIN>, and symptom 'step does not fire on update'.`
+
+- `review_security_role`
+  `Run the built-in prompt review_security_role for environment <ENV>, role <ROLE>, and business unit <BUSINESS_UNIT>.`
+
+- `analyze_environment_drift`
+  `Run the built-in prompt analyze_environment_drift with baseline <SOURCE_ENV>, targets <TARGET_ENVS>, and component type plugins.`
+
+- `trace_flow_dependency`
+  `Run the built-in prompt trace_flow_dependency for environment <ENV>, flow <FLOW>, and solution <SOLUTION>.`
+
+## Built-in MCP Resource Examples
+
+Read these resources when you want fixed guidance before you call a tool.
+
+- `d365://guides/getting-started`
+- `d365://reference/prompts`
+- `d365://reference/tool-groups`
+- `d365://reference/task-routing`
+- `d365://reference/release-checklist`
+- `d365://reference/plugin-troubleshooting`
+- `d365://environments/<ENV>/starter`
+
 ## Placeholders
 
 Replace these values before you run a prompt:

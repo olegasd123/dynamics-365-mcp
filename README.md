@@ -253,10 +253,15 @@ The server also supports HTTP mode for service scripts. Use this when you want a
 
 The server also exposes MCP prompts for common tasks:
 
+- `analyze_environment_drift`
 - `discover_metadata`
+- `investigate_plugin_failure`
 - `review_solution`
+- `release_gate_check`
+- `review_security_role`
 - `compare_solution`
 - `investigate_table_change`
+- `trace_flow_dependency`
 
 These prompts guide the client toward the right tool flow. They are useful when the user knows the task but not the exact tool names yet.
 
@@ -268,6 +273,9 @@ The server also exposes MCP resources for reusable context:
 - `d365://reference/environments`
 - `d365://reference/prompts`
 - `d365://reference/tool-groups`
+- `d365://reference/task-routing`
+- `d365://reference/release-checklist`
+- `d365://reference/plugin-troubleshooting`
 - `d365://environments/{environment}/starter`
 
 These resources help first-run discovery and give clients stable reference material without calling a tool first.
