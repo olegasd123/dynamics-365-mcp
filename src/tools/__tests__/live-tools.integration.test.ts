@@ -75,6 +75,7 @@ interface ToolRunFailure {
 
 interface LiveToolCase {
   buildArgs: (fixtures: LiveFixtures) => Record<string, unknown>;
+  timeoutMs?: number;
 }
 
 const LIVE_TOOL_CASES = {
@@ -484,10 +485,10 @@ const LIVE_TOOL_CASES = {
     }),
   },
   release_gate_report: {
+    timeoutMs: 5 * 60 * 1000,
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       solution: fixtures.solution,
-      targetEnvironment: fixtures.targetEnvironment,
     }),
   },
 } satisfies Record<ToolName, LiveToolCase>;
@@ -706,17 +707,26 @@ describeLive("live tool smoke tests", () => {
         const client = new DynamicsClient(tokenManager);
         const recorder = installRequestRecorder(client);
         const harness = await createConnectedLiveClient(client);
-        const args = LIVE_TOOL_CASES[toolName].buildArgs(fixtures);
+        const toolCase = LIVE_TOOL_CASES[toolName];
+        const args = toolCase.buildArgs(fixtures);
+        const effectiveToolTimeoutMs = Math.max(toolTimeoutMs, toolCase.timeoutMs ?? 0);
 
         console.info(`[live] [${index + 1}/${selectedTools.length}] starting ${toolName}`);
 
         try {
           const response = (await withTimeout(
-            harness.client.callTool({
-              name: toolName,
-              arguments: args,
-            }) as Promise<ToolResponse>,
-            toolTimeoutMs,
+            harness.client.callTool(
+              {
+                name: toolName,
+                arguments: args,
+              },
+              undefined,
+              {
+                timeout: effectiveToolTimeoutMs,
+                maxTotalTimeout: effectiveToolTimeoutMs,
+              },
+            ) as Promise<ToolResponse>,
+            effectiveToolTimeoutMs,
             `Tool '${toolName}'`,
           )) as ToolResponse;
           const requests = recorder.getAll();

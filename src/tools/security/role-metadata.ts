@@ -6,6 +6,7 @@ import {
   listRolePrivilegesQuery,
   listSecurityRolesQuery,
 } from "../../queries/security-queries.js";
+import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
 
 const DEPTH_MASK_LABELS: Array<{ mask: number; label: string }> = [
   { mask: 1, label: "Basic" },
@@ -190,10 +191,13 @@ async function fetchPrivilegesForRoleIds(
           "roleprivilegescollection",
           listRolePrivilegesQuery(uniqueRoleIds[0]),
         )
-      : await client.query<Record<string, unknown>>(
+      : await queryRecordsByIdsInChunks<Record<string, unknown>>(
           env,
+          client,
           "roleprivilegescollection",
-          listRolePrivilegesForRolesQuery(uniqueRoleIds),
+          uniqueRoleIds,
+          "roleprivilegeid",
+          (chunkRoleIds) => listRolePrivilegesForRolesQuery(chunkRoleIds),
         );
 
   const privilegeIds = [
@@ -202,10 +206,13 @@ async function fetchPrivilegesForRoleIds(
   const privilegeRecords =
     privilegeIds.length === 0
       ? []
-      : await client.query<Record<string, unknown>>(
+      : await queryRecordsByIdsInChunks<Record<string, unknown>>(
           env,
+          client,
           "privileges",
-          listPrivilegesByIdsQuery(privilegeIds),
+          privilegeIds,
+          "privilegeid",
+          (chunkPrivilegeIds) => listPrivilegesByIdsQuery(chunkPrivilegeIds),
         );
   const privilegeMap = new Map(
     privilegeRecords.map((record) => [String(record.privilegeid || ""), record]),

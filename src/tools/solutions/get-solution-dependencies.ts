@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
-import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { DynamicsApiError, type DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listPluginAssembliesByIdsQuery } from "../../queries/plugin-queries.js";
@@ -646,10 +646,10 @@ async function fetchDependenciesForComponent(
   const results: NormalizedDependencyRecord[] = [];
 
   if (direction === "required" || direction === "both") {
-    const dependencies = await client.query<Record<string, unknown>>(
+    const dependencies = await queryDependenciesSafely(
       env,
+      client,
       retrieveRequiredComponentsPath(component.solutioncomponentid, component.componenttype),
-      dependencySelectQuery(),
     );
     results.push(
       ...dependencies.map((dependency) =>
@@ -665,10 +665,10 @@ async function fetchDependenciesForComponent(
   }
 
   if (direction === "dependents" || direction === "both") {
-    const dependencies = await client.query<Record<string, unknown>>(
+    const dependencies = await queryDependenciesSafely(
       env,
+      client,
       retrieveDependentComponentsPath(component.solutioncomponentid, component.componenttype),
-      dependencySelectQuery(),
     );
     results.push(
       ...dependencies.map((dependency) =>
@@ -684,6 +684,31 @@ async function fetchDependenciesForComponent(
   }
 
   return results;
+}
+
+async function queryDependenciesSafely(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  resourcePath: string,
+): Promise<Record<string, unknown>[]> {
+  try {
+    return await client.query<Record<string, unknown>>(env, resourcePath, dependencySelectQuery());
+  } catch (error) {
+    if (isMissingDependencyNodeError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+function isMissingDependencyNodeError(error: unknown): boolean {
+  return (
+    error instanceof DynamicsApiError &&
+    error.statusCode === 400 &&
+    error.message.includes("DependencyNode") &&
+    error.message.includes("Count = 0")
+  );
 }
 
 async function resolveExternalSupportedComponentNames(

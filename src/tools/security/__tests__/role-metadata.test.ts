@@ -64,4 +64,42 @@ describe("role metadata", () => {
       }),
     ]);
   });
+
+  it("chunks privilege detail requests for large roles", async () => {
+    const privilegeCount = 41;
+    const { client, calls } = createRecordingClient({
+      dev: {
+        roles: [
+          {
+            roleid: "role-1",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: Array.from({ length: privilegeCount }, (_, index) => ({
+          roleprivilegeid: `rp-${index + 1}`,
+          roleid: "role-1",
+          privilegeid: `priv-${index + 1}`,
+          privilegedepthmask: 8,
+          ismanaged: false,
+        })),
+        privileges: Array.from({ length: privilegeCount }, (_, index) => ({
+          privilegeid: `priv-${index + 1}`,
+          name: `prv-${index + 1}`,
+          accessright: 2,
+          canbeglobal: true,
+        })),
+      },
+    });
+
+    const details = await fetchRolePrivileges(env, client, "Salesperson");
+    const privilegeCalls = calls.filter((call) => call.entitySet === "privileges");
+
+    expect(details.privileges).toHaveLength(privilegeCount);
+    expect(privilegeCalls).toHaveLength(2);
+    expect(privilegeCalls[0]?.queryParams).toContain("privilegeid eq 'priv-1'");
+    expect(privilegeCalls[1]?.queryParams).toContain("privilegeid eq 'priv-41'");
+  });
 });
