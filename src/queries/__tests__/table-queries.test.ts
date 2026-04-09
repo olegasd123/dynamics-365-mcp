@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  listTableDateTimeColumnsQuery,
   listTableChoiceColumnsQuery,
   listTableColumnsQuery,
   listTableKeysQuery,
+  listTableLookupColumnsQuery,
   listTableManyToManyRelationshipsQuery,
   listTableManyToOneRelationshipsQuery,
+  listTableNumericColumnsQuery,
+  listTableStringColumnsQuery,
   listTablesByMetadataIdsQuery,
   listTablesQuery,
   tableChoiceColumnsPath,
   tableColumnsPath,
+  tableDetailColumnsPath,
   tableKeysPath,
   tableManyToManyRelationshipsPath,
   tableManyToOneRelationshipsPath,
@@ -55,6 +60,9 @@ describe("table queries", () => {
     expect(tableChoiceColumnsPath("account", "PicklistAttributeMetadata")).toBe(
       "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata",
     );
+    expect(tableDetailColumnsPath("account", "LookupAttributeMetadata")).toBe(
+      "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+    );
   });
 
   it("builds the columns query", () => {
@@ -63,14 +71,27 @@ describe("table queries", () => {
     expect(query).toContain("$filter=AttributeOf eq null");
     expect(query).toContain("$orderby=LogicalName asc");
     expect(query).toContain("AttributeTypeName");
+    expect(query).not.toContain("Targets");
   });
 
   it("builds the choice columns query", () => {
-    const query = listTableChoiceColumnsQuery();
+    const picklistQuery = listTableChoiceColumnsQuery();
 
-    expect(query).toContain(
-      "$select=MetadataId,LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,OptionSet,GlobalOptionSet,TrueOption,FalseOption",
+    expect(picklistQuery).toContain(
+      "$select=MetadataId,LogicalName,SchemaName,DisplayName,AttributeType,AttributeTypeName,OptionSet,GlobalOptionSet",
     );
+    expect(picklistQuery).not.toContain("TrueOption");
+  });
+
+  it("builds detail queries for derived column metadata", () => {
+    expect(listTableLookupColumnsQuery()).toContain("$select=MetadataId,LogicalName,Targets");
+    expect(listTableStringColumnsQuery()).toContain(
+      "$select=MetadataId,LogicalName,MaxLength,FormatName",
+    );
+    expect(listTableNumericColumnsQuery()).toContain(
+      "$select=MetadataId,LogicalName,Precision,MinValue,MaxValue",
+    );
+    expect(listTableDateTimeColumnsQuery()).toContain("$select=MetadataId,LogicalName");
   });
 
   it("builds the keys and relationship queries", () => {

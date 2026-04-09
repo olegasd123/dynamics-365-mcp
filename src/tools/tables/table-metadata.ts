@@ -2,21 +2,26 @@ import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listSolutionComponentsQuery } from "../../queries/solution-queries.js";
 import {
+  listTableDateTimeColumnsQuery,
   listTableChoiceColumnsQuery,
   listTableColumnsQuery,
   listTableKeysQuery,
   listTableManyToManyRelationshipsQuery,
   listTableManyToOneRelationshipsQuery,
   listTableOneToManyRelationshipsQuery,
+  listTableLookupColumnsQuery,
+  listTableStringColumnsQuery,
   listTablesByMetadataIdsQuery,
   listTablesQuery,
   tableChoiceColumnsPath,
   tableColumnsPath,
+  tableDetailColumnsPath,
   tableKeysPath,
   tableManyToManyRelationshipsPath,
   tableManyToOneRelationshipsPath,
   tableOneToManyRelationshipsPath,
   type ChoiceAttributeMetadataType,
+  type ColumnDetailMetadataType,
 } from "../../queries/table-queries.js";
 import { resolveSolution } from "../solutions/solution-inventory.js";
 import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
@@ -127,6 +132,16 @@ interface ChoiceColumnDetails {
   optionSetName: string;
   isGlobalChoice: boolean;
   optionCount?: number;
+}
+
+interface ColumnDetailRecord {
+  logicalName: string;
+  targets?: string[];
+  maxLength?: number;
+  precision?: number;
+  minValue?: number;
+  maxValue?: number;
+  formatName?: string;
 }
 
 export async function listTables(
@@ -313,7 +328,7 @@ export async function fetchColumnsByLogicalName(
   client: DynamicsClient,
   logicalName: string,
 ): Promise<TableColumnRecord[]> {
-  const [baseColumns, ...choiceGroups] = await Promise.all([
+  const [baseColumns, ...detailGroups] = await Promise.all([
     client.queryPath<Record<string, unknown>>(
       env,
       tableColumnsPath(logicalName),
@@ -326,19 +341,37 @@ export async function fetchColumnsByLogicalName(
         listTableChoiceColumnsQuery(),
       ),
     ),
+    ...buildColumnDetailRequests().map(({ metadataType, query }) =>
+      client.queryPath<Record<string, unknown>>(
+        env,
+        tableDetailColumnsPath(logicalName, metadataType),
+        query,
+      ),
+    ),
   ]);
 
   const choiceByLogicalName = new Map<string, ChoiceColumnDetails>();
-  for (const group of choiceGroups) {
+  for (const group of detailGroups.slice(0, CHOICE_ATTRIBUTE_TYPES.length)) {
     for (const attribute of group) {
       const choice = normalizeChoiceColumn(attribute);
       choiceByLogicalName.set(choice.logicalName, choice);
     }
   }
 
+  const columnDetailsByLogicalName = new Map<string, ColumnDetailRecord>();
+  for (const group of detailGroups.slice(CHOICE_ATTRIBUTE_TYPES.length)) {
+    for (const attribute of group) {
+      mergeColumnDetails(columnDetailsByLogicalName, normalizeColumnDetail(attribute));
+    }
+  }
+
   return baseColumns
     .map((column) =>
-      normalizeColumn(column, choiceByLogicalName.get(String(column.LogicalName || ""))),
+      normalizeColumn(
+        column,
+        choiceByLogicalName.get(String(column.LogicalName || "")),
+        columnDetailsByLogicalName.get(String(column.LogicalName || "")),
+      ),
     )
     .sort((left, right) => left.logicalName.localeCompare(right.logicalName));
 }
@@ -489,6 +522,7 @@ function normalizeTable(table: Record<string, unknown>): TableRecord {
 function normalizeColumn(
   column: Record<string, unknown>,
   choiceDetails?: ChoiceColumnDetails,
+  columnDetails?: ColumnDetailRecord,
 ): TableColumnRecord {
   return {
     ...column,
@@ -508,17 +542,69 @@ function normalizeColumn(
     isValidForUpdate: getBooleanValue(column.IsValidForUpdate),
     isCustomAttribute: getBooleanValue(column.IsCustomAttribute),
     isSecured: getBooleanValue(column.IsSecured),
+    targets: columnDetails?.targets || [],
+    maxLength: columnDetails?.maxLength,
+    precision: columnDetails?.precision,
+    minValue: columnDetails?.minValue,
+    maxValue: columnDetails?.maxValue,
+    formatName: columnDetails?.formatName || "",
+    choiceKind: choiceDetails?.choiceKind || "",
+    optionSetName: choiceDetails?.optionSetName || "",
+    isGlobalChoice: choiceDetails?.isGlobalChoice || false,
+    optionCount: choiceDetails?.optionCount,
+  };
+}
+
+function buildColumnDetailRequests(): Array<{
+  metadataType: ColumnDetailMetadataType;
+  query: string;
+}> {
+  return [
+    {
+      metadataType: "LookupAttributeMetadata",
+      query: listTableLookupColumnsQuery(),
+    },
+    {
+      metadataType: "StringAttributeMetadata",
+      query: listTableStringColumnsQuery(),
+    },
+    {
+      metadataType: "MemoAttributeMetadata",
+      query: listTableStringColumnsQuery(),
+    },
+    {
+      metadataType: "DateTimeAttributeMetadata",
+      query: listTableDateTimeColumnsQuery(),
+    },
+  ] satisfies Array<{ metadataType: ColumnDetailMetadataType; query: string }>;
+}
+
+function normalizeColumnDetail(column: Record<string, unknown>): ColumnDetailRecord {
+  return {
+    logicalName: String(column.LogicalName || ""),
     targets: getStringArray(column.Targets),
     maxLength: getNumberValue(column.MaxLength),
     precision: getNumberValue(column.Precision),
     minValue: getNumberValue(column.MinValue),
     maxValue: getNumberValue(column.MaxValue),
     formatName: normalizeEnumValue(column.FormatName),
-    choiceKind: choiceDetails?.choiceKind || "",
-    optionSetName: choiceDetails?.optionSetName || "",
-    isGlobalChoice: choiceDetails?.isGlobalChoice || false,
-    optionCount: choiceDetails?.optionCount,
   };
+}
+
+function mergeColumnDetails(
+  detailsByLogicalName: Map<string, ColumnDetailRecord>,
+  nextDetails: ColumnDetailRecord,
+) {
+  const currentDetails = detailsByLogicalName.get(nextDetails.logicalName);
+  detailsByLogicalName.set(nextDetails.logicalName, {
+    logicalName: nextDetails.logicalName,
+    targets: nextDetails.targets?.length ? nextDetails.targets : currentDetails?.targets,
+    maxLength: nextDetails.maxLength ?? currentDetails?.maxLength,
+    precision: nextDetails.precision ?? currentDetails?.precision,
+    minValue: nextDetails.minValue ?? currentDetails?.minValue,
+    maxValue: nextDetails.maxValue ?? currentDetails?.maxValue,
+    formatName: nextDetails.formatName || currentDetails?.formatName,
+  });
 }
 
 function normalizeChoiceColumn(column: Record<string, unknown>): ChoiceColumnDetails {

@@ -55,4 +55,40 @@ describe("form metadata", () => {
     expect(details.summary.libraries).toContain("new_/account.js");
     expect(details.summaryHash).toHaveLength(12);
   });
+
+  it("resolves form details by form id when unique name is empty", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        systemforms: [
+          {
+            formid: "form-1",
+            name: "Informations",
+            objecttypecode: "account",
+            type: 2,
+            uniquename: "",
+            formactivationstate: 1,
+            isdefault: false,
+            ismanaged: false,
+            formxml: "<form />",
+          },
+          {
+            formid: "form-2",
+            name: "Informations",
+            objecttypecode: "contact",
+            type: 2,
+            uniquename: "",
+            formactivationstate: 1,
+            isdefault: false,
+            ismanaged: false,
+            formxml: "<form />",
+          },
+        ],
+      },
+    });
+
+    const details = await fetchFormDetails(env, client, "form-1");
+
+    expect(details.formid).toBe("form-1");
+    expect(details.objecttypecode).toBe("account");
+  });
 });

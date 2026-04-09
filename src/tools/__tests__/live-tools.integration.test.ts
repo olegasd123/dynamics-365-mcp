@@ -540,6 +540,29 @@ function getLiveToolTimeoutMs(): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TOOL_TIMEOUT_MS;
 }
 
+function getSelectedLiveTools(): ToolName[] {
+  const raw = process.env.D365_MCP_LIVE_TOOLS?.trim();
+  if (!raw) {
+    return [...EXPECTED_TOOL_NAMES];
+  }
+
+  const requestedTools = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const selectedTools = requestedTools.filter((toolName): toolName is ToolName =>
+    EXPECTED_TOOL_NAMES.includes(toolName as ToolName),
+  );
+
+  if (selectedTools.length === 0) {
+    throw new Error(
+      `D365_MCP_LIVE_TOOLS did not match any known tool names. Requested: ${requestedTools.join(", ")}`,
+    );
+  }
+
+  return selectedTools;
+}
+
 function installRequestRecorder(client: DynamicsClient) {
   const recordedRequests: RecordedRequest[] = [];
 
@@ -675,16 +698,17 @@ describeLive("live tool smoke tests", () => {
       const fixtures = loadLiveFixtures();
       const tokenManager = new TokenManager();
       const toolTimeoutMs = getLiveToolTimeoutMs();
+      const selectedTools = getSelectedLiveTools();
       const results: ToolRunSummary[] = [];
       const failures: ToolRunFailure[] = [];
 
-      for (const [index, toolName] of EXPECTED_TOOL_NAMES.entries()) {
+      for (const [index, toolName] of selectedTools.entries()) {
         const client = new DynamicsClient(tokenManager);
         const recorder = installRequestRecorder(client);
         const harness = await createConnectedLiveClient(client);
         const args = LIVE_TOOL_CASES[toolName].buildArgs(fixtures);
 
-        console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] starting ${toolName}`);
+        console.info(`[live] [${index + 1}/${selectedTools.length}] starting ${toolName}`);
 
         try {
           const response = (await withTimeout(
@@ -705,7 +729,7 @@ describeLive("live tool smoke tests", () => {
               error,
               requests,
             });
-            console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
+            console.info(`[live] [${index + 1}/${selectedTools.length}] ${toolName} failed`);
             continue;
           }
 
@@ -716,7 +740,7 @@ describeLive("live tool smoke tests", () => {
               error: "Tool completed without any recorded CRM request.",
               requests,
             });
-            console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
+            console.info(`[live] [${index + 1}/${selectedTools.length}] ${toolName} failed`);
             continue;
           }
 
@@ -727,7 +751,7 @@ describeLive("live tool smoke tests", () => {
           });
 
           console.info(
-            `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} ok (${requests.length} request(s))`,
+            `[live] [${index + 1}/${selectedTools.length}] ${toolName} ok (${requests.length} request(s))`,
           );
         } catch (error) {
           const requests = recorder.getAll();
@@ -737,7 +761,7 @@ describeLive("live tool smoke tests", () => {
             error: error instanceof Error ? error.message : String(error),
             requests,
           });
-          console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
+          console.info(`[live] [${index + 1}/${selectedTools.length}] ${toolName} failed`);
         } finally {
           await Promise.race([
             harness.close(),

@@ -310,7 +310,7 @@ export async function findColumnUsageData(
   const [pluginInventory, formDetails, viewDetails, flowDetails] = await Promise.all([
     fetchPluginInventory(env, client, pluginAssemblies),
     Promise.all(
-      formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.name)),
+      formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.formid)),
     ),
     Promise.all(
       viewCandidates.map((view) =>
@@ -428,7 +428,7 @@ export async function findWebResourceUsageData(
   }
 
   const formDetails = await Promise.all(
-    formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.name)),
+    formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.formid)),
   );
 
   return {

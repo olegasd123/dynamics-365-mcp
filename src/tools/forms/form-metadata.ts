@@ -87,6 +87,11 @@ export async function resolveForm(
   },
 ): Promise<FormRecord> {
   const forms = await listForms(env, client, options);
+  const exactId = forms.filter((form) => form.formid === formRef);
+  if (exactId.length === 1) {
+    return exactId[0];
+  }
+
   const exactUnique = forms.filter((form) => form.uniquename === formRef);
   if (exactUnique.length === 1) {
     return exactUnique[0];
@@ -100,7 +105,10 @@ export async function resolveForm(
   const needle = formRef.trim().toLowerCase();
   const caseInsensitiveMatches = uniqueForms(
     forms.filter(
-      (form) => form.uniquename.toLowerCase() === needle || form.name.toLowerCase() === needle,
+      (form) =>
+        form.formid.toLowerCase() === needle ||
+        form.uniquename.toLowerCase() === needle ||
+        form.name.toLowerCase() === needle,
     ),
   );
 
@@ -111,7 +119,9 @@ export async function resolveForm(
   const partialMatches = uniqueForms(
     forms.filter(
       (form) =>
-        form.uniquename.toLowerCase().includes(needle) || form.name.toLowerCase().includes(needle),
+        form.formid.toLowerCase().includes(needle) ||
+        form.uniquename.toLowerCase().includes(needle) ||
+        form.name.toLowerCase().includes(needle),
     ),
   );
 
@@ -120,6 +130,7 @@ export async function resolveForm(
   }
 
   const matches = uniqueForms([
+    ...exactId,
     ...exactUnique,
     ...exactName,
     ...caseInsensitiveMatches,
@@ -150,9 +161,10 @@ export async function fetchFormDetails(
     env,
     "systemforms",
     getFormDetailsByIdentityQuery({
+      formId: form.formid || undefined,
       table: form.objecttypecode,
-      uniqueName: form.uniquename || undefined,
-      formName: form.uniquename ? undefined : form.name,
+      uniqueName: form.formid ? undefined : form.uniquename || undefined,
+      formName: form.formid || form.uniquename ? undefined : form.name,
     }),
   );
 

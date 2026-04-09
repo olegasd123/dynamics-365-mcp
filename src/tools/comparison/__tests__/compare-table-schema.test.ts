@@ -60,6 +60,14 @@ describe("compare_table_schema", () => {
           [],
         "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata":
           [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StringAttributeMetadata":
+          [
+            {
+              MetadataId: "col-1",
+              LogicalName: "name",
+              MaxLength: 160,
+            },
+          ],
         "EntityDefinitions(LogicalName='account')/Keys": [],
         "EntityDefinitions(LogicalName='account')/ManyToOneRelationships": [],
         "EntityDefinitions(LogicalName='account')/OneToManyRelationships": [],
@@ -114,6 +122,14 @@ describe("compare_table_schema", () => {
           [],
         "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata":
           [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StringAttributeMetadata":
+          [
+            {
+              MetadataId: "col-1",
+              LogicalName: "name",
+              MaxLength: 200,
+            },
+          ],
         "EntityDefinitions(LogicalName='account')/Keys": [],
         "EntityDefinitions(LogicalName='account')/ManyToOneRelationships": [],
         "EntityDefinitions(LogicalName='account')/OneToManyRelationships": [],

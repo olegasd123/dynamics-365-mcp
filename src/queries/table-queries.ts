@@ -37,12 +37,6 @@ const COLUMN_SELECT = [
   "IsValidForUpdate",
   "IsCustomAttribute",
   "IsSecured",
-  "Targets",
-  "MaxLength",
-  "Precision",
-  "MinValue",
-  "MaxValue",
-  "FormatName",
 ];
 
 const KEY_SELECT = [
@@ -89,9 +83,15 @@ const CHOICE_SELECT = [
   "AttributeTypeName",
   "OptionSet",
   "GlobalOptionSet",
-  "TrueOption",
-  "FalseOption",
 ];
+
+const LOOKUP_COLUMN_SELECT = ["MetadataId", "LogicalName", "Targets"];
+
+const STRING_COLUMN_SELECT = ["MetadataId", "LogicalName", "MaxLength", "FormatName"];
+
+const NUMERIC_COLUMN_SELECT = ["MetadataId", "LogicalName", "Precision", "MinValue", "MaxValue"];
+
+const DATETIME_COLUMN_SELECT = ["MetadataId", "LogicalName"];
 
 export type ChoiceAttributeMetadataType =
   | "PicklistAttributeMetadata"
@@ -99,6 +99,17 @@ export type ChoiceAttributeMetadataType =
   | "BooleanAttributeMetadata"
   | "StateAttributeMetadata"
   | "StatusAttributeMetadata";
+
+export type ColumnDetailMetadataType =
+  | "LookupAttributeMetadata"
+  | "StringAttributeMetadata"
+  | "MemoAttributeMetadata"
+  | "IntegerAttributeMetadata"
+  | "BigIntAttributeMetadata"
+  | "DecimalAttributeMetadata"
+  | "DoubleAttributeMetadata"
+  | "MoneyAttributeMetadata"
+  | "DateTimeAttributeMetadata";
 
 function buildOrStringFilter(field: string, values: string[]): string {
   return values.map((value) => odataEq(field, value)).join(" or ");
@@ -141,6 +152,13 @@ export function tableChoiceColumnsPath(
   return `${tableColumnsPath(logicalName)}/Microsoft.Dynamics.CRM.${metadataType}`;
 }
 
+export function tableDetailColumnsPath(
+  logicalName: string,
+  metadataType: ColumnDetailMetadataType,
+): string {
+  return `${tableColumnsPath(logicalName)}/Microsoft.Dynamics.CRM.${metadataType}`;
+}
+
 export function listTableColumnsQuery(): string {
   return buildQueryString({
     select: COLUMN_SELECT,
@@ -152,6 +170,34 @@ export function listTableColumnsQuery(): string {
 export function listTableChoiceColumnsQuery(): string {
   return buildQueryString({
     select: CHOICE_SELECT,
+    orderby: "LogicalName asc",
+  });
+}
+
+export function listTableLookupColumnsQuery(): string {
+  return buildQueryString({
+    select: LOOKUP_COLUMN_SELECT,
+    orderby: "LogicalName asc",
+  });
+}
+
+export function listTableStringColumnsQuery(): string {
+  return buildQueryString({
+    select: STRING_COLUMN_SELECT,
+    orderby: "LogicalName asc",
+  });
+}
+
+export function listTableNumericColumnsQuery(): string {
+  return buildQueryString({
+    select: NUMERIC_COLUMN_SELECT,
+    orderby: "LogicalName asc",
+  });
+}
+
+export function listTableDateTimeColumnsQuery(): string {
+  return buildQueryString({
+    select: DATETIME_COLUMN_SELECT,
     orderby: "LogicalName asc",
   });
 }

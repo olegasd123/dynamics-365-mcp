@@ -161,6 +161,37 @@ describe("table metadata", () => {
           [],
         "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata":
           [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata":
+          [
+            {
+              MetadataId: "col-4",
+              LogicalName: "primarycontactid",
+              Targets: ["contact"],
+            },
+          ],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.StringAttributeMetadata":
+          [
+            {
+              MetadataId: "col-2",
+              LogicalName: "name",
+              MaxLength: 160,
+              FormatName: { Value: "Text" },
+            },
+          ],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.MemoAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.IntegerAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.BigIntAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.DecimalAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.DoubleAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.MoneyAttributeMetadata":
+          [],
+        "EntityDefinitions(LogicalName='account')/Attributes/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata":
+          [],
         "EntityDefinitions(LogicalName='account')/Keys": [
           {
             MetadataId: "key-1",
@@ -227,6 +258,11 @@ describe("table metadata", () => {
       choiceKind: "Picklist",
       optionSetName: "account_preferredcontactmethodcode",
       optionCount: 2,
+    });
+    expect(
+      schema.columns.find((column) => column.logicalName === "primarycontactid"),
+    ).toMatchObject({
+      targets: ["contact"],
     });
     expect(schema.keys).toEqual([
       expect.objectContaining({

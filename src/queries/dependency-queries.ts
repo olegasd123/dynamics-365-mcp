@@ -15,14 +15,14 @@ export function retrieveDependentComponentsPath(
   solutionComponentId: string,
   componentType: number,
 ): string {
-  return `RetrieveDependentComponents(ObjectId=${toGuidLiteral(solutionComponentId)},ComponentType=${componentType})`;
+  return `RetrieveDependentComponents(ObjectId=${toGuidParameter(solutionComponentId)},ComponentType=${componentType})`;
 }
 
 export function retrieveRequiredComponentsPath(
   solutionComponentId: string,
   componentType: number,
 ): string {
-  return `RetrieveRequiredComponents(ObjectId=${toGuidLiteral(solutionComponentId)},ComponentType=${componentType})`;
+  return `RetrieveRequiredComponents(ObjectId=${toGuidParameter(solutionComponentId)},ComponentType=${componentType})`;
 }
 
 export function dependencySelectQuery(): string {
@@ -31,6 +31,6 @@ export function dependencySelectQuery(): string {
   });
 }
 
-function toGuidLiteral(value: string): string {
-  return `guid'${value}'`;
+function toGuidParameter(value: string): string {
+  return value;
 }
