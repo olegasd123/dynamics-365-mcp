@@ -47,6 +47,7 @@ import { registerAnalyzeCreateTriggers } from "./usage/analyze-create-triggers.j
 import { registerAnalyzeUpdateTriggers } from "./usage/analyze-update-triggers.js";
 import { registerAnalyzeImpact } from "./impact/analyze-impact.js";
 import { registerEnvironmentHealthReport } from "./health/environment-health-report.js";
+import { registerReleaseGateReport } from "./health/release-gate-report.js";
 import { registerComparePluginAssemblies } from "./comparison/compare-plugin-assemblies.js";
 import { registerCompareSolutions } from "./comparison/compare-solutions.js";
 import { registerCompareWorkflows } from "./comparison/compare-workflows.js";
@@ -446,6 +447,13 @@ export const TOOL_MANIFEST: readonly ToolManifestEntry[] = [
     description: "Build a release-health summary for one environment.",
     mainParams: ["environment", "solution"],
     register: registerEnvironmentHealthReport,
+  },
+  {
+    name: "release_gate_report",
+    group: "health",
+    description: "Build an opinionated go or no-go report for moving one solution.",
+    mainParams: ["environment", "solution", "targetEnvironment", "strict"],
+    register: registerReleaseGateReport,
   },
   {
     name: "compare_plugin_assemblies",

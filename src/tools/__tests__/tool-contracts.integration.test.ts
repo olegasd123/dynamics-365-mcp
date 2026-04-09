@@ -207,6 +207,12 @@ describe("tool contracts", () => {
         direction: expect.any(Object),
         componentType: expect.any(Object),
       });
+      expect(toolsByName.release_gate_report.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        solution: expect.any(Object),
+        targetEnvironment: expect.any(Object),
+        strict: expect.any(Object),
+      });
       expect(REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName))).toBe(
         true,
       );

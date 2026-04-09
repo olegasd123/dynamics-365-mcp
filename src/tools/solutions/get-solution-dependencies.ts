@@ -78,6 +78,93 @@ interface NormalizedDependencyRecord {
   dependencyType: number;
 }
 
+export interface SolutionDependencySummaryRow {
+  direction: "required" | "dependents";
+  sourceComponentName: string;
+  sourceComponentType: string;
+  otherComponentName: string;
+  otherComponentType: string;
+  dependencyType: string;
+}
+
+export interface SolutionDependencySummary {
+  selectedComponents: number;
+  counts: {
+    required: number;
+    dependents: number;
+    external: number;
+    externalRequired: number;
+    externalDependents: number;
+    total: number;
+  };
+  externalRows: SolutionDependencySummaryRow[];
+}
+
+export async function summarizeSolutionDependencies(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  solution: string,
+  maxSampleRows = 10,
+): Promise<SolutionDependencySummary> {
+  const inventory = await fetchSolutionInventory(env, client, solution);
+  const allComponents = listSupportedComponents(inventory);
+  const solutionComponentKeySet = new Set(
+    inventory.components.map((component) =>
+      createComponentKey(component.componenttype, component.objectid),
+    ),
+  );
+  const namedComponentMap = new Map(
+    allComponents.map((component) => [
+      createComponentKey(component.componenttype, component.objectid),
+      component.displayName,
+    ]),
+  );
+
+  const dependencyRecords = deduplicateDependencyRecords(
+    (
+      await Promise.all(
+        allComponents.map((component) =>
+          fetchDependenciesForComponent(
+            env,
+            client,
+            component,
+            "both",
+            solutionComponentKeySet,
+            namedComponentMap,
+          ),
+        ),
+      )
+    ).flat(),
+  );
+  await resolveExternalSupportedComponentNames(env, client, dependencyRecords, namedComponentMap);
+
+  const externalRows = dependencyRecords
+    .filter((record) => !record.otherInSolution)
+    .slice(0, maxSampleRows)
+    .map((record) => ({
+      direction: record.direction,
+      sourceComponentName: record.sourceComponent.displayName,
+      sourceComponentType: getSolutionComponentTypeLabel(record.sourceComponent.componenttype),
+      otherComponentName: record.otherDisplayName,
+      otherComponentType: getSolutionComponentTypeLabel(record.otherComponentType),
+      dependencyType:
+        DEPENDENCY_TYPE_LABELS[record.dependencyType] || String(record.dependencyType),
+    }));
+
+  return {
+    selectedComponents: allComponents.length,
+    counts: {
+      required: dependencyRecords.filter((record) => record.direction === "required").length,
+      dependents: dependencyRecords.filter((record) => record.direction === "dependents").length,
+      external: dependencyRecords.filter((record) => !record.otherInSolution).length,
+      externalRequired: countDirection(dependencyRecords, "required", false),
+      externalDependents: countDirection(dependencyRecords, "dependents", false),
+      total: dependencyRecords.length,
+    },
+    externalRows,
+  };
+}
+
 export function registerGetSolutionDependencies(
   server: McpServer,
   config: AppConfig,

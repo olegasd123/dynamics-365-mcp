@@ -120,7 +120,7 @@ Make large environments usable without huge responses.
 - `src/tools/plugins/list-plugins.ts`
 - `src/tools/solutions/list-solutions.ts`
 
-## Milestone 4: Metadata Manifest And Doc Generation
+## [done] Milestone 4: Metadata Manifest And Doc Generation
 
 ### Goal
 
@@ -156,7 +156,7 @@ Stop tool drift between code, tests, resources, and docs.
 - `README.md`
 - `src/config/environments.ts`
 
-## Milestone 5: MCP Guidance And Prompt Expansion
+## [done] Milestone 5: MCP Guidance And Prompt Expansion
 
 ### Goal
 
@@ -202,7 +202,7 @@ Help agents and users choose the right tool path faster.
 - `src/__tests__/mcp-prompts-resources.integration.test.ts`
 - `docs/prompt-examples.md`
 
-## Milestone 6: Release Gate Tool
+## [done]  Milestone 6: Release Gate Tool
 
 ### Goal
 

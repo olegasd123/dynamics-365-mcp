@@ -288,7 +288,7 @@ export function registerAllPrompts(server: McpServer, config: AppConfig): void {
               solution
                 ? `Run a release gate check for solution "${solution}" in environment "${environment}".`
                 : `Run a release gate check for environment "${environment}".`,
-              "Start with `environment_health_report`.",
+              "Start with `release_gate_report`.",
               compareWith
                 ? `Then use \`compare_solutions\` to compare the release scope with "${compareWith}".`
                 : "Then use `get_solution_dependencies` when the first pass shows dependency or missing-component risk.",

@@ -259,6 +259,9 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `environment_health_report`
   `Build an environment health report for <ENV> and focus on solution <SOLUTION>.`
 
+- `release_gate_report`
+  `In <ENV>, build a release gate report for solution <SOLUTION>. Compare with <TARGET_ENV> when you want drift in the same report, and use strict mode for a no-warning gate.`
+
 ## Cross-Environment Comparison
 
 This group needs at least two configured environments.
@@ -353,3 +356,4 @@ This prompt list covers these tools:
 - `list_views`
 - `list_web_resources`
 - `list_workflows`
+- `release_gate_report`

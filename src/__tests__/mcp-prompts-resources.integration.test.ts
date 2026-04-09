@@ -122,7 +122,7 @@ describe("MCP prompts and resources", () => {
       if (releasePrompt.messages[0]?.content.type !== "text") {
         throw new Error("Expected a text content block");
       }
-      expect(releasePrompt.messages[0].content.text).toContain("environment_health_report");
+      expect(releasePrompt.messages[0].content.text).toContain("release_gate_report");
       expect(releasePrompt.messages[0].content.text).toContain("compare_solutions");
 
       const pluginPrompt = await harness.client.getPrompt({
@@ -217,6 +217,7 @@ describe("MCP prompts and resources", () => {
       expect(gettingStarted.contents[0].text).toContain("discover_metadata");
       expect(gettingStarted.contents[0].text).toContain("release_gate_check");
       expect(gettingStarted.contents[0].text).toContain("## By Role");
+      expect(gettingStarted.contents[0].text).toContain("`release_gate_report`");
 
       const toolGroups = await harness.client.readResource({
         uri: "d365://reference/tool-groups",
@@ -254,7 +255,7 @@ describe("MCP prompts and resources", () => {
         throw new Error("Expected text resource content");
       }
       expect(releaseChecklist.contents[0].text).toContain("# Release Checklist");
-      expect(releaseChecklist.contents[0].text).toContain("`environment_health_report`");
+      expect(releaseChecklist.contents[0].text).toContain("`release_gate_report`");
 
       const pluginTroubleshooting = await harness.client.readResource({
         uri: "d365://reference/plugin-troubleshooting",
@@ -274,6 +275,7 @@ describe("MCP prompts and resources", () => {
       expect(environmentStarter.contents[0].text).toContain("Starter For dev");
       expect(environmentStarter.contents[0].text).toContain("release_gate_check");
       expect(environmentStarter.contents[0].text).toContain("## Quick Paths By Task");
+      expect(environmentStarter.contents[0].text).toContain("`release_gate_report`");
       expect(environmentStarter.contents[0].text).toContain(
         "Compare solution ContosoCore between dev and prod.",
       );
