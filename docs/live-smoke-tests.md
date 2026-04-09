@@ -39,6 +39,7 @@ npm run test:live
 Optional:
 
 - Set `D365_MCP_LIVE_FIXTURES` when your fixture file is in another path.
+- Set `D365_MCP_LIVE_TOOL_TIMEOUT_MS` when one tool needs a longer timeout.
 
 ## What The Suite Does
 

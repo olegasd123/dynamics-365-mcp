@@ -14,6 +14,7 @@ import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
 const DEFAULT_FIXTURES_PATH = "live-fixtures.json";
+const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
 
 const liveFixturesSchema = z.object({
   environment: z.string().min(1),
@@ -529,6 +530,16 @@ async function createConnectedLiveClient(client: DynamicsClient) {
   };
 }
 
+function getLiveToolTimeoutMs(): number {
+  const raw = process.env.D365_MCP_LIVE_TOOL_TIMEOUT_MS;
+  if (!raw) {
+    return DEFAULT_TOOL_TIMEOUT_MS;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TOOL_TIMEOUT_MS;
+}
+
 function installRequestRecorder(client: DynamicsClient) {
   const recordedRequests: RecordedRequest[] = [];
 
@@ -605,9 +616,6 @@ function logCoverageSummary(results: ToolRunSummary[]) {
 
   for (const result of results) {
     console.info(`[live] ${result.toolName}: ${result.requestCount} request(s)`);
-    for (const request of result.requests) {
-      console.info(`[live]   ${formatRecordedRequest(request)}`);
-    }
   }
 }
 
@@ -633,6 +641,25 @@ function logFailureSummary(failures: ToolRunFailure[]) {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${timeoutMs} ms.`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 const describeLive = LIVE_FLAG ? describe : describe.skip;
 
 describeLive("live tool smoke tests", () => {
@@ -646,81 +673,84 @@ describeLive("live tool smoke tests", () => {
     "calls every tool with real CRM data and records request coverage",
     async () => {
       const fixtures = loadLiveFixtures();
-      const client = new DynamicsClient(new TokenManager());
-      const recorder = installRequestRecorder(client);
-      const harness = await createConnectedLiveClient(client);
+      const tokenManager = new TokenManager();
+      const toolTimeoutMs = getLiveToolTimeoutMs();
       const results: ToolRunSummary[] = [];
       const failures: ToolRunFailure[] = [];
 
-      try {
-        for (const [index, toolName] of EXPECTED_TOOL_NAMES.entries()) {
-          client.clearCache();
-          recorder.reset();
+      for (const [index, toolName] of EXPECTED_TOOL_NAMES.entries()) {
+        const client = new DynamicsClient(tokenManager);
+        const recorder = installRequestRecorder(client);
+        const harness = await createConnectedLiveClient(client);
+        const args = LIVE_TOOL_CASES[toolName].buildArgs(fixtures);
 
-          const args = LIVE_TOOL_CASES[toolName].buildArgs(fixtures);
-          try {
-            const response = (await harness.client.callTool({
+        console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] starting ${toolName}`);
+
+        try {
+          const response = (await withTimeout(
+            harness.client.callTool({
               name: toolName,
               arguments: args,
-            })) as ToolResponse;
-            const requests = recorder.getAll();
-            const error = getToolResponseError(response);
+            }) as Promise<ToolResponse>,
+            toolTimeoutMs,
+            `Tool '${toolName}'`,
+          )) as ToolResponse;
+          const requests = recorder.getAll();
+          const error = getToolResponseError(response);
 
-            if (error) {
-              failures.push({
-                toolName,
-                arguments: args,
-                error,
-                requests,
-              });
-              console.info(
-                `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`,
-              );
-              continue;
-            }
-
-            if (requests.length === 0) {
-              failures.push({
-                toolName,
-                arguments: args,
-                error: "Tool completed without any recorded CRM request.",
-                requests,
-              });
-              console.info(
-                `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`,
-              );
-              continue;
-            }
-
-            results.push({
-              toolName,
-              requestCount: requests.length,
-              requests,
-            });
-
-            console.info(
-              `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} ok (${requests.length} request(s))`,
-            );
-          } catch (error) {
-            const requests = recorder.getAll();
+          if (error) {
             failures.push({
               toolName,
               arguments: args,
-              error: error instanceof Error ? error.message : String(error),
+              error,
               requests,
             });
             console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
+            continue;
           }
+
+          if (requests.length === 0) {
+            failures.push({
+              toolName,
+              arguments: args,
+              error: "Tool completed without any recorded CRM request.",
+              requests,
+            });
+            console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
+            continue;
+          }
+
+          results.push({
+            toolName,
+            requestCount: requests.length,
+            requests,
+          });
+
+          console.info(
+            `[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} ok (${requests.length} request(s))`,
+          );
+        } catch (error) {
+          const requests = recorder.getAll();
+          failures.push({
+            toolName,
+            arguments: args,
+            error: error instanceof Error ? error.message : String(error),
+            requests,
+          });
+          console.info(`[live] [${index + 1}/${EXPECTED_TOOL_NAMES.length}] ${toolName} failed`);
+        } finally {
+          await Promise.race([
+            harness.close(),
+            new Promise((resolve) => setTimeout(resolve, 1000)),
+          ]);
         }
-      } finally {
-        await harness.close();
       }
 
       logCoverageSummary(results);
       logFailureSummary(failures);
 
       expect(
-        failures,
+        failures.length,
         failures
           .map((failure) =>
             [
@@ -734,7 +764,7 @@ describeLive("live tool smoke tests", () => {
             ].join("\n"),
           )
           .join("\n\n"),
-      ).toEqual([]);
+      ).toBe(0);
     },
     20 * 60 * 1000,
   );
