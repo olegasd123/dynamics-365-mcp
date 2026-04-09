@@ -55,7 +55,7 @@ describe("paginated list helpers", () => {
     });
 
     expect(summary).toBe(
-      "Showing 2 of 5 tables. Use cursor='2' to continue. Use nameFilter to narrow the result.",
+      "Showing 2 of 5 tables. Recommended next step: ask for the next page with cursor='2' and the same filters. Use nameFilter to narrow the result.",
     );
   });
 });

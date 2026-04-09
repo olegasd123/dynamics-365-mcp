@@ -140,7 +140,9 @@ export function buildPaginatedListSummary(options: {
   const parts = [`Showing ${returnedCount} of ${totalCount} ${itemLabelPlural}.`];
 
   if (nextCursor) {
-    parts.push(`Use cursor='${nextCursor}' to continue.`);
+    parts.push(
+      `Recommended next step: ask for the next page with cursor='${nextCursor}' and the same filters.`,
+    );
   }
 
   if (narrowHint) {
