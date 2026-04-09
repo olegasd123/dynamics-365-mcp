@@ -4,7 +4,7 @@ This roadmap turns the improvement ideas into milestones that are ready to build
 
 The order is based on value for MCP clients first, then runtime safety, then new high-level workflows.
 
-## Milestone 1: MCP Surface Cleanup
+## Milestone 1: MCP Surface Cleanup [done]
 
 ### Goal
 
@@ -44,7 +44,7 @@ Make the MCP surface smaller, cleaner, and easier for clients to use.
 - `src/logging/__tests__/request-logger.test.ts`
 - `src/__tests__/runtime-transports.test.ts`
 
-## Milestone 2: HTTP Runtime Hardening
+## [done] Milestone 2: HTTP Runtime Hardening
 
 ### Goal
 

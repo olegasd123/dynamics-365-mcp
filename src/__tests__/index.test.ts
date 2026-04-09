@@ -12,8 +12,16 @@ import {
 describe("index runtime helpers", () => {
   it("parses HTTP runtime options from argv and env", () => {
     const options = parseRuntimeOptions(
-      ["--transport=http", "--port=4010", "--host=0.0.0.0", "--path=custom"],
-      {},
+      [
+        "--transport=http",
+        "--port=4010",
+        "--host=0.0.0.0",
+        "--path=custom",
+        "--session-idle-timeout-ms=120000",
+        "--max-active-sessions=7",
+        "--session-cleanup-interval-ms=15000",
+      ],
+      { MCP_PORT: "9999" },
     );
 
     expect(options).toEqual({
@@ -21,6 +29,9 @@ describe("index runtime helpers", () => {
       port: 4010,
       host: "0.0.0.0",
       path: "/custom",
+      sessionIdleTimeoutMs: 120000,
+      maxActiveSessions: 7,
+      sessionCleanupIntervalMs: 15000,
     });
   });
 
@@ -29,9 +40,16 @@ describe("index runtime helpers", () => {
     healthState.requestCount = 3;
     healthState.activeRequestCount = 1;
     healthState.activeSessionCount = 2;
+    healthState.pendingSessionCount = 1;
     healthState.errorCount = 1;
     healthState.lastErrorMessage = "Boom";
     healthState.lastErrorAt = "2026-04-06T19:00:00.000Z";
+    healthState.evictedSessionCount = 2;
+    healthState.expiredSessionCount = 2;
+    healthState.rejectedSessionCount = 1;
+    healthState.oldestSessionAgeMs = 8500;
+    healthState.longestIdleSessionMs = 4200;
+    healthState.lastExpiredAt = "2026-04-06T19:05:00.000Z";
 
     const payload = buildHealthPayload(
       {
@@ -51,6 +69,9 @@ describe("index runtime helpers", () => {
         host: "127.0.0.1",
         port: 3003,
         path: "/mcp",
+        sessionIdleTimeoutMs: 600000,
+        maxActiveSessions: 10,
+        sessionCleanupIntervalMs: 30000,
       },
       {
         getHealthSnapshot: () => ({
@@ -94,6 +115,16 @@ describe("index runtime helpers", () => {
       },
       sessions: {
         active: 2,
+        pending: 1,
+        maxActive: 10,
+        idleTimeoutMs: 600000,
+        cleanupIntervalMs: 30000,
+        evicted: 2,
+        expired: 2,
+        rejected: 1,
+        oldestAgeSeconds: 8,
+        longestIdleSeconds: 4,
+        lastExpiredAt: "2026-04-06T19:05:00.000Z",
         shuttingDown: false,
       },
       auth: {

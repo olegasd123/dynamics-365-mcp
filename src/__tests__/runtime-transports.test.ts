@@ -47,7 +47,10 @@ function createTempConfigPath(): { dir: string; configPath: string } {
   return { dir, configPath };
 }
 
-function createChildEnv(configPath: string): Record<string, string> {
+function createChildEnv(
+  configPath: string,
+  overrides: Record<string, string> = {},
+): Record<string, string> {
   return {
     ...Object.fromEntries(
       Object.entries(process.env).filter(
@@ -55,6 +58,7 @@ function createChildEnv(configPath: string): Record<string, string> {
       ),
     ),
     D365_MCP_CONFIG: configPath,
+    ...overrides,
   };
 }
 
@@ -280,6 +284,16 @@ describe("runtime transports", () => {
         },
         sessions: {
           active: 0,
+          pending: 0,
+          maxActive: 25,
+          idleTimeoutMs: 900000,
+          cleanupIntervalMs: 30000,
+          evicted: 0,
+          expired: 0,
+          rejected: 0,
+          oldestAgeSeconds: null,
+          longestIdleSeconds: null,
+          lastExpiredAt: null,
           shuttingDown: false,
         },
       });
@@ -469,6 +483,119 @@ describe("runtime transports", () => {
       expect(exited).toBe(true);
     } finally {
       await Promise.allSettled([client.close(), transport.close()]);
+      await closeChildProcess(child);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  it("expires idle HTTP sessions and reports timeout stats", async () => {
+    const { dir, configPath } = createTempConfigPath();
+    const port = await getFreePort();
+    const child = spawn(
+      process.execPath,
+      getNodeEntrypointArgs(["--transport=http", "--host=127.0.0.1", `--port=${port}`]),
+      {
+        cwd: workspaceRoot,
+        env: createChildEnv(configPath, {
+          MCP_SESSION_IDLE_TIMEOUT_MS: "200",
+          MCP_SESSION_CLEANUP_INTERVAL_MS: "50",
+        }),
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    const stderr = readStream(child.stderr);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
+    const client = new Client({
+      name: "runtime-http-timeout-client",
+      version: "1.0.0",
+    });
+
+    try {
+      await waitForHttpServer(baseUrl, stderr);
+      await client.connect(transport);
+      await client.listTools();
+
+      const connectedHealth = await waitForHealthValue(
+        baseUrl,
+        (payload) => (payload.sessions as Record<string, unknown>).active,
+        (active) => active === 1,
+      );
+      expect((connectedHealth.sessions as Record<string, unknown>).idleTimeoutMs).toBe(200);
+      expect((connectedHealth.sessions as Record<string, unknown>).cleanupIntervalMs).toBe(50);
+
+      const expiredHealth = await waitForHealthValue(
+        baseUrl,
+        (payload) => ({
+          active: Number((payload.sessions as Record<string, unknown>).active || 0),
+          expired: Number((payload.sessions as Record<string, unknown>).expired || 0),
+          evicted: Number((payload.sessions as Record<string, unknown>).evicted || 0),
+        }),
+        (sessions) => sessions.active === 0 && sessions.expired >= 1 && sessions.evicted >= 1,
+      );
+
+      expect((expiredHealth.sessions as Record<string, unknown>).lastExpiredAt).toBeTruthy();
+      expect((expiredHealth.sessions as Record<string, unknown>).oldestAgeSeconds).toBeNull();
+      expect((expiredHealth.sessions as Record<string, unknown>).longestIdleSeconds).toBeNull();
+    } finally {
+      await Promise.allSettled([client.close(), transport.close()]);
+      await closeChildProcess(child);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  it("rejects new HTTP sessions when the active session limit is reached", async () => {
+    const { dir, configPath } = createTempConfigPath();
+    const port = await getFreePort();
+    const child = spawn(
+      process.execPath,
+      getNodeEntrypointArgs(["--transport=http", "--host=127.0.0.1", `--port=${port}`]),
+      {
+        cwd: workspaceRoot,
+        env: createChildEnv(configPath, {
+          MCP_MAX_ACTIVE_SESSIONS: "1",
+        }),
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    const stderr = readStream(child.stderr);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const transportA = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
+    const transportB = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`));
+    const clientA = new Client({
+      name: "runtime-http-limit-client-a",
+      version: "1.0.0",
+    });
+    const clientB = new Client({
+      name: "runtime-http-limit-client-b",
+      version: "1.0.0",
+    });
+
+    try {
+      await waitForHttpServer(baseUrl, stderr);
+      await clientA.connect(transportA);
+      await clientA.listTools();
+
+      await expect(clientB.connect(transportB)).rejects.toThrow();
+
+      const limitedHealth = await waitForHealthValue(
+        baseUrl,
+        (payload) => ({
+          active: Number((payload.sessions as Record<string, unknown>).active || 0),
+          rejected: Number((payload.sessions as Record<string, unknown>).rejected || 0),
+        }),
+        (sessions) => sessions.active === 1 && sessions.rejected >= 1,
+      );
+
+      expect((limitedHealth.sessions as Record<string, unknown>).maxActive).toBe(1);
+      expect((limitedHealth.sessions as Record<string, unknown>).pending).toBe(0);
+    } finally {
+      await Promise.allSettled([
+        clientA.close(),
+        clientB.close(),
+        transportA.close(),
+        transportB.close(),
+      ]);
       await closeChildProcess(child);
       rmSync(dir, { recursive: true, force: true });
     }

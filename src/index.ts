@@ -19,6 +19,7 @@ import {
   createHttpHealthState,
   HttpRuntime,
   type HttpHealthState,
+  type HttpRuntimeOptions,
   type HttpRequest,
   type HttpResponse,
 } from "./http/http-runtime.js";
@@ -33,7 +34,14 @@ interface RuntimeOptions {
   port: number;
   host: string;
   path: string;
+  sessionIdleTimeoutMs: number;
+  maxActiveSessions: number;
+  sessionCleanupIntervalMs: number;
 }
+
+const DEFAULT_HTTP_SESSION_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const DEFAULT_HTTP_MAX_ACTIVE_SESSIONS = 25;
+const DEFAULT_HTTP_SESSION_CLEANUP_INTERVAL_MS = 30 * 1000;
 
 function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClient): McpServer {
   const server = new McpServer({
@@ -77,12 +85,33 @@ export function parseRuntimeOptions(argv: string[], env: NodeJS.ProcessEnv): Run
   const host = args.get("host") || env.MCP_HOST || "127.0.0.1";
   const rawPath = args.get("path") || env.MCP_PATH || "/mcp";
   const path = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+  const sessionIdleTimeoutMs = parsePositiveInteger(
+    args.get("session-idle-timeout-ms") ||
+      env.MCP_SESSION_IDLE_TIMEOUT_MS ||
+      String(DEFAULT_HTTP_SESSION_IDLE_TIMEOUT_MS),
+    "session idle timeout",
+  );
+  const maxActiveSessions = parsePositiveInteger(
+    args.get("max-active-sessions") ||
+      env.MCP_MAX_ACTIVE_SESSIONS ||
+      String(DEFAULT_HTTP_MAX_ACTIVE_SESSIONS),
+    "max active sessions",
+  );
+  const sessionCleanupIntervalMs = parsePositiveInteger(
+    args.get("session-cleanup-interval-ms") ||
+      env.MCP_SESSION_CLEANUP_INTERVAL_MS ||
+      String(Math.min(DEFAULT_HTTP_SESSION_CLEANUP_INTERVAL_MS, sessionIdleTimeoutMs)),
+    "session cleanup interval",
+  );
 
   return {
     transport: transportValue,
     port,
     host,
     path,
+    sessionIdleTimeoutMs,
+    maxActiveSessions,
+    sessionCleanupIntervalMs,
   };
 }
 
@@ -121,6 +150,16 @@ export function buildHealthPayload(
     },
     sessions: {
       active: healthState.activeSessionCount,
+      pending: healthState.pendingSessionCount,
+      maxActive: options.maxActiveSessions,
+      idleTimeoutMs: options.sessionIdleTimeoutMs,
+      cleanupIntervalMs: options.sessionCleanupIntervalMs,
+      evicted: healthState.evictedSessionCount,
+      expired: healthState.expiredSessionCount,
+      rejected: healthState.rejectedSessionCount,
+      oldestAgeSeconds: toWholeSeconds(healthState.oldestSessionAgeMs),
+      longestIdleSeconds: toWholeSeconds(healthState.longestIdleSessionMs),
+      lastExpiredAt: healthState.lastExpiredAt,
       shuttingDown: healthState.shuttingDown,
     },
     auth: tokenManager.getHealthSnapshot(),
@@ -160,9 +199,15 @@ async function startHttpServer(
 ): Promise<void> {
   const app = createMcpExpressApp({ host: options.host });
   const healthState = createHttpHealthState();
+  const runtimeOptions: HttpRuntimeOptions = {
+    sessionIdleTimeoutMs: options.sessionIdleTimeoutMs,
+    maxActiveSessions: options.maxActiveSessions,
+    sessionCleanupIntervalMs: options.sessionCleanupIntervalMs,
+  };
   const runtime = new HttpRuntime(
     () => buildServer(config, client),
     healthState,
+    runtimeOptions,
     (error, context) => {
       requestLogger.logError("http-request", error, context);
     },
@@ -224,6 +269,19 @@ export function loadRuntimeEnv(env: NodeJS.ProcessEnv, cwd: string): string[] {
 
 function isEntrypoint(): boolean {
   return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+function parsePositiveInteger(rawValue: string, label: string): number {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`Invalid ${label} '${rawValue}'. Use an integer greater than 0.`);
+  }
+
+  return parsed;
+}
+
+function toWholeSeconds(valueMs: number | null): number | null {
+  return valueMs === null ? null : Math.floor(valueMs / 1000);
 }
 
 if (isEntrypoint()) {
