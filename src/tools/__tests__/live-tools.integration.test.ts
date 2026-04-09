@@ -32,8 +32,8 @@ const liveFixturesSchema = z.object({
   formName: z.string().min(1),
   viewName: z.string().min(1),
   viewScope: z.enum(["system", "personal", "all"]).optional(),
-  customApi: z.string().min(1),
-  cloudFlow: z.string().min(1),
+  customApi: z.string().min(1).nullable().optional(),
+  cloudFlow: z.string().min(1).nullable().optional(),
   securityRole: z.string().min(1),
   businessUnit: z.string().min(1).optional(),
   targetBusinessUnit: z.string().min(1).optional(),
@@ -73,8 +73,14 @@ interface ToolRunFailure {
   requests: RecordedRequest[];
 }
 
+interface ToolRunSkip {
+  toolName: ToolName;
+  reason: string;
+}
+
 interface LiveToolCase {
   buildArgs: (fixtures: LiveFixtures) => Record<string, unknown>;
+  skipReason?: (fixtures: LiveFixtures) => string | null;
   timeoutMs?: number;
 }
 
@@ -106,7 +112,7 @@ const LIVE_TOOL_CASES = {
     buildArgs: (fixtures) => ({
       sourceEnvironment: fixtures.environment,
       targetEnvironment: fixtures.targetEnvironment,
-      apiName: fixtures.customApi,
+      ...(fixtures.customApi ? { apiName: fixtures.customApi } : {}),
     }),
   },
   compare_environment_matrix: {
@@ -228,10 +234,11 @@ const LIVE_TOOL_CASES = {
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       referenceName: fixtures.connectionReference,
-      solution: fixtures.solution,
     }),
   },
   get_custom_api_details: {
+    skipReason: (fixtures) =>
+      fixtures.customApi ? null : "Skipped because the live environment has no Custom APIs.",
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       apiName: fixtures.customApi,
@@ -248,10 +255,11 @@ const LIVE_TOOL_CASES = {
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       variableName: fixtures.environmentVariable,
-      solution: fixtures.solution,
     }),
   },
   get_flow_details: {
+    skipReason: (fixtures) =>
+      fixtures.cloudFlow ? null : "Skipped because the live environment has no cloud flows.",
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       flowName: fixtures.cloudFlow,
@@ -358,21 +366,20 @@ const LIVE_TOOL_CASES = {
   list_cloud_flows: {
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
-      nameFilter: fixtures.cloudFlow,
       solution: fixtures.solution,
+      ...(fixtures.cloudFlow ? { nameFilter: fixtures.cloudFlow } : {}),
     }),
   },
   list_connection_references: {
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       nameFilter: fixtures.connectionReference,
-      solution: fixtures.solution,
     }),
   },
   list_custom_apis: {
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
-      nameFilter: fixtures.customApi,
+      ...(fixtures.customApi ? { nameFilter: fixtures.customApi } : {}),
     }),
   },
   list_dashboards: {
@@ -386,7 +393,6 @@ const LIVE_TOOL_CASES = {
     buildArgs: (fixtures) => ({
       environment: fixtures.environment,
       nameFilter: fixtures.environmentVariable,
-      solution: fixtures.solution,
     }),
   },
   list_forms: {
@@ -665,6 +671,19 @@ function logFailureSummary(failures: ToolRunFailure[]) {
   }
 }
 
+function logSkipSummary(skips: ToolRunSkip[]) {
+  if (skips.length === 0) {
+    return;
+  }
+
+  console.info("");
+  console.info("[live] Skipped");
+
+  for (const skip of skips) {
+    console.info(`[live] ${skip.toolName}: ${skip.reason}`);
+  }
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -702,12 +721,23 @@ describeLive("live tool smoke tests", () => {
       const selectedTools = getSelectedLiveTools();
       const results: ToolRunSummary[] = [];
       const failures: ToolRunFailure[] = [];
+      const skips: ToolRunSkip[] = [];
 
       for (const [index, toolName] of selectedTools.entries()) {
+        const toolCase = LIVE_TOOL_CASES[toolName];
+        const skipReason = toolCase.skipReason?.(fixtures) ?? null;
+
+        if (skipReason) {
+          skips.push({ toolName, reason: skipReason });
+          console.info(
+            `[live] [${index + 1}/${selectedTools.length}] ${toolName} skipped (${skipReason})`,
+          );
+          continue;
+        }
+
         const client = new DynamicsClient(tokenManager);
         const recorder = installRequestRecorder(client);
         const harness = await createConnectedLiveClient(client);
-        const toolCase = LIVE_TOOL_CASES[toolName];
         const args = toolCase.buildArgs(fixtures);
         const effectiveToolTimeoutMs = Math.max(toolTimeoutMs, toolCase.timeoutMs ?? 0);
 
@@ -781,6 +811,7 @@ describeLive("live tool smoke tests", () => {
       }
 
       logCoverageSummary(results);
+      logSkipSummary(skips);
       logFailureSummary(failures);
 
       expect(

@@ -41,6 +41,14 @@ Optional:
 - Set `D365_MCP_LIVE_FIXTURES` when your fixture file is in another path.
 - Set `D365_MCP_LIVE_TOOL_TIMEOUT_MS` when one tool needs a longer timeout.
 
+If your environment has no Custom APIs or no cloud flows:
+
+- set `customApi` to `null`
+- set `cloudFlow` to `null`
+
+The detail tools for those objects will be skipped.
+The list tools will still run without a name filter.
+
 ## What The Suite Does
 
 - builds a real MCP server in memory
@@ -49,6 +57,7 @@ Optional:
 - records `query`, `queryPath`, and `getPath` calls
 - prints which CRM requests each tool used
 - keeps going after tool failures
+- skips detail tools that need objects which do not exist in the environment
 - prints one full failure list at the end
 
 ## Notes
