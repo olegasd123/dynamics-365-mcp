@@ -26,7 +26,7 @@ const ENVIRONMENT_VARIABLE_VALUE_SELECT = [
 const CONNECTION_REFERENCE_SELECT = [
   "connectionreferenceid",
   "connectionreferencelogicalname",
-  "displayname",
+  "connectionreferencedisplayname",
   "connectorid",
   "connectionid",
   "ismanaged",
@@ -88,13 +88,13 @@ export function listEnvironmentVariableValuesByIdsQuery(ids: string[]): string {
 
 export function listConnectionReferencesQuery(nameFilter?: string): string {
   const filter = nameFilter
-    ? `(${odataContains("displayname", nameFilter)} or ${odataContains("connectionreferencelogicalname", nameFilter)})`
+    ? `(${odataContains("connectionreferencedisplayname", nameFilter)} or ${odataContains("connectionreferencelogicalname", nameFilter)})`
     : undefined;
 
   return buildQueryString({
     select: CONNECTION_REFERENCE_SELECT,
     filter,
-    orderby: "displayname asc",
+    orderby: "connectionreferencedisplayname asc",
   });
 }
 
@@ -102,7 +102,7 @@ export function listConnectionReferencesByIdsQuery(ids: string[]): string {
   return buildQueryString({
     select: CONNECTION_REFERENCE_SELECT,
     filter: buildOrFilter("connectionreferenceid", ids),
-    orderby: "displayname asc",
+    orderby: "connectionreferencedisplayname asc",
   });
 }
 

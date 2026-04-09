@@ -103,11 +103,13 @@ export function normalizeEnvironmentVariableValue(
 export function normalizeConnectionReference(
   record: Record<string, unknown>,
 ): ConnectionReferenceRecord {
+  const displayName = record.connectionreferencedisplayname || record.displayname || "";
+
   return {
     ...record,
     connectionreferenceid: String(record.connectionreferenceid || ""),
     connectionreferencelogicalname: String(record.connectionreferencelogicalname || ""),
-    displayname: String(record.displayname || ""),
+    displayname: String(displayName),
     connectorid: String(record.connectorid || ""),
     connectionid: String(record.connectionid || ""),
     ismanaged: Boolean(record.ismanaged),

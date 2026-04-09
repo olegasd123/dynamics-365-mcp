@@ -26,8 +26,9 @@ describe("alm queries", () => {
   it("builds the connection reference query with a name filter", () => {
     const query = listConnectionReferencesQuery("Office");
 
-    expect(query).toContain("contains(displayname,'Office')");
+    expect(query).toContain("contains(connectionreferencedisplayname,'Office')");
     expect(query).toContain("contains(connectionreferencelogicalname,'Office')");
+    expect(query).toContain("$orderby=connectionreferencedisplayname asc");
   });
 
   it("builds the app module query with a name filter", () => {

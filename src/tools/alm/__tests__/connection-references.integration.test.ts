@@ -17,7 +17,7 @@ describe("connection reference tools", () => {
           {
             connectionreferenceid: "conn-1",
             connectionreferencelogicalname: "contoso_sharedoffice365",
-            displayname: "Office 365",
+            connectionreferencedisplayname: "Office 365",
             connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
             connectionid: "",
             ismanaged: false,
@@ -52,7 +52,7 @@ describe("connection reference tools", () => {
           {
             connectionreferenceid: "conn-1",
             connectionreferencelogicalname: "contoso_sharedoffice365",
-            displayname: "Office 365",
+            connectionreferencedisplayname: "Office 365",
             connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
             connectionid: "shared-office-1",
             ismanaged: false,
