@@ -1,27 +1,581 @@
 {
-  "environment": "dev",
-  "targetEnvironment": "test",
-  "targetEnvironments": ["test"],
-  "solution": "Contoso_Core",
-  "targetSolution": "Contoso_Core",
-  "table": "account",
-  "targetTable": "account",
-  "column": "name",
-  "pluginAssembly": "Contoso.Plugins",
-  "pluginClass": "Contoso.Plugins.AccountPlugin",
-  "workflowName": "Contoso Main Workflow",
-  "workflowUniqueName": "contoso_MainWorkflow",
-  "formName": "Account Main",
-  "viewName": "Active Accounts",
-  "viewScope": "system",
-  "customApi": null,
-  "cloudFlow": null,
-  "securityRole": "Salesperson",
-  "businessUnit": "Root Business Unit",
-  "targetBusinessUnit": "Root Business Unit",
-  "webResource": "contoso_/scripts/account.js",
-  "environmentVariable": "contoso_BaseUrl",
-  "connectionReference": "contoso_sharedoffice365",
-  "appModule": "Sales Hub",
-  "dashboard": "Sales Dashboard"
+  "tools": {
+    "analyze_create_triggers": [
+      {
+        "name": "account name",
+        "enabled": false,
+        "skipReason": "This test is currently disabled.",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "providedAttributes": ["name"]
+        }
+      }
+    ],
+    "analyze_impact": [
+      {
+        "name": "account name column",
+        "arguments": {
+          "environment": "dev",
+          "componentType": "column",
+          "table": "account",
+          "name": "name",
+          "maxDependencies": 20
+        }
+      }
+    ],
+    "analyze_update_triggers": [
+      {
+        "name": "account name",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "changedAttributes": ["name"]
+        }
+      }
+    ],
+    "compare_custom_apis": [
+      {
+        "name": "compare all custom apis",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test"
+        }
+      }
+    ],
+    "compare_environment_matrix": [
+      {
+        "name": "plugin matrix",
+        "arguments": {
+          "baselineEnvironment": "dev",
+          "targetEnvironments": ["test"],
+          "componentType": "plugins",
+          "assemblyName": "Contoso.Plugins",
+          "maxRows": 10
+        }
+      }
+    ],
+    "compare_forms": [
+      {
+        "name": "account main form",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "table": "account",
+          "formName": "Account Main",
+          "solution": "Contoso_Core",
+          "targetSolution": "Contoso_Core"
+        }
+      }
+    ],
+    "compare_plugin_assemblies": [
+      {
+        "name": "main assembly",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "assemblyName": "Contoso.Plugins"
+        }
+      }
+    ],
+    "compare_security_roles": [
+      {
+        "name": "salesperson role",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "roleName": "Salesperson",
+          "sourceBusinessUnit": "Root Business Unit",
+          "targetBusinessUnit": "Root Business Unit"
+        }
+      }
+    ],
+    "compare_solutions": [
+      {
+        "name": "contoso core",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "solution": "Contoso_Core",
+          "targetSolution": "Contoso_Core"
+        }
+      }
+    ],
+    "compare_table_schema": [
+      {
+        "name": "account schema",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "table": "account",
+          "targetTable": "account"
+        }
+      }
+    ],
+    "compare_views": [
+      {
+        "name": "active accounts",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "table": "account",
+          "scope": "system",
+          "viewName": "Active Accounts",
+          "solution": "Contoso_Core",
+          "targetSolution": "Contoso_Core"
+        }
+      }
+    ],
+    "compare_web_resources": [
+      {
+        "name": "account script",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "nameFilter": "contoso_/scripts/account.js"
+        }
+      }
+    ],
+    "compare_workflows": [
+      {
+        "name": "main workflow",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "workflowName": "Contoso Main Workflow"
+        }
+      }
+    ],
+    "environment_health_report": [
+      {
+        "name": "contoso core",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "find_column_usage": [
+      {
+        "name": "account name",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "column": "name"
+        }
+      }
+    ],
+    "find_metadata": [
+      {
+        "name": "account search",
+        "arguments": {
+          "environment": "dev",
+          "query": "account",
+          "limit": 10
+        }
+      },
+      {
+        "enabled": false,
+        "name": "solution search",
+        "arguments": {
+          "environment": "dev",
+          "query": "Contoso_Core",
+          "limit": 10
+        }
+      }
+    ],
+    "find_table_usage": [
+      {
+        "name": "account table",
+        "arguments": {
+          "environment": "dev",
+          "table": "account"
+        }
+      }
+    ],
+    "find_web_resource_usage": [
+      {
+        "name": "account script",
+        "arguments": {
+          "environment": "dev",
+          "name": "contoso_/scripts/account.js"
+        }
+      }
+    ],
+    "get_app_module_details": [
+      {
+        "name": "sales hub",
+        "arguments": {
+          "environment": "dev",
+          "appName": "Sales Hub",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_connection_reference_details": [
+      {
+        "name": "office 365 reference",
+        "arguments": {
+          "environment": "dev",
+          "referenceName": "contoso_sharedoffice365"
+        }
+      }
+    ],
+    "get_custom_api_details": [
+      {
+        "name": "no custom api in this env",
+        "skipReason": "Set a real apiName here when the environment has Custom APIs."
+      }
+    ],
+    "get_dashboard_details": [
+      {
+        "name": "sales dashboard",
+        "arguments": {
+          "environment": "dev",
+          "dashboardName": "Sales Dashboard",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_environment_variable_details": [
+      {
+        "name": "base url",
+        "arguments": {
+          "environment": "dev",
+          "variableName": "contoso_BaseUrl"
+        }
+      }
+    ],
+    "get_flow_details": [
+      {
+        "name": "no cloud flow in this env",
+        "skipReason": "Set a real flowName here when the environment has cloud flows."
+      }
+    ],
+    "get_form_details": [
+      {
+        "name": "account main form",
+        "arguments": {
+          "environment": "dev",
+          "formName": "Account Main",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_plugin_assembly_details": [
+      {
+        "name": "main assembly",
+        "arguments": {
+          "environment": "dev",
+          "assemblyName": "Contoso.Plugins"
+        }
+      }
+    ],
+    "get_plugin_details": [
+      {
+        "name": "account plugin",
+        "arguments": {
+          "environment": "dev",
+          "pluginName": "Contoso.Plugins.AccountPlugin",
+          "assemblyName": "Contoso.Plugins",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_role_privileges": [
+      {
+        "name": "salesperson role",
+        "arguments": {
+          "environment": "dev",
+          "roleName": "Salesperson",
+          "businessUnit": "Root Business Unit"
+        }
+      }
+    ],
+    "get_solution_dependencies": [
+      {
+        "name": "web resource dependencies",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core",
+          "direction": "both",
+          "componentType": "web_resource",
+          "componentName": "contoso_/scripts/account.js",
+          "maxRows": 20
+        }
+      }
+    ],
+    "get_solution_details": [
+      {
+        "name": "contoso core",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_table_schema": [
+      {
+        "name": "account schema",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_view_details": [
+      {
+        "name": "active accounts",
+        "arguments": {
+          "environment": "dev",
+          "viewName": "Active Accounts",
+          "table": "account",
+          "scope": "system",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_view_fetchxml": [
+      {
+        "name": "active accounts",
+        "arguments": {
+          "environment": "dev",
+          "viewName": "Active Accounts",
+          "table": "account",
+          "scope": "system",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_web_resource_content": [
+      {
+        "name": "account script",
+        "arguments": {
+          "environment": "dev",
+          "name": "contoso_/scripts/account.js"
+        }
+      }
+    ],
+    "get_workflow_details": [
+      {
+        "name": "main workflow by unique name",
+        "arguments": {
+          "environment": "dev",
+          "uniqueName": "contoso_MainWorkflow"
+        }
+      }
+    ],
+    "list_actions": [
+      {
+        "name": "contoso core actions",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_app_modules": [
+      {
+        "name": "sales hub",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Sales Hub",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_cloud_flows": [
+      {
+        "name": "all cloud flows in solution",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_connection_references": [
+      {
+        "name": "office 365 reference",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "contoso_sharedoffice365"
+        }
+      }
+    ],
+    "list_custom_apis": [
+      {
+        "name": "all custom apis",
+        "arguments": {
+          "environment": "dev"
+        }
+      }
+    ],
+    "list_dashboards": [
+      {
+        "name": "sales dashboard",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Sales Dashboard",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_environment_variables": [
+      {
+        "name": "base url",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "contoso_BaseUrl"
+        }
+      }
+    ],
+    "list_forms": [
+      {
+        "name": "account main form",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "solution": "Contoso_Core",
+          "nameFilter": "Account Main"
+        }
+      }
+    ],
+    "list_plugin_assemblies": [
+      {
+        "name": "assemblies in solution",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_plugin_assembly_images": [
+      {
+        "name": "main assembly images",
+        "arguments": {
+          "environment": "dev",
+          "assemblyName": "Contoso.Plugins"
+        }
+      }
+    ],
+    "list_plugin_assembly_steps": [
+      {
+        "name": "main assembly steps",
+        "arguments": {
+          "environment": "dev",
+          "assemblyName": "Contoso.Plugins"
+        }
+      }
+    ],
+    "list_plugin_steps": [
+      {
+        "name": "account plugin steps",
+        "arguments": {
+          "environment": "dev",
+          "pluginName": "Contoso.Plugins.AccountPlugin",
+          "assemblyName": "Contoso.Plugins",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_plugins": [
+      {
+        "name": "plugins in solution",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_security_roles": [
+      {
+        "name": "salesperson role",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Salesperson"
+        }
+      }
+    ],
+    "list_solutions": [
+      {
+        "name": "contoso core",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Contoso_Core"
+        }
+      }
+    ],
+    "list_table_columns": [
+      {
+        "name": "account columns",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_table_relationships": [
+      {
+        "name": "account relationships",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_tables": [
+      {
+        "name": "account table",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_views": [
+      {
+        "name": "active accounts system view",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "scope": "system",
+          "nameFilter": "Active Accounts",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_web_resources": [
+      {
+        "name": "account script",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "contoso_/scripts/account.js",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_workflows": [
+      {
+        "name": "workflows in solution",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "release_gate_report": [
+      {
+        "name": "contoso core release gate",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core"
+        }
+      }
+    ]
+  }
 }

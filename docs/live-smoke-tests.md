@@ -30,6 +30,15 @@ Start from:
 
 - `live-fixtures.example.json`
 
+The file is tool-first:
+
+- `tools.<toolName>` is an array of test cases for one tool
+- each case has `arguments` with real tool input
+- one tool can have several cases with different data
+- set `enabled` to `false` to disable one case
+- use `name` to make logs easy to read
+- use `skipReason` when one detail tool has no real object in the environment
+
 ## Run
 
 ```bash
@@ -43,26 +52,28 @@ Optional:
 
 If your environment has no Custom APIs or no cloud flows:
 
-- set `customApi` to `null`
-- set `cloudFlow` to `null`
+- keep the list tool cases
+- add `skipReason` to the detail tool case
 
-The detail tools for those objects will be skipped.
-The list tools will still run without a name filter.
+The detail tool case will be skipped.
+The list tool can still run without a name filter.
 
 ## What The Suite Does
 
 - builds a real MCP server in memory
-- calls every tool one by one
+- calls every configured tool case one by one
 - clears the response cache before each tool
 - records `query`, `queryPath`, and `getPath` calls
 - prints which CRM requests each tool used
 - keeps going after tool failures
-- skips detail tools that need objects which do not exist in the environment
+- skips cases with `skipReason`
+- skips cases with `enabled: false`
 - prints one full failure list at the end
 
 ## Notes
 
 - The suite is opt-in only.
 - Normal `npm test` does not run it.
-- If one fixture name is wrong, only that tool should fail.
+- If one case has bad data, only that case should fail.
 - If a shared CRM query is wrong, many tools can fail. This is useful signal.
+- If you select a tool with `D365_MCP_LIVE_TOOLS`, that tool must have at least one case in `live-fixtures.json`.

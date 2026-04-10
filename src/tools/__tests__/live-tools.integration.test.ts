@@ -15,37 +15,40 @@ import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
 const DEFAULT_FIXTURES_PATH = "live-fixtures.json";
 const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
+const RELEASE_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
-const liveFixturesSchema = z.object({
-  environment: z.string().min(1),
-  targetEnvironment: z.string().min(1),
-  targetEnvironments: z.array(z.string().min(1)).min(1).optional(),
-  solution: z.string().min(1),
-  targetSolution: z.string().min(1).optional(),
-  table: z.string().min(1),
-  targetTable: z.string().min(1).optional(),
-  column: z.string().min(1),
-  pluginAssembly: z.string().min(1),
-  pluginClass: z.string().min(1),
-  workflowName: z.string().min(1),
-  workflowUniqueName: z.string().min(1).optional(),
-  formName: z.string().min(1),
-  viewName: z.string().min(1),
-  viewScope: z.enum(["system", "personal", "all"]).optional(),
-  customApi: z.string().min(1).nullable().optional(),
-  cloudFlow: z.string().min(1).nullable().optional(),
-  securityRole: z.string().min(1),
-  businessUnit: z.string().min(1).optional(),
-  targetBusinessUnit: z.string().min(1).optional(),
-  webResource: z.string().min(1),
-  environmentVariable: z.string().min(1),
-  connectionReference: z.string().min(1),
-  appModule: z.string().min(1),
-  dashboard: z.string().min(1),
-});
+type ToolName = (typeof EXPECTED_TOOL_NAMES)[number];
+
+const runnableLiveToolCaseSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+    arguments: z.record(z.string(), z.unknown()),
+    timeoutMs: z.number().int().positive().optional(),
+  })
+  .strict();
+
+const skippedLiveToolCaseSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+    skipReason: z.string().min(1),
+  })
+  .strict();
+
+const liveFixturesSchema = z
+  .object({
+    tools: z.record(
+      z.enum(EXPECTED_TOOL_NAMES),
+      z.array(z.union([runnableLiveToolCaseSchema, skippedLiveToolCaseSchema])).min(1),
+    ),
+  })
+  .strict();
 
 type LiveFixtures = z.infer<typeof liveFixturesSchema>;
-type ToolName = (typeof EXPECTED_TOOL_NAMES)[number];
+type RunnableLiveToolCase = z.infer<typeof runnableLiveToolCaseSchema>;
+type SkippedLiveToolCase = z.infer<typeof skippedLiveToolCaseSchema>;
+type ConfiguredLiveToolCase = RunnableLiveToolCase | SkippedLiveToolCase;
 
 interface ToolResponse {
   content: Array<{ type: "text"; text: string }>;
@@ -62,12 +65,14 @@ interface RecordedRequest {
 
 interface ToolRunSummary {
   toolName: ToolName;
+  caseName: string;
   requestCount: number;
   requests: RecordedRequest[];
 }
 
 interface ToolRunFailure {
   toolName: ToolName;
+  caseName: string;
   arguments: Record<string, unknown>;
   error: string;
   requests: RecordedRequest[];
@@ -75,429 +80,25 @@ interface ToolRunFailure {
 
 interface ToolRunSkip {
   toolName: ToolName;
+  caseName: string;
   reason: string;
 }
 
-interface LiveToolCase {
-  buildArgs: (fixtures: LiveFixtures) => Record<string, unknown>;
-  skipReason?: (fixtures: LiveFixtures) => string | null;
+interface SelectedLiveToolCase {
+  toolName: ToolName;
+  caseName: string;
+  arguments: Record<string, unknown> | null;
+  skipReason: string | null;
   timeoutMs?: number;
 }
 
-const LIVE_TOOL_CASES = {
-  analyze_create_triggers: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      providedAttributes: [fixtures.column],
-    }),
-  },
-  analyze_impact: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      componentType: "column",
-      table: fixtures.table,
-      name: fixtures.column,
-      maxDependencies: 20,
-    }),
-  },
-  analyze_update_triggers: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      changedAttributes: [fixtures.column],
-    }),
-  },
-  compare_custom_apis: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      ...(fixtures.customApi ? { apiName: fixtures.customApi } : {}),
-    }),
-  },
-  compare_environment_matrix: {
-    buildArgs: (fixtures) => ({
-      baselineEnvironment: fixtures.environment,
-      targetEnvironments: fixtures.targetEnvironments ?? [fixtures.targetEnvironment],
-      componentType: "plugins",
-      assemblyName: fixtures.pluginAssembly,
-      maxRows: 10,
-    }),
-  },
-  compare_forms: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      table: fixtures.table,
-      formName: fixtures.formName,
-      solution: fixtures.solution,
-      targetSolution: fixtures.targetSolution ?? fixtures.solution,
-    }),
-  },
-  compare_plugin_assemblies: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      assemblyName: fixtures.pluginAssembly,
-    }),
-  },
-  compare_security_roles: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      roleName: fixtures.securityRole,
-      ...(fixtures.businessUnit ? { sourceBusinessUnit: fixtures.businessUnit } : {}),
-      ...(fixtures.targetBusinessUnit ? { targetBusinessUnit: fixtures.targetBusinessUnit } : {}),
-    }),
-  },
-  compare_solutions: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      solution: fixtures.solution,
-      targetSolution: fixtures.targetSolution ?? fixtures.solution,
-    }),
-  },
-  compare_table_schema: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      table: fixtures.table,
-      targetTable: fixtures.targetTable ?? fixtures.table,
-    }),
-  },
-  compare_views: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      table: fixtures.table,
-      scope: fixtures.viewScope ?? "system",
-      viewName: fixtures.viewName,
-      solution: fixtures.solution,
-      targetSolution: fixtures.targetSolution ?? fixtures.solution,
-    }),
-  },
-  compare_web_resources: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      nameFilter: fixtures.webResource,
-    }),
-  },
-  compare_workflows: {
-    buildArgs: (fixtures) => ({
-      sourceEnvironment: fixtures.environment,
-      targetEnvironment: fixtures.targetEnvironment,
-      workflowName: fixtures.workflowName,
-    }),
-  },
-  environment_health_report: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-  find_column_usage: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      column: fixtures.column,
-    }),
-  },
-  find_metadata: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      query: fixtures.table,
-      limit: 10,
-    }),
-  },
-  find_table_usage: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-    }),
-  },
-  find_web_resource_usage: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      name: fixtures.webResource,
-    }),
-  },
-  get_app_module_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      appName: fixtures.appModule,
-      solution: fixtures.solution,
-    }),
-  },
-  get_connection_reference_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      referenceName: fixtures.connectionReference,
-    }),
-  },
-  get_custom_api_details: {
-    skipReason: (fixtures) =>
-      fixtures.customApi ? null : "Skipped because the live environment has no Custom APIs.",
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      apiName: fixtures.customApi,
-    }),
-  },
-  get_dashboard_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      dashboardName: fixtures.dashboard,
-      solution: fixtures.solution,
-    }),
-  },
-  get_environment_variable_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      variableName: fixtures.environmentVariable,
-    }),
-  },
-  get_flow_details: {
-    skipReason: (fixtures) =>
-      fixtures.cloudFlow ? null : "Skipped because the live environment has no cloud flows.",
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      flowName: fixtures.cloudFlow,
-      solution: fixtures.solution,
-    }),
-  },
-  get_form_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      formName: fixtures.formName,
-      table: fixtures.table,
-      solution: fixtures.solution,
-    }),
-  },
-  get_plugin_assembly_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      assemblyName: fixtures.pluginAssembly,
-    }),
-  },
-  get_plugin_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      pluginName: fixtures.pluginClass,
-      assemblyName: fixtures.pluginAssembly,
-      solution: fixtures.solution,
-    }),
-  },
-  get_role_privileges: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      roleName: fixtures.securityRole,
-      ...(fixtures.businessUnit ? { businessUnit: fixtures.businessUnit } : {}),
-    }),
-  },
-  get_solution_dependencies: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-      direction: "both",
-      componentType: "web_resource",
-      componentName: fixtures.webResource,
-      maxRows: 20,
-    }),
-  },
-  get_solution_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-  get_table_schema: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      solution: fixtures.solution,
-    }),
-  },
-  get_view_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      viewName: fixtures.viewName,
-      table: fixtures.table,
-      scope: fixtures.viewScope ?? "system",
-      solution: fixtures.solution,
-    }),
-  },
-  get_view_fetchxml: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      viewName: fixtures.viewName,
-      table: fixtures.table,
-      scope: fixtures.viewScope ?? "system",
-      solution: fixtures.solution,
-    }),
-  },
-  get_web_resource_content: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      name: fixtures.webResource,
-    }),
-  },
-  get_workflow_details: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      ...(fixtures.workflowUniqueName
-        ? { uniqueName: fixtures.workflowUniqueName }
-        : { workflowName: fixtures.workflowName }),
-    }),
-  },
-  list_actions: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-  list_app_modules: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.appModule,
-      solution: fixtures.solution,
-    }),
-  },
-  list_cloud_flows: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-      ...(fixtures.cloudFlow ? { nameFilter: fixtures.cloudFlow } : {}),
-    }),
-  },
-  list_connection_references: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.connectionReference,
-    }),
-  },
-  list_custom_apis: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      ...(fixtures.customApi ? { nameFilter: fixtures.customApi } : {}),
-    }),
-  },
-  list_dashboards: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.dashboard,
-      solution: fixtures.solution,
-    }),
-  },
-  list_environment_variables: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.environmentVariable,
-    }),
-  },
-  list_forms: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      solution: fixtures.solution,
-      nameFilter: fixtures.formName,
-    }),
-  },
-  list_plugin_assemblies: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-  list_plugin_assembly_images: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      assemblyName: fixtures.pluginAssembly,
-    }),
-  },
-  list_plugin_assembly_steps: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      assemblyName: fixtures.pluginAssembly,
-    }),
-  },
-  list_plugin_steps: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      pluginName: fixtures.pluginClass,
-      assemblyName: fixtures.pluginAssembly,
-      solution: fixtures.solution,
-    }),
-  },
-  list_plugins: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-  list_security_roles: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.securityRole,
-    }),
-  },
-  list_solutions: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.solution,
-    }),
-  },
-  list_table_columns: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      solution: fixtures.solution,
-    }),
-  },
-  list_table_relationships: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      solution: fixtures.solution,
-    }),
-  },
-  list_tables: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.table,
-      solution: fixtures.solution,
-    }),
-  },
-  list_views: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      table: fixtures.table,
-      scope: fixtures.viewScope ?? "system",
-      nameFilter: fixtures.viewName,
-      solution: fixtures.solution,
-    }),
-  },
-  list_web_resources: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      nameFilter: fixtures.webResource,
-      solution: fixtures.solution,
-    }),
-  },
-  list_workflows: {
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-  release_gate_report: {
-    timeoutMs: 5 * 60 * 1000,
-    buildArgs: (fixtures) => ({
-      environment: fixtures.environment,
-      solution: fixtures.solution,
-    }),
-  },
-} satisfies Record<ToolName, LiveToolCase>;
+function isSkippedLiveToolCase(toolCase: ConfiguredLiveToolCase): toolCase is SkippedLiveToolCase {
+  return "skipReason" in toolCase;
+}
+
+function isEnabledLiveToolCase(toolCase: ConfiguredLiveToolCase): boolean {
+  return toolCase.enabled !== false;
+}
 
 function loadLiveFixtures(): LiveFixtures {
   const path = resolve(process.env.D365_MCP_LIVE_FIXTURES || DEFAULT_FIXTURES_PATH);
@@ -568,6 +169,66 @@ function getSelectedLiveTools(): ToolName[] {
   }
 
   return selectedTools;
+}
+
+function getToolCaseLabel(
+  toolName: ToolName,
+  toolCase: ConfiguredLiveToolCase,
+  caseIndex: number,
+): string {
+  return toolCase.name?.trim() || `${toolName} case ${caseIndex + 1}`;
+}
+
+function getToolTimeoutMs(toolName: ToolName, toolCase: RunnableLiveToolCase): number {
+  const configuredTimeoutMs = toolCase.timeoutMs ?? 0;
+  const toolTimeoutMs = toolName === "release_gate_report" ? RELEASE_GATE_TIMEOUT_MS : 0;
+
+  return Math.max(configuredTimeoutMs, toolTimeoutMs);
+}
+
+function getSelectedLiveCases(
+  fixtures: LiveFixtures,
+  selectedTools: ToolName[],
+): SelectedLiveToolCase[] {
+  return selectedTools.flatMap((toolName) => {
+    const configuredCases = fixtures.tools[toolName];
+
+    if (!configuredCases || configuredCases.length === 0) {
+      throw new Error(
+        `Missing live fixture cases for '${toolName}'. Add at least one case under tools.${toolName}.`,
+      );
+    }
+
+    return configuredCases.map((toolCase, caseIndex) => {
+      const caseName = getToolCaseLabel(toolName, toolCase, caseIndex);
+
+      if (!isEnabledLiveToolCase(toolCase)) {
+        return {
+          toolName,
+          caseName,
+          arguments: null,
+          skipReason: "Disabled in live-fixtures.json.",
+        };
+      }
+
+      if (isSkippedLiveToolCase(toolCase)) {
+        return {
+          toolName,
+          caseName,
+          arguments: null,
+          skipReason: toolCase.skipReason,
+        };
+      }
+
+      return {
+        toolName,
+        caseName,
+        arguments: toolCase.arguments,
+        skipReason: null,
+        timeoutMs: getToolTimeoutMs(toolName, toolCase),
+      };
+    });
+  });
 }
 
 function installRequestRecorder(client: DynamicsClient) {
@@ -645,7 +306,9 @@ function logCoverageSummary(results: ToolRunSummary[]) {
   console.info("[live] CRM request coverage");
 
   for (const result of results) {
-    console.info(`[live] ${result.toolName}: ${result.requestCount} request(s)`);
+    console.info(
+      `[live] ${result.toolName} / ${result.caseName}: ${result.requestCount} request(s)`,
+    );
   }
 }
 
@@ -658,7 +321,7 @@ function logFailureSummary(failures: ToolRunFailure[]) {
   console.info("[live] Failures");
 
   for (const failure of failures) {
-    console.info(`[live] ${failure.toolName}`);
+    console.info(`[live] ${failure.toolName} / ${failure.caseName}`);
     console.info(`[live]   arguments: ${JSON.stringify(failure.arguments)}`);
     console.info(`[live]   error: ${failure.error}`);
     if (failure.requests.length === 0) {
@@ -680,7 +343,7 @@ function logSkipSummary(skips: ToolRunSkip[]) {
   console.info("[live] Skipped");
 
   for (const skip of skips) {
-    console.info(`[live] ${skip.toolName}: ${skip.reason}`);
+    console.info(`[live] ${skip.toolName} / ${skip.caseName}: ${skip.reason}`);
   }
 }
 
@@ -706,31 +369,24 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 const describeLive = LIVE_FLAG ? describe : describe.skip;
 
 describeLive("live tool smoke tests", () => {
-  it("defines one live case for every published tool", () => {
-    expect(Object.keys(LIVE_TOOL_CASES).sort((left, right) => left.localeCompare(right))).toEqual(
-      EXPECTED_TOOL_NAMES,
-    );
-  });
-
   it(
     "calls every tool with real CRM data and records request coverage",
     async () => {
       const fixtures = loadLiveFixtures();
       const tokenManager = new TokenManager();
-      const toolTimeoutMs = getLiveToolTimeoutMs();
-      const selectedTools = getSelectedLiveTools();
+      const selectedCases = getSelectedLiveCases(fixtures, getSelectedLiveTools());
+      const defaultToolTimeoutMs = getLiveToolTimeoutMs();
       const results: ToolRunSummary[] = [];
       const failures: ToolRunFailure[] = [];
       const skips: ToolRunSkip[] = [];
 
-      for (const [index, toolName] of selectedTools.entries()) {
-        const toolCase = LIVE_TOOL_CASES[toolName];
-        const skipReason = toolCase.skipReason?.(fixtures) ?? null;
+      for (const [index, selectedCase] of selectedCases.entries()) {
+        const { toolName, caseName, arguments: args, skipReason } = selectedCase;
 
         if (skipReason) {
-          skips.push({ toolName, reason: skipReason });
+          skips.push({ toolName, caseName, reason: skipReason });
           console.info(
-            `[live] [${index + 1}/${selectedTools.length}] ${toolName} skipped (${skipReason})`,
+            `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} skipped (${skipReason})`,
           );
           continue;
         }
@@ -738,17 +394,18 @@ describeLive("live tool smoke tests", () => {
         const client = new DynamicsClient(tokenManager);
         const recorder = installRequestRecorder(client);
         const harness = await createConnectedLiveClient(client);
-        const args = toolCase.buildArgs(fixtures);
-        const effectiveToolTimeoutMs = Math.max(toolTimeoutMs, toolCase.timeoutMs ?? 0);
+        const effectiveToolTimeoutMs = Math.max(defaultToolTimeoutMs, selectedCase.timeoutMs ?? 0);
 
-        console.info(`[live] [${index + 1}/${selectedTools.length}] starting ${toolName}`);
+        console.info(
+          `[live] [${index + 1}/${selectedCases.length}] starting ${toolName} / ${caseName}`,
+        );
 
         try {
           const response = (await withTimeout(
             harness.client.callTool(
               {
                 name: toolName,
-                arguments: args,
+                arguments: args ?? {},
               },
               undefined,
               {
@@ -765,43 +422,53 @@ describeLive("live tool smoke tests", () => {
           if (error) {
             failures.push({
               toolName,
-              arguments: args,
+              caseName,
+              arguments: args ?? {},
               error,
               requests,
             });
-            console.info(`[live] [${index + 1}/${selectedTools.length}] ${toolName} failed`);
+            console.info(
+              `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} failed`,
+            );
             continue;
           }
 
           if (requests.length === 0) {
             failures.push({
               toolName,
-              arguments: args,
+              caseName,
+              arguments: args ?? {},
               error: "Tool completed without any recorded CRM request.",
               requests,
             });
-            console.info(`[live] [${index + 1}/${selectedTools.length}] ${toolName} failed`);
+            console.info(
+              `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} failed`,
+            );
             continue;
           }
 
           results.push({
             toolName,
+            caseName,
             requestCount: requests.length,
             requests,
           });
 
           console.info(
-            `[live] [${index + 1}/${selectedTools.length}] ${toolName} ok (${requests.length} request(s))`,
+            `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} ok (${requests.length} request(s))`,
           );
         } catch (error) {
           const requests = recorder.getAll();
           failures.push({
             toolName,
-            arguments: args,
+            caseName,
+            arguments: args ?? {},
             error: error instanceof Error ? error.message : String(error),
             requests,
           });
-          console.info(`[live] [${index + 1}/${selectedTools.length}] ${toolName} failed`);
+          console.info(
+            `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} failed`,
+          );
         } finally {
           await Promise.race([
             harness.close(),
@@ -819,7 +486,7 @@ describeLive("live tool smoke tests", () => {
         failures
           .map((failure) =>
             [
-              `Tool '${failure.toolName}' failed.`,
+              `Tool '${failure.toolName}' case '${failure.caseName}' failed.`,
               `Arguments: ${JSON.stringify(failure.arguments)}`,
               `Error: ${failure.error}`,
               "Recorded CRM requests:",
