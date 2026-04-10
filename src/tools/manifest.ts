@@ -395,7 +395,8 @@ export const TOOL_MANIFEST: readonly ToolManifestEntry[] = [
   {
     name: "get_role_privileges",
     group: "solutions_alm",
-    description: "Show privileges for one security role.",
+    description:
+      "Show privileges for one security role. Uses the default global business unit when `businessUnit` is missing.",
     mainParams: ["environment", "roleName", "businessUnit"],
     register: registerGetRolePrivileges,
   },
@@ -521,7 +522,8 @@ export const TOOL_MANIFEST: readonly ToolManifestEntry[] = [
   {
     name: "compare_security_roles",
     group: "comparison",
-    description: "Compare security roles across environments.",
+    description:
+      "Compare security roles across environments. Uses each environment's default global business unit when business unit is missing.",
     mainParams: ["sourceEnvironment", "targetEnvironment", "roleName"],
     register: registerCompareSecurityRoles,
   },

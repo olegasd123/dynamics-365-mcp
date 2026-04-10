@@ -232,7 +232,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list security roles with names that contain 'Sales'.`
 
 - `get_role_privileges`
-  `In <ENV>, show privileges for security role <ROLE> in business unit <BUSINESS_UNIT>.`
+  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`
 
 ## Usage And Impact
 
@@ -294,7 +294,7 @@ This group needs at least two configured environments.
   `Compare Custom API <API> between <SOURCE_ENV> and <TARGET_ENV>.`
 
 - `compare_security_roles`
-  `Compare security role <ROLE> between <SOURCE_ENV> and <TARGET_ENV>. Use business unit <BUSINESS_UNIT> in both environments if needed.`
+  `Compare security role <ROLE> between <SOURCE_ENV> and <TARGET_ENV>. Use business unit <BUSINESS_UNIT> in both environments if needed. Otherwise use each environment's default global business unit.`
 
 ## Full Coverage Checklist
 

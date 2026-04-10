@@ -4,6 +4,7 @@ import {
   listPrivilegesByIdsQuery,
   listRolePrivilegesForRolesQuery,
   listRolePrivilegesQuery,
+  listRootBusinessUnitsQuery,
   listSecurityRolesQuery,
 } from "../../queries/security-queries.js";
 import {
@@ -68,6 +69,11 @@ export interface RolePrivilegeInventory {
   privilegesByRoleId: Map<string, RolePrivilegeRecord[]>;
 }
 
+interface BusinessUnitRecord extends Record<string, unknown> {
+  businessunitid: string;
+  name: string;
+}
+
 export async function listSecurityRoles(
   env: EnvironmentConfig,
   client: DynamicsClient,
@@ -88,6 +94,7 @@ export async function resolveSecurityRole(
   roleRef: string,
   businessUnit?: string,
 ): Promise<SecurityRoleRecord> {
+  const resolvedBusinessUnit = await resolveRoleBusinessUnitName(env, client, businessUnit);
   const roles = await listSecurityRoles(env, client);
   const exactId = roles.filter((role) => role.roleid === roleRef);
   if (exactId.length === 1) {
@@ -95,8 +102,8 @@ export async function resolveSecurityRole(
   }
 
   const exactName = roles.filter((role) => role.name === roleRef);
-  const narrowedExact = businessUnit
-    ? exactName.filter((role) => role.businessUnitName === businessUnit)
+  const narrowedExact = resolvedBusinessUnit
+    ? exactName.filter((role) => role.businessUnitName === resolvedBusinessUnit)
     : exactName;
   if (narrowedExact.length === 1) {
     return narrowedExact[0];
@@ -107,7 +114,8 @@ export async function resolveSecurityRole(
     roles.filter(
       (role) =>
         role.name.toLowerCase().includes(needle) &&
-        (!businessUnit || role.businessUnitName.toLowerCase() === businessUnit.toLowerCase()),
+        (!resolvedBusinessUnit ||
+          role.businessUnitName.toLowerCase() === resolvedBusinessUnit.toLowerCase()),
     ),
   );
 
@@ -159,6 +167,45 @@ export async function fetchRolePrivilegeInventory(
   };
 }
 
+async function resolveRoleBusinessUnitName(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  businessUnit?: string,
+): Promise<string> {
+  const trimmedBusinessUnit = businessUnit?.trim();
+  if (trimmedBusinessUnit) {
+    return trimmedBusinessUnit;
+  }
+
+  return fetchDefaultGlobalBusinessUnitName(env, client);
+}
+
+async function fetchDefaultGlobalBusinessUnitName(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+): Promise<string> {
+  const businessUnits = await client.query<Record<string, unknown>>(
+    env,
+    "businessunits",
+    listRootBusinessUnitsQuery(),
+  );
+  const rootBusinessUnits = businessUnits.map(normalizeBusinessUnit).filter((unit) => unit.name);
+
+  if (rootBusinessUnits.length === 1) {
+    return rootBusinessUnits[0].name;
+  }
+
+  if (rootBusinessUnits.length > 1) {
+    throw new Error(
+      `Default global business unit is ambiguous in '${env.name}'. Matches: ${rootBusinessUnits
+        .map((unit) => unit.name)
+        .join(", ")}.`,
+    );
+  }
+
+  throw new Error(`Default global business unit not found in '${env.name}'.`);
+}
+
 function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
   return {
     ...record,
@@ -174,6 +221,14 @@ function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
     roletemplateid: String(record._roletemplateid_value || ""),
     ismanaged: Boolean(record.ismanaged),
     modifiedon: String(record.modifiedon || ""),
+  };
+}
+
+function normalizeBusinessUnit(record: Record<string, unknown>): BusinessUnitRecord {
+  return {
+    ...record,
+    businessunitid: String(record.businessunitid || ""),
+    name: String(record.name || ""),
   };
 }
 

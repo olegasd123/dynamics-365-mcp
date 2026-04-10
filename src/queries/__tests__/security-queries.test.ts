@@ -3,6 +3,7 @@ import {
   listPrivilegesByIdsQuery,
   listRolePrivilegesForRolesQuery,
   listRolePrivilegesQuery,
+  listRootBusinessUnitsQuery,
   listSecurityRolesQuery,
 } from "../security-queries.js";
 
@@ -21,6 +22,14 @@ describe("security queries", () => {
     expect(listRolePrivilegesForRolesQuery(["role-1", "role-2"])).toContain(
       "roleid eq 'role-1' or roleid eq 'role-2'",
     );
+  });
+
+  it("builds the root business unit query", () => {
+    const query = listRootBusinessUnitsQuery();
+
+    expect(query).toContain("$select=businessunitid,name,_parentbusinessunitid_value");
+    expect(query).toContain("$filter=_parentbusinessunitid_value eq null");
+    expect(query).toContain("$top=2");
   });
 
   it("builds the privileges query", () => {

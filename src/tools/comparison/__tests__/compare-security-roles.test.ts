@@ -12,6 +12,12 @@ describe("compare_security_roles", () => {
     const config = createTestConfig(["prod", "dev"]);
     const { client } = createRecordingClient({
       prod: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-1",
@@ -38,6 +44,12 @@ describe("compare_security_roles", () => {
         ],
       },
       dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-2",

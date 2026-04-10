@@ -20,8 +20,18 @@ export function registerCompareSecurityRoles(
       sourceEnvironment: z.string().describe("Source environment name"),
       targetEnvironment: z.string().describe("Target environment name"),
       roleName: z.string().describe("Security role name or role id"),
-      sourceBusinessUnit: z.string().optional().describe("Optional source business unit name"),
-      targetBusinessUnit: z.string().optional().describe("Optional target business unit name"),
+      sourceBusinessUnit: z
+        .string()
+        .optional()
+        .describe(
+          "Optional source business unit name. If missing, use the default global business unit.",
+        ),
+      targetBusinessUnit: z
+        .string()
+        .optional()
+        .describe(
+          "Optional target business unit name. If missing, use the default global business unit.",
+        ),
     },
     async ({
       sourceEnvironment,
@@ -88,8 +98,8 @@ export function registerCompareSecurityRoles(
             sourceEnvironment,
             targetEnvironment,
             roleName,
-            sourceBusinessUnit: sourceBusinessUnit || null,
-            targetBusinessUnit: targetBusinessUnit || null,
+            sourceBusinessUnit: sourceRole.role.businessUnitName || null,
+            targetBusinessUnit: targetRole.role.businessUnitName || null,
             roleComparison: roleDiff,
             privilegeComparison: privilegeDiff,
           },

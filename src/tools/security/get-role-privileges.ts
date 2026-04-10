@@ -21,7 +21,7 @@ export function registerGetRolePrivileges(
       businessUnit: z
         .string()
         .optional()
-        .describe("Optional business unit name for duplicate role names"),
+        .describe("Optional business unit name. If missing, use the default global business unit."),
     },
     async ({ environment, roleName, businessUnit }) => {
       try {
@@ -55,7 +55,7 @@ export function registerGetRolePrivileges(
           `Loaded privileges for role '${details.role.name}' in '${env.name}'.`,
           {
             environment: env.name,
-            businessUnit: businessUnit || null,
+            businessUnit: details.role.businessUnitName || null,
             role: details.role,
             privilegeCount: details.privileges.length,
             privileges: details.privileges,

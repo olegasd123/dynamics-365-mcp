@@ -15,6 +15,12 @@ describe("role metadata", () => {
   it("lists roles and resolves privilege details", async () => {
     const { client } = createRecordingClient({
       dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-1",
@@ -69,6 +75,12 @@ describe("role metadata", () => {
     const privilegeCount = 41;
     const { client, calls } = createRecordingClient({
       dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-1",
@@ -101,5 +113,62 @@ describe("role metadata", () => {
     expect(privilegeCalls).toHaveLength(2);
     expect(privilegeCalls[0]?.queryParams).toContain("privilegeid eq 'priv-1'");
     expect(privilegeCalls[1]?.queryParams).toContain("privilegeid eq 'priv-41'");
+  });
+
+  it("uses the default global business unit when business unit is not provided", async () => {
+    const { client, calls } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-root",
+            name: "Salesperson",
+            _businessunitid_value: "bu-root",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+          {
+            roleid: "role-child",
+            name: "Salesperson",
+            _businessunitid_value: "bu-child",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Child",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: [
+          {
+            roleprivilegeid: "rp-1",
+            roleid: "role-root",
+            privilegeid: "priv-1",
+            privilegedepthmask: 8,
+            ismanaged: false,
+          },
+        ],
+        privileges: [
+          {
+            privilegeid: "priv-1",
+            name: "prvReadAccount",
+            accessright: 2,
+            canbeglobal: true,
+          },
+        ],
+      },
+    });
+
+    const details = await fetchRolePrivileges(env, client, "Salesperson");
+
+    expect(details.role.roleid).toBe("role-root");
+    expect(details.role.businessUnitName).toBe("Root");
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        environment: "dev",
+        entitySet: "businessunits",
+      }),
+    );
   });
 });

@@ -311,7 +311,7 @@ export function registerAllPrompts(server: McpServer, config: AppConfig): void {
         businessUnit: z
           .string()
           .optional()
-          .describe("Optional business unit when the same role name appears many times"),
+          .describe("Optional business unit. If missing, use the default global business unit."),
       },
     },
     ({ environment, roleName, businessUnit }) => ({
@@ -323,7 +323,9 @@ export function registerAllPrompts(server: McpServer, config: AppConfig): void {
             type: "text",
             text: [
               `Review the security role "${roleName}" in environment "${environment}".`,
-              businessUnit ? `Limit the role to business unit "${businessUnit}".` : "",
+              businessUnit
+                ? `Limit the role to business unit "${businessUnit}".`
+                : "If business unit is not provided, use the default global business unit.",
               "Start with `list_security_roles` to confirm the right role record.",
               "Then use `get_role_privileges` for the selected role.",
               "Summarize the main access level risks and call out any ambiguity if many matching roles exist.",
