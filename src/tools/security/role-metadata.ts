@@ -167,7 +167,7 @@ export async function fetchRolePrivilegeInventory(
   };
 }
 
-async function resolveRoleBusinessUnitName(
+export async function resolveRoleBusinessUnitName(
   env: EnvironmentConfig,
   client: DynamicsClient,
   businessUnit?: string,

@@ -229,7 +229,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 ## Security
 
 - `list_security_roles`
-  `In <ENV>, list security roles with names that contain 'Sales'.`
+  `In <ENV>, list security roles with names that contain 'Sales'. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`
 
 - `get_role_privileges`
   `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`

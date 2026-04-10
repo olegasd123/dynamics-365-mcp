@@ -388,8 +388,9 @@ export const TOOL_MANIFEST: readonly ToolManifestEntry[] = [
   {
     name: "list_security_roles",
     group: "solutions_alm",
-    description: "List security roles.",
-    mainParams: ["environment", "nameFilter"],
+    description:
+      "List security roles. Uses the default global business unit when `businessUnit` is missing.",
+    mainParams: ["environment", "nameFilter", "businessUnit"],
     register: registerListSecurityRoles,
   },
   {
