@@ -33,6 +33,8 @@ Start from:
 The file is tool-first:
 
 - optional `execution.maxParallel` sets how many cases can run at the same time
+- optional `execution.maxLoggedRequests` sets how many CRM requests to show for one failed case
+- optional `execution.maxLoggedRequestChars` sets how long one logged CRM request line can be
 - `tools.<toolName>` is an array of test cases for one tool
 - each case has `arguments` with real tool input
 - one tool can have several cases with different data
@@ -51,6 +53,7 @@ Optional:
 - Set `D365_MCP_LIVE_FIXTURES` when your fixture file is in another path.
 - Set `D365_MCP_LIVE_TOOL_TIMEOUT_MS` when one tool needs a longer timeout.
 - Set `execution.maxParallel` in `live-fixtures.json` when you want bounded parallel runs.
+- Set `execution.maxLoggedRequests` and `execution.maxLoggedRequestChars` when you want shorter or longer failure logs.
 
 If your environment has no Custom APIs or no cloud flows:
 

@@ -5,6 +5,8 @@ import { EXPECTED_TOOL_NAMES } from "./tool-test-helpers.js";
 
 export const DEFAULT_FIXTURES_PATH = "live-fixtures.json";
 export const DEFAULT_LIVE_MAX_PARALLEL = 1;
+export const DEFAULT_MAX_LOGGED_REQUESTS = 3;
+export const DEFAULT_MAX_LOGGED_REQUEST_CHARS = 240;
 
 export type ToolName = (typeof EXPECTED_TOOL_NAMES)[number];
 
@@ -28,6 +30,8 @@ const skippedLiveToolCaseSchema = z
 const liveExecutionSchema = z
   .object({
     maxParallel: z.number().int().positive().optional(),
+    maxLoggedRequests: z.number().int().positive().optional(),
+    maxLoggedRequestChars: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -69,6 +73,14 @@ export function loadLiveFixtures(fixturesPath?: string): LiveFixtures {
 
 export function getLiveMaxParallel(fixtures: LiveFixtures): number {
   return fixtures.execution?.maxParallel ?? DEFAULT_LIVE_MAX_PARALLEL;
+}
+
+export function getMaxLoggedRequests(fixtures: LiveFixtures): number {
+  return fixtures.execution?.maxLoggedRequests ?? DEFAULT_MAX_LOGGED_REQUESTS;
+}
+
+export function getMaxLoggedRequestChars(fixtures: LiveFixtures): number {
+  return fixtures.execution?.maxLoggedRequestChars ?? DEFAULT_MAX_LOGGED_REQUEST_CHARS;
 }
 
 export function getSelectedLiveTools(): ToolName[] {

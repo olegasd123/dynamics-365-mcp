@@ -1,6 +1,8 @@
 {
   "execution": {
-    "maxParallel": 1
+    "maxParallel": 1,
+    "maxLoggedRequests": 3,
+    "maxLoggedRequestChars": 240
   },
   "tools": {
     "analyze_create_triggers": [

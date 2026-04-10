@@ -11,6 +11,8 @@ import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
   countConfiguredLiveCases,
   countRunnableLiveCases,
+  getMaxLoggedRequestChars,
+  getMaxLoggedRequests,
   getLiveMaxParallel,
   getSelectedLiveCases,
   getSelectedLiveTools,
@@ -23,8 +25,6 @@ import {
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
 const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
 const RELEASE_GATE_TIMEOUT_MS = 5 * 60 * 1000;
-const MAX_LOGGED_REQUESTS = 3;
-const MAX_LOGGED_REQUEST_CHARS = 240;
 
 interface RecordedRequest {
   method: "query" | "queryPath" | "getPath";
@@ -186,7 +186,10 @@ function logCoverageSummary(results: ToolRunSummary[]) {
   }
 }
 
-function logFailureSummary(failures: ToolRunFailure[]) {
+function logFailureSummary(
+  failures: ToolRunFailure[],
+  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+) {
   if (failures.length === 0) {
     return;
   }
@@ -198,26 +201,32 @@ function logFailureSummary(failures: ToolRunFailure[]) {
     console.info(`[live] [FAILED] ${failure.toolName} / ${failure.caseName}`);
     console.info(`[live]   arguments: ${JSON.stringify(failure.arguments)}`);
     console.info(`[live]   error: ${failure.error}`);
-    logRequestSample(failure.requests);
+    logRequestSample(failure.requests, requestLogOptions);
   }
 }
 
-function logFailureDetails(failure: ToolRunFailure): void {
+function logFailureDetails(
+  failure: ToolRunFailure,
+  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+): void {
   console.info(`[live]   error: ${failure.error}`);
-  logRequestSample(failure.requests);
+  logRequestSample(failure.requests, requestLogOptions);
 }
 
-function logRequestSample(requests: RecordedRequest[]): void {
+function logRequestSample(
+  requests: RecordedRequest[],
+  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+): void {
   if (requests.length === 0) {
     console.info("[live]   requests: none");
     return;
   }
 
-  const shownRequests = requests.slice(0, MAX_LOGGED_REQUESTS);
+  const shownRequests = requests.slice(0, requestLogOptions.maxLoggedRequests);
   console.info(`[live]   requests: ${requests.length} recorded, showing ${shownRequests.length}`);
   for (const request of shownRequests) {
     console.info(
-      `[live]   request: ${truncateText(formatRecordedRequest(request), MAX_LOGGED_REQUEST_CHARS)}`,
+      `[live]   request: ${truncateText(formatRecordedRequest(request), requestLogOptions.maxLoggedRequestChars)}`,
     );
   }
   if (requests.length > shownRequests.length) {
@@ -297,6 +306,7 @@ async function runLiveToolCase(
   totalCases: number,
   tokenManager: TokenManager,
   defaultToolTimeoutMs: number,
+  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
 ): Promise<ToolRunOutcome> {
   const { toolName, caseName, arguments: args, skipReason } = selectedCase;
 
@@ -345,7 +355,7 @@ async function runLiveToolCase(
         requests,
       };
       console.info(`[live] [${index + 1}/${totalCases}] [FAILED] ${toolName} / ${caseName}`);
-      logFailureDetails(failure);
+      logFailureDetails(failure, requestLogOptions);
       return {
         kind: "failure",
         failure,
@@ -361,7 +371,7 @@ async function runLiveToolCase(
         requests,
       };
       console.info(`[live] [${index + 1}/${totalCases}] [FAILED] ${toolName} / ${caseName}`);
-      logFailureDetails(failure);
+      logFailureDetails(failure, requestLogOptions);
       return {
         kind: "failure",
         failure,
@@ -390,7 +400,7 @@ async function runLiveToolCase(
       requests,
     };
     console.info(`[live] [${index + 1}/${totalCases}] [FAILED] ${toolName} / ${caseName}`);
-    logFailureDetails(failure);
+    logFailureDetails(failure, requestLogOptions);
     return {
       kind: "failure",
       failure,
@@ -413,6 +423,10 @@ describeLive("live tool smoke tests", () => {
       const configuredCaseCount = countConfiguredLiveCases(fixtures, selectedTools);
       const runnableCaseCount = countRunnableLiveCases(selectedCases);
       const maxParallel = getLiveMaxParallel(fixtures);
+      const requestLogOptions = {
+        maxLoggedRequests: getMaxLoggedRequests(fixtures),
+        maxLoggedRequestChars: getMaxLoggedRequestChars(fixtures),
+      };
       const defaultToolTimeoutMs = getLiveToolTimeoutMs();
       const completedOutcomes: Array<{ index: number; outcome: ToolRunOutcome }> = [];
 
@@ -427,6 +441,7 @@ describeLive("live tool smoke tests", () => {
           selectedCases.length,
           tokenManager,
           defaultToolTimeoutMs,
+          requestLogOptions,
         );
         completedOutcomes.push({ index, outcome });
         return outcome;
@@ -435,7 +450,7 @@ describeLive("live tool smoke tests", () => {
       const { results, failures, skips } = getOrderedRunBuckets(completedOutcomes);
       logCoverageSummary(results);
       logSkipSummary(skips);
-      logFailureSummary(failures);
+      logFailureSummary(failures, requestLogOptions);
 
       expect(
         failures.length,

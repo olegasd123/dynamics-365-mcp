@@ -3,7 +3,11 @@ import {
   countConfiguredLiveCases,
   countRunnableLiveCases,
   DEFAULT_LIVE_MAX_PARALLEL,
+  DEFAULT_MAX_LOGGED_REQUEST_CHARS,
+  DEFAULT_MAX_LOGGED_REQUESTS,
   getLiveMaxParallel,
+  getMaxLoggedRequestChars,
+  getMaxLoggedRequests,
   getSelectedLiveCases,
   mapWithConcurrencyLimit,
   type LiveFixtures,
@@ -27,12 +31,16 @@ describe("live test support", () => {
     } as LiveFixtures;
 
     expect(getLiveMaxParallel(fixtures)).toBe(DEFAULT_LIVE_MAX_PARALLEL);
+    expect(getMaxLoggedRequests(fixtures)).toBe(DEFAULT_MAX_LOGGED_REQUESTS);
+    expect(getMaxLoggedRequestChars(fixtures)).toBe(DEFAULT_MAX_LOGGED_REQUEST_CHARS);
   });
 
   it("reads live parallelism from execution config", () => {
     const fixtures = {
       execution: {
         maxParallel: 3,
+        maxLoggedRequests: 5,
+        maxLoggedRequestChars: 120,
       },
       tools: {
         analyze_impact: [
@@ -49,6 +57,8 @@ describe("live test support", () => {
     } as LiveFixtures;
 
     expect(getLiveMaxParallel(fixtures)).toBe(3);
+    expect(getMaxLoggedRequests(fixtures)).toBe(5);
+    expect(getMaxLoggedRequestChars(fixtures)).toBe(120);
   });
 
   it("keeps per-case timeout and disabled cases when building selected cases", () => {
