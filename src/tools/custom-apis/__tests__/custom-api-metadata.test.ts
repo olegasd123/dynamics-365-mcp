@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
+import type { DynamicsClient } from "../../../client/dynamics-client.js";
 import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
-import { fetchCustomApiDetails, listCustomApis } from "../custom-api-metadata.js";
+import {
+  fetchCustomApiDetails,
+  fetchCustomApiInventory,
+  listCustomApis,
+  type CustomApiRecord,
+} from "../custom-api-metadata.js";
 
 describe("custom api metadata", () => {
   const env: EnvironmentConfig = {
@@ -81,4 +87,77 @@ describe("custom api metadata", () => {
       }),
     ]);
   });
+
+  it("chunks child metadata queries for many custom apis", async () => {
+    const apis = Array.from({ length: 30 }, (_, index) => ({
+      customapiid: `api-${index + 1}`,
+      name: `API ${index + 1}`,
+      uniquename: `contoso_Api${index + 1}`,
+    })) as CustomApiRecord[];
+
+    const requestRecords = apis.map((api) => ({
+      customapirequestparameterid: `req-${api.customapiid}`,
+      _customapiid_value: api.customapiid,
+      name: `Request ${api.customapiid}`,
+      uniquename: `Request_${api.customapiid}`,
+      type: 10,
+      isoptional: false,
+      logicalentityname: "",
+      ismanaged: false,
+      statecode: 0,
+    }));
+    const responseRecords = apis.map((api) => ({
+      customapiresponsepropertyid: `resp-${api.customapiid}`,
+      _customapiid_value: api.customapiid,
+      name: `Response ${api.customapiid}`,
+      uniquename: `Response_${api.customapiid}`,
+      type: 10,
+      logicalentityname: "",
+      ismanaged: false,
+      statecode: 0,
+    }));
+
+    const requestQueries: string[] = [];
+    const responseQueries: string[] = [];
+    const client = {
+      async query<T>(_: EnvironmentConfig, entitySet: string, queryParams?: string): Promise<T[]> {
+        const apiIds = extractQuotedIds(queryParams);
+
+        if (entitySet === "customapirequestparameters") {
+          requestQueries.push(String(queryParams || ""));
+          return requestRecords.filter((record) =>
+            apiIds.includes(record._customapiid_value),
+          ) as T[];
+        }
+
+        if (entitySet === "customapiresponseproperties") {
+          responseQueries.push(String(queryParams || ""));
+          return responseRecords.filter((record) =>
+            apiIds.includes(record._customapiid_value),
+          ) as T[];
+        }
+
+        return [];
+      },
+    } as DynamicsClient;
+
+    const inventory = await fetchCustomApiInventory(env, client, apis);
+
+    expect(inventory.requestParameters).toHaveLength(30);
+    expect(inventory.responseProperties).toHaveLength(30);
+    expect(requestQueries).toHaveLength(2);
+    expect(responseQueries).toHaveLength(2);
+    expect(countFilterTerms(requestQueries[0])).toBeLessThanOrEqual(25);
+    expect(countFilterTerms(requestQueries[1])).toBeLessThanOrEqual(25);
+    expect(countFilterTerms(responseQueries[0])).toBeLessThanOrEqual(25);
+    expect(countFilterTerms(responseQueries[1])).toBeLessThanOrEqual(25);
+  });
 });
+
+function extractQuotedIds(queryParams?: string): string[] {
+  return [...String(queryParams || "").matchAll(/'([^']+)'/g)].map((match) => match[1]);
+}
+
+function countFilterTerms(queryParams: string): number {
+  return (queryParams.match(/_customapiid_value eq/g) || []).length;
+}

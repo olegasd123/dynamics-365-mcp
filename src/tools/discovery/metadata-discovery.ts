@@ -19,6 +19,7 @@ import { listViews, type ViewRecord } from "../views/view-metadata.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listSolutionComponentsByObjectIdsQuery } from "../../queries/solution-queries.js";
+import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
 
 export const METADATA_COMPONENT_TYPES = [
   "table",
@@ -626,10 +627,13 @@ async function loadSolutionsForMatches(
       [...groupedIds.entries()].map(async ([componentType, objectIds]) => ({
         componentType,
         objectIds,
-        components: await client.query<Record<string, unknown>>(
+        components: await queryRecordsByFieldValuesInChunks<Record<string, unknown>>(
           env,
+          client,
           "solutioncomponents",
-          listSolutionComponentsByObjectIdsQuery(componentType, objectIds),
+          objectIds,
+          "objectid",
+          (chunkObjectIds) => listSolutionComponentsByObjectIdsQuery(componentType, chunkObjectIds),
         ),
       })),
     ),

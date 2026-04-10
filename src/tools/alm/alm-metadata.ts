@@ -26,6 +26,7 @@ import {
   type EnvironmentVariableDefinitionRecord,
   type EnvironmentVariableValueRecord,
 } from "./alm-shared.js";
+import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
 
 export interface EnvironmentVariableRecord extends EnvironmentVariableDefinitionRecord {
   typeLabel: string;
@@ -79,12 +80,13 @@ export async function listEnvironmentVariables(
   }
 
   const values = (
-    await client.query<Record<string, unknown>>(
+    await queryRecordsByFieldValuesInChunks<Record<string, unknown>>(
       env,
+      client,
       "environmentvariablevalues",
-      listEnvironmentVariableValuesForDefinitionsQuery(
-        filteredDefinitions.map((definition) => definition.environmentvariabledefinitionid),
-      ),
+      filteredDefinitions.map((definition) => definition.environmentvariabledefinitionid),
+      "_environmentvariabledefinitionid_value",
+      listEnvironmentVariableValuesForDefinitionsQuery,
     )
   ).map(normalizeEnvironmentVariableValue);
 

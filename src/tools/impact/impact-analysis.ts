@@ -24,7 +24,10 @@ import {
   listEnvironmentVariableValuesByIdsQuery,
 } from "../../queries/alm-queries.js";
 import { listSecurityRolesByIdsQuery } from "../../queries/security-queries.js";
-import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import {
+  queryRecordsByFieldValuesInChunks,
+  queryRecordsByIdsInChunks,
+} from "../../utils/query-batching.js";
 import {
   fetchPluginImagesByIds,
   fetchPluginInventory,
@@ -828,10 +831,13 @@ async function expandToSolutionComponents(
       continue;
     }
 
-    const rawRecords = await client.query<Record<string, unknown>>(
+    const rawRecords = await queryRecordsByFieldValuesInChunks<Record<string, unknown>>(
       env,
+      client,
       "solutioncomponents",
-      listSolutionComponentsByObjectIdsQuery(componentType, objectIds),
+      objectIds,
+      "objectid",
+      (chunkObjectIds) => listSolutionComponentsByObjectIdsQuery(componentType, chunkObjectIds),
     );
     const records = rawRecords
       .map(normalizeSolutionComponent)

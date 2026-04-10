@@ -6,7 +6,10 @@ import {
   listRolePrivilegesQuery,
   listSecurityRolesQuery,
 } from "../../queries/security-queries.js";
-import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import {
+  queryRecordsByFieldValuesInChunks,
+  queryRecordsByIdsInChunks,
+} from "../../utils/query-batching.js";
 
 const DEPTH_MASK_LABELS: Array<{ mask: number; label: string }> = [
   { mask: 1, label: "Basic" },
@@ -191,12 +194,12 @@ async function fetchPrivilegesForRoleIds(
           "roleprivilegescollection",
           listRolePrivilegesQuery(uniqueRoleIds[0]),
         )
-      : await queryRecordsByIdsInChunks<Record<string, unknown>>(
+      : await queryRecordsByFieldValuesInChunks<Record<string, unknown>>(
           env,
           client,
           "roleprivilegescollection",
           uniqueRoleIds,
-          "roleprivilegeid",
+          "roleid",
           (chunkRoleIds) => listRolePrivilegesForRolesQuery(chunkRoleIds),
         );
 
