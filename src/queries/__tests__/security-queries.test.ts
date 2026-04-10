@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  listBusinessUnitsQuery,
   listPrivilegesByIdsQuery,
   listRolePrivilegesForRolesQuery,
   listRolePrivilegesQuery,
@@ -30,6 +31,15 @@ describe("security queries", () => {
     expect(query).toContain("$select=businessunitid,name,_parentbusinessunitid_value");
     expect(query).toContain("$filter=_parentbusinessunitid_value eq null");
     expect(query).toContain("$top=2");
+  });
+
+  it("builds the business units query", () => {
+    const query = listBusinessUnitsQuery("Sales");
+
+    expect(query).toContain(
+      "$select=businessunitid,name,_parentbusinessunitid_value,_organizationid_value,isdisabled,createdon,modifiedon",
+    );
+    expect(query).toContain("$filter=contains(name,'Sales')");
   });
 
   it("builds the privileges query", () => {

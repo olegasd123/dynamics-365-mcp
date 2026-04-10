@@ -111,6 +111,14 @@ describe("tool contracts", () => {
         dashboardName: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_business_units.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+      });
+      expect(toolsByName.get_business_units_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        businessUnitName: expect.any(Object),
+      });
       expect(toolsByName.analyze_create_triggers.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         table: expect.any(Object),

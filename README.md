@@ -348,6 +348,8 @@ Priority order:
 | `list_solutions`                   | List solutions by display name and unique name.                                                              | `environment`, `nameFilter`                              |
 | `get_solution_details`             | Show a solution summary and supported ALM component groups.                                                  | `environment`, `solution`                                |
 | `get_solution_dependencies`        | Show dependency links for supported solution components.                                                     | `environment`, `solution`, `direction`, `componentType`  |
+| `list_business_units`              | List business units with parent and state details.                                                           | `environment`, `nameFilter`                              |
+| `get_business_units_details`       | Show one business unit with parent and child context.                                                        | `environment`, `businessUnitName`                        |
 | `list_security_roles`              | List security roles. Uses the default global business unit when `businessUnit` is missing.                   | `environment`, `nameFilter`, `businessUnit`              |
 | `get_role_privileges`              | Show privileges for one security role. Uses the default global business unit when `businessUnit` is missing. | `environment`, `roleName`, `businessUnit`                |
 | `list_tables`                      | List Dataverse tables with main schema flags.                                                                | `environment`, `nameFilter`, `solution`                  |

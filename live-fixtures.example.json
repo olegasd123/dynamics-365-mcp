@@ -288,6 +288,15 @@
         }
       }
     ],
+    "get_business_units_details": [
+      {
+        "name": "sales unit",
+        "arguments": {
+          "environment": "dev",
+          "businessUnitName": "Sales"
+        }
+      }
+    ],
     "get_role_privileges": [
       {
         "name": "salesperson role",
@@ -295,6 +304,15 @@
           "environment": "dev",
           "roleName": "Salesperson",
           "businessUnit": "Root Business Unit"
+        }
+      }
+    ],
+    "list_business_units": [
+      {
+        "name": "filtered business units",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Sales"
         }
       }
     ],

@@ -38,6 +38,8 @@ import { registerListCustomApis } from "./custom-apis/list-custom-apis.js";
 import { registerGetCustomApiDetails } from "./custom-apis/get-custom-api-details.js";
 import { registerListCloudFlows } from "./flows/list-cloud-flows.js";
 import { registerGetFlowDetails } from "./flows/get-flow-details.js";
+import { registerListBusinessUnits } from "./security/list-business-units.js";
+import { registerGetBusinessUnitsDetails } from "./security/get-business-units-details.js";
 import { registerListSecurityRoles } from "./security/list-security-roles.js";
 import { registerGetRolePrivileges } from "./security/get-role-privileges.js";
 import { registerFindTableUsage } from "./usage/find-table-usage.js";
@@ -384,6 +386,20 @@ export const TOOL_MANIFEST: readonly ToolManifestEntry[] = [
     description: "Show one cloud flow with trigger and action summary.",
     mainParams: ["environment", "flowName", "solution"],
     register: registerGetFlowDetails,
+  },
+  {
+    name: "list_business_units",
+    group: "solutions_alm",
+    description: "List business units with parent and state details.",
+    mainParams: ["environment", "nameFilter"],
+    register: registerListBusinessUnits,
+  },
+  {
+    name: "get_business_units_details",
+    group: "solutions_alm",
+    description: "Show one business unit with parent and child context.",
+    mainParams: ["environment", "businessUnitName"],
+    register: registerGetBusinessUnitsDetails,
   },
   {
     name: "list_security_roles",

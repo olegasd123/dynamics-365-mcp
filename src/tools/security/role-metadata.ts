@@ -4,13 +4,13 @@ import {
   listPrivilegesByIdsQuery,
   listRolePrivilegesForRolesQuery,
   listRolePrivilegesQuery,
-  listRootBusinessUnitsQuery,
   listSecurityRolesQuery,
 } from "../../queries/security-queries.js";
 import {
   queryRecordsByFieldValuesInChunks,
   queryRecordsByIdsInChunks,
 } from "../../utils/query-batching.js";
+import { fetchDefaultGlobalBusinessUnitName as fetchDefaultGlobalBusinessUnitNameMetadata } from "./business-unit-metadata.js";
 
 const DEPTH_MASK_LABELS: Array<{ mask: number; label: string }> = [
   { mask: 1, label: "Basic" },
@@ -67,11 +67,6 @@ export interface RolePrivilegeDetails {
 export interface RolePrivilegeInventory {
   roles: SecurityRoleRecord[];
   privilegesByRoleId: Map<string, RolePrivilegeRecord[]>;
-}
-
-interface BusinessUnitRecord extends Record<string, unknown> {
-  businessunitid: string;
-  name: string;
 }
 
 export async function listSecurityRoles(
@@ -184,26 +179,7 @@ async function fetchDefaultGlobalBusinessUnitName(
   env: EnvironmentConfig,
   client: DynamicsClient,
 ): Promise<string> {
-  const businessUnits = await client.query<Record<string, unknown>>(
-    env,
-    "businessunits",
-    listRootBusinessUnitsQuery(),
-  );
-  const rootBusinessUnits = businessUnits.map(normalizeBusinessUnit).filter((unit) => unit.name);
-
-  if (rootBusinessUnits.length === 1) {
-    return rootBusinessUnits[0].name;
-  }
-
-  if (rootBusinessUnits.length > 1) {
-    throw new Error(
-      `Default global business unit is ambiguous in '${env.name}'. Matches: ${rootBusinessUnits
-        .map((unit) => unit.name)
-        .join(", ")}.`,
-    );
-  }
-
-  throw new Error(`Default global business unit not found in '${env.name}'.`);
+  return fetchDefaultGlobalBusinessUnitNameMetadata(env, client);
 }
 
 function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
@@ -221,14 +197,6 @@ function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
     roletemplateid: String(record._roletemplateid_value || ""),
     ismanaged: Boolean(record.ismanaged),
     modifiedon: String(record.modifiedon || ""),
-  };
-}
-
-function normalizeBusinessUnit(record: Record<string, unknown>): BusinessUnitRecord {
-  return {
-    ...record,
-    businessunitid: String(record.businessunitid || ""),
-    name: String(record.name || ""),
   };
 }
 
