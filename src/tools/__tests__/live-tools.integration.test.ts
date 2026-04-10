@@ -9,6 +9,8 @@ import { registerAllTools } from "../index.js";
 import type { ToolResponse } from "./tool-test-helpers.js";
 import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
+  countConfiguredLiveCases,
+  countRunnableLiveCases,
   getLiveMaxParallel,
   getSelectedLiveCases,
   getSelectedLiveTools,
@@ -21,6 +23,8 @@ import {
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
 const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
 const RELEASE_GATE_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_LOGGED_REQUESTS = 3;
+const MAX_LOGGED_REQUEST_CHARS = 240;
 
 interface RecordedRequest {
   method: "query" | "queryPath" | "getPath";
@@ -163,13 +167,21 @@ function formatRecordedRequest(request: RecordedRequest): string {
   }`;
 }
 
+function truncateText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
+}
+
 function logCoverageSummary(results: ToolRunSummary[]) {
   console.info("");
   console.info("[live] CRM request coverage");
 
   for (const result of results) {
     console.info(
-      `[live] ${result.toolName} / ${result.caseName}: ${result.requestCount} request(s)`,
+      `[live] [OK] ${result.toolName} / ${result.caseName}: ${result.requestCount} request(s)`,
     );
   }
 }
@@ -183,16 +195,33 @@ function logFailureSummary(failures: ToolRunFailure[]) {
   console.info("[live] Failures");
 
   for (const failure of failures) {
-    console.info(`[live] ${failure.toolName} / ${failure.caseName}`);
+    console.info(`[live] [FAILED] ${failure.toolName} / ${failure.caseName}`);
     console.info(`[live]   arguments: ${JSON.stringify(failure.arguments)}`);
     console.info(`[live]   error: ${failure.error}`);
-    if (failure.requests.length === 0) {
-      console.info("[live]   requests: none");
-      continue;
-    }
-    for (const request of failure.requests) {
-      console.info(`[live]   request: ${formatRecordedRequest(request)}`);
-    }
+    logRequestSample(failure.requests);
+  }
+}
+
+function logFailureDetails(failure: ToolRunFailure): void {
+  console.info(`[live]   error: ${failure.error}`);
+  logRequestSample(failure.requests);
+}
+
+function logRequestSample(requests: RecordedRequest[]): void {
+  if (requests.length === 0) {
+    console.info("[live]   requests: none");
+    return;
+  }
+
+  const shownRequests = requests.slice(0, MAX_LOGGED_REQUESTS);
+  console.info(`[live]   requests: ${requests.length} recorded, showing ${shownRequests.length}`);
+  for (const request of shownRequests) {
+    console.info(
+      `[live]   request: ${truncateText(formatRecordedRequest(request), MAX_LOGGED_REQUEST_CHARS)}`,
+    );
+  }
+  if (requests.length > shownRequests.length) {
+    console.info(`[live]   requests: ${requests.length - shownRequests.length} more not shown`);
   }
 }
 
@@ -233,6 +262,35 @@ type ToolRunOutcome =
   | { kind: "failure"; failure: ToolRunFailure }
   | { kind: "skip"; skip: ToolRunSkip };
 
+function getOrderedRunBuckets(
+  completedOutcomes: Array<{ index: number; outcome: ToolRunOutcome }>,
+): {
+  results: ToolRunSummary[];
+  failures: ToolRunFailure[];
+  skips: ToolRunSkip[];
+} {
+  const orderedOutcomes = [...completedOutcomes].sort((left, right) => left.index - right.index);
+  const results: ToolRunSummary[] = [];
+  const failures: ToolRunFailure[] = [];
+  const skips: ToolRunSkip[] = [];
+
+  for (const { outcome } of orderedOutcomes) {
+    if (outcome.kind === "success") {
+      results.push(outcome.summary);
+      continue;
+    }
+
+    if (outcome.kind === "failure") {
+      failures.push(outcome.failure);
+      continue;
+    }
+
+    skips.push(outcome.skip);
+  }
+
+  return { results, failures, skips };
+}
+
 async function runLiveToolCase(
   selectedCase: SelectedLiveToolCase,
   index: number,
@@ -244,7 +302,7 @@ async function runLiveToolCase(
 
   if (skipReason) {
     console.info(
-      `[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} skipped (${skipReason})`,
+      `[live] [${index + 1}/${totalCases}] [SKIPPED] ${toolName} / ${caseName} (${skipReason})`,
     );
     return {
       kind: "skip",
@@ -279,35 +337,39 @@ async function runLiveToolCase(
     const error = getToolResponseError(response);
 
     if (error) {
-      console.info(`[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} failed`);
+      const failure: ToolRunFailure = {
+        toolName,
+        caseName,
+        arguments: args ?? {},
+        error,
+        requests,
+      };
+      console.info(`[live] [${index + 1}/${totalCases}] [FAILED] ${toolName} / ${caseName}`);
+      logFailureDetails(failure);
       return {
         kind: "failure",
-        failure: {
-          toolName,
-          caseName,
-          arguments: args ?? {},
-          error,
-          requests,
-        },
+        failure,
       };
     }
 
     if (requests.length === 0) {
-      console.info(`[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} failed`);
+      const failure: ToolRunFailure = {
+        toolName,
+        caseName,
+        arguments: args ?? {},
+        error: "Tool completed without any recorded CRM request.",
+        requests,
+      };
+      console.info(`[live] [${index + 1}/${totalCases}] [FAILED] ${toolName} / ${caseName}`);
+      logFailureDetails(failure);
       return {
         kind: "failure",
-        failure: {
-          toolName,
-          caseName,
-          arguments: args ?? {},
-          error: "Tool completed without any recorded CRM request.",
-          requests,
-        },
+        failure,
       };
     }
 
     console.info(
-      `[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} ok (${requests.length} request(s))`,
+      `[live] [${index + 1}/${totalCases}] [OK] ${toolName} / ${caseName} (${requests.length} request(s))`,
     );
     return {
       kind: "success",
@@ -320,16 +382,18 @@ async function runLiveToolCase(
     };
   } catch (error) {
     const requests = recorder.getAll();
-    console.info(`[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} failed`);
+    const failure: ToolRunFailure = {
+      toolName,
+      caseName,
+      arguments: args ?? {},
+      error: error instanceof Error ? error.message : String(error),
+      requests,
+    };
+    console.info(`[live] [${index + 1}/${totalCases}] [FAILED] ${toolName} / ${caseName}`);
+    logFailureDetails(failure);
     return {
       kind: "failure",
-      failure: {
-        toolName,
-        caseName,
-        arguments: args ?? {},
-        error: error instanceof Error ? error.message : String(error),
-        requests,
-      },
+      failure,
     };
   } finally {
     await Promise.race([harness.close(), new Promise((resolve) => setTimeout(resolve, 1000))]);
@@ -344,48 +408,31 @@ describeLive("live tool smoke tests", () => {
     async () => {
       const fixtures = loadLiveFixtures();
       const tokenManager = new TokenManager();
-      const selectedCases = getSelectedLiveCases(
-        fixtures,
-        getSelectedLiveTools(),
-        getToolTimeoutMs,
-      );
+      const selectedTools = getSelectedLiveTools();
+      const selectedCases = getSelectedLiveCases(fixtures, selectedTools, getToolTimeoutMs);
+      const configuredCaseCount = countConfiguredLiveCases(fixtures, selectedTools);
+      const runnableCaseCount = countRunnableLiveCases(selectedCases);
       const maxParallel = getLiveMaxParallel(fixtures);
       const defaultToolTimeoutMs = getLiveToolTimeoutMs();
-      const results: ToolRunSummary[] = [];
-      const failures: ToolRunFailure[] = [];
-      const skips: ToolRunSkip[] = [];
+      const completedOutcomes: Array<{ index: number; outcome: ToolRunOutcome }> = [];
 
       console.info(
-        `[live] running ${selectedCases.length} case(s) with maxParallel=${maxParallel}`,
+        `[live] running ${runnableCaseCount} runnable case(s) out of ${configuredCaseCount} configured case(s) with maxParallel=${maxParallel}`,
       );
 
-      const outcomes = await mapWithConcurrencyLimit(
-        selectedCases,
-        maxParallel,
-        async (selectedCase, index) =>
-          runLiveToolCase(
-            selectedCase,
-            index,
-            selectedCases.length,
-            tokenManager,
-            defaultToolTimeoutMs,
-          ),
-      );
+      await mapWithConcurrencyLimit(selectedCases, maxParallel, async (selectedCase, index) => {
+        const outcome = await runLiveToolCase(
+          selectedCase,
+          index,
+          selectedCases.length,
+          tokenManager,
+          defaultToolTimeoutMs,
+        );
+        completedOutcomes.push({ index, outcome });
+        return outcome;
+      });
 
-      for (const outcome of outcomes) {
-        if (outcome.kind === "success") {
-          results.push(outcome.summary);
-          continue;
-        }
-
-        if (outcome.kind === "failure") {
-          failures.push(outcome.failure);
-          continue;
-        }
-
-        skips.push(outcome.skip);
-      }
-
+      const { results, failures, skips } = getOrderedRunBuckets(completedOutcomes);
       logCoverageSummary(results);
       logSkipSummary(skips);
       logFailureSummary(failures);

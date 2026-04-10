@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  countConfiguredLiveCases,
+  countRunnableLiveCases,
   DEFAULT_LIVE_MAX_PARALLEL,
   getLiveMaxParallel,
   getSelectedLiveCases,
@@ -105,6 +107,9 @@ describe("live test support", () => {
         skipReason: "Disabled in live-fixtures.json.",
       },
     ]);
+
+    expect(countConfiguredLiveCases(fixtures, ["analyze_impact"])).toBe(2);
+    expect(countRunnableLiveCases(cases)).toBe(1);
   });
 
   it("runs work with a concurrency limit", async () => {

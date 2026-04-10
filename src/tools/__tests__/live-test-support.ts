@@ -140,6 +140,20 @@ export function getSelectedLiveCases(
   });
 }
 
+export function countConfiguredLiveCases(
+  fixtures: LiveFixtures,
+  selectedTools: ToolName[],
+): number {
+  return selectedTools.reduce(
+    (count, toolName) => count + (fixtures.tools[toolName]?.length ?? 0),
+    0,
+  );
+}
+
+export function countRunnableLiveCases(selectedCases: SelectedLiveToolCase[]): number {
+  return selectedCases.filter((selectedCase) => selectedCase.skipReason === null).length;
+}
+
 export async function mapWithConcurrencyLimit<TItem, TResult>(
   items: readonly TItem[],
   maxParallel: number,
