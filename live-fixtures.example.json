@@ -1,4 +1,7 @@
 {
+  "execution": {
+    "maxParallel": 1
+  },
   "tools": {
     "analyze_create_triggers": [
       {

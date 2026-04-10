@@ -1,7 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -9,52 +6,21 @@ import { TokenManager } from "../../auth/token-manager.js";
 import { DynamicsClient } from "../../client/dynamics-client.js";
 import { loadConfig } from "../../config/environments.js";
 import { registerAllTools } from "../index.js";
-import { EXPECTED_TOOL_NAMES } from "./tool-test-helpers.js";
+import type { ToolResponse } from "./tool-test-helpers.js";
 import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
+import {
+  getLiveMaxParallel,
+  getSelectedLiveCases,
+  getSelectedLiveTools,
+  loadLiveFixtures,
+  mapWithConcurrencyLimit,
+  type SelectedLiveToolCase,
+  type ToolName,
+} from "./live-test-support.js";
 
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
-const DEFAULT_FIXTURES_PATH = "live-fixtures.json";
 const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
 const RELEASE_GATE_TIMEOUT_MS = 5 * 60 * 1000;
-
-type ToolName = (typeof EXPECTED_TOOL_NAMES)[number];
-
-const runnableLiveToolCaseSchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    enabled: z.boolean().optional(),
-    arguments: z.record(z.string(), z.unknown()),
-    timeoutMs: z.number().int().positive().optional(),
-  })
-  .strict();
-
-const skippedLiveToolCaseSchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    enabled: z.boolean().optional(),
-    skipReason: z.string().min(1),
-  })
-  .strict();
-
-const liveFixturesSchema = z
-  .object({
-    tools: z.record(
-      z.enum(EXPECTED_TOOL_NAMES),
-      z.array(z.union([runnableLiveToolCaseSchema, skippedLiveToolCaseSchema])).min(1),
-    ),
-  })
-  .strict();
-
-type LiveFixtures = z.infer<typeof liveFixturesSchema>;
-type RunnableLiveToolCase = z.infer<typeof runnableLiveToolCaseSchema>;
-type SkippedLiveToolCase = z.infer<typeof skippedLiveToolCaseSchema>;
-type ConfiguredLiveToolCase = RunnableLiveToolCase | SkippedLiveToolCase;
-
-interface ToolResponse {
-  content: Array<{ type: "text"; text: string }>;
-  structuredContent?: Record<string, unknown>;
-  isError?: boolean;
-}
 
 interface RecordedRequest {
   method: "query" | "queryPath" | "getPath";
@@ -82,34 +48,6 @@ interface ToolRunSkip {
   toolName: ToolName;
   caseName: string;
   reason: string;
-}
-
-interface SelectedLiveToolCase {
-  toolName: ToolName;
-  caseName: string;
-  arguments: Record<string, unknown> | null;
-  skipReason: string | null;
-  timeoutMs?: number;
-}
-
-function isSkippedLiveToolCase(toolCase: ConfiguredLiveToolCase): toolCase is SkippedLiveToolCase {
-  return "skipReason" in toolCase;
-}
-
-function isEnabledLiveToolCase(toolCase: ConfiguredLiveToolCase): boolean {
-  return toolCase.enabled !== false;
-}
-
-function loadLiveFixtures(): LiveFixtures {
-  const path = resolve(process.env.D365_MCP_LIVE_FIXTURES || DEFAULT_FIXTURES_PATH);
-  if (!existsSync(path)) {
-    throw new Error(
-      `Live fixtures file not found: ${path}. Copy 'live-fixtures.example.json' to 'live-fixtures.json' or set D365_MCP_LIVE_FIXTURES.`,
-    );
-  }
-
-  const parsed = JSON.parse(readFileSync(path, "utf-8")) as unknown;
-  return liveFixturesSchema.parse(parsed);
 }
 
 async function createConnectedLiveClient(client: DynamicsClient) {
@@ -148,87 +86,11 @@ function getLiveToolTimeoutMs(): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_TOOL_TIMEOUT_MS;
 }
 
-function getSelectedLiveTools(): ToolName[] {
-  const raw = process.env.D365_MCP_LIVE_TOOLS?.trim();
-  if (!raw) {
-    return [...EXPECTED_TOOL_NAMES];
-  }
-
-  const requestedTools = raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-  const selectedTools = requestedTools.filter((toolName): toolName is ToolName =>
-    EXPECTED_TOOL_NAMES.includes(toolName as ToolName),
-  );
-
-  if (selectedTools.length === 0) {
-    throw new Error(
-      `D365_MCP_LIVE_TOOLS did not match any known tool names. Requested: ${requestedTools.join(", ")}`,
-    );
-  }
-
-  return selectedTools;
-}
-
-function getToolCaseLabel(
-  toolName: ToolName,
-  toolCase: ConfiguredLiveToolCase,
-  caseIndex: number,
-): string {
-  return toolCase.name?.trim() || `${toolName} case ${caseIndex + 1}`;
-}
-
-function getToolTimeoutMs(toolName: ToolName, toolCase: RunnableLiveToolCase): number {
+function getToolTimeoutMs(toolName: ToolName, toolCase: { timeoutMs?: number }): number {
   const configuredTimeoutMs = toolCase.timeoutMs ?? 0;
   const toolTimeoutMs = toolName === "release_gate_report" ? RELEASE_GATE_TIMEOUT_MS : 0;
 
   return Math.max(configuredTimeoutMs, toolTimeoutMs);
-}
-
-function getSelectedLiveCases(
-  fixtures: LiveFixtures,
-  selectedTools: ToolName[],
-): SelectedLiveToolCase[] {
-  return selectedTools.flatMap((toolName) => {
-    const configuredCases = fixtures.tools[toolName];
-
-    if (!configuredCases || configuredCases.length === 0) {
-      throw new Error(
-        `Missing live fixture cases for '${toolName}'. Add at least one case under tools.${toolName}.`,
-      );
-    }
-
-    return configuredCases.map((toolCase, caseIndex) => {
-      const caseName = getToolCaseLabel(toolName, toolCase, caseIndex);
-
-      if (!isEnabledLiveToolCase(toolCase)) {
-        return {
-          toolName,
-          caseName,
-          arguments: null,
-          skipReason: "Disabled in live-fixtures.json.",
-        };
-      }
-
-      if (isSkippedLiveToolCase(toolCase)) {
-        return {
-          toolName,
-          caseName,
-          arguments: null,
-          skipReason: toolCase.skipReason,
-        };
-      }
-
-      return {
-        toolName,
-        caseName,
-        arguments: toolCase.arguments,
-        skipReason: null,
-        timeoutMs: getToolTimeoutMs(toolName, toolCase),
-      };
-    });
-  });
 }
 
 function installRequestRecorder(client: DynamicsClient) {
@@ -366,6 +228,114 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 }
 
+type ToolRunOutcome =
+  | { kind: "success"; summary: ToolRunSummary }
+  | { kind: "failure"; failure: ToolRunFailure }
+  | { kind: "skip"; skip: ToolRunSkip };
+
+async function runLiveToolCase(
+  selectedCase: SelectedLiveToolCase,
+  index: number,
+  totalCases: number,
+  tokenManager: TokenManager,
+  defaultToolTimeoutMs: number,
+): Promise<ToolRunOutcome> {
+  const { toolName, caseName, arguments: args, skipReason } = selectedCase;
+
+  if (skipReason) {
+    console.info(
+      `[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} skipped (${skipReason})`,
+    );
+    return {
+      kind: "skip",
+      skip: { toolName, caseName, reason: skipReason },
+    };
+  }
+
+  const client = new DynamicsClient(tokenManager);
+  const recorder = installRequestRecorder(client);
+  const harness = await createConnectedLiveClient(client);
+  const effectiveToolTimeoutMs = Math.max(defaultToolTimeoutMs, selectedCase.timeoutMs ?? 0);
+
+  console.info(`[live] [${index + 1}/${totalCases}] starting ${toolName} / ${caseName}`);
+
+  try {
+    const response = (await withTimeout(
+      harness.client.callTool(
+        {
+          name: toolName,
+          arguments: args ?? {},
+        },
+        undefined,
+        {
+          timeout: effectiveToolTimeoutMs,
+          maxTotalTimeout: effectiveToolTimeoutMs,
+        },
+      ) as Promise<ToolResponse>,
+      effectiveToolTimeoutMs,
+      `Tool '${toolName}'`,
+    )) as ToolResponse;
+    const requests = recorder.getAll();
+    const error = getToolResponseError(response);
+
+    if (error) {
+      console.info(`[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} failed`);
+      return {
+        kind: "failure",
+        failure: {
+          toolName,
+          caseName,
+          arguments: args ?? {},
+          error,
+          requests,
+        },
+      };
+    }
+
+    if (requests.length === 0) {
+      console.info(`[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} failed`);
+      return {
+        kind: "failure",
+        failure: {
+          toolName,
+          caseName,
+          arguments: args ?? {},
+          error: "Tool completed without any recorded CRM request.",
+          requests,
+        },
+      };
+    }
+
+    console.info(
+      `[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} ok (${requests.length} request(s))`,
+    );
+    return {
+      kind: "success",
+      summary: {
+        toolName,
+        caseName,
+        requestCount: requests.length,
+        requests,
+      },
+    };
+  } catch (error) {
+    const requests = recorder.getAll();
+    console.info(`[live] [${index + 1}/${totalCases}] ${toolName} / ${caseName} failed`);
+    return {
+      kind: "failure",
+      failure: {
+        toolName,
+        caseName,
+        arguments: args ?? {},
+        error: error instanceof Error ? error.message : String(error),
+        requests,
+      },
+    };
+  } finally {
+    await Promise.race([harness.close(), new Promise((resolve) => setTimeout(resolve, 1000))]);
+  }
+}
+
 const describeLive = LIVE_FLAG ? describe : describe.skip;
 
 describeLive("live tool smoke tests", () => {
@@ -374,107 +344,46 @@ describeLive("live tool smoke tests", () => {
     async () => {
       const fixtures = loadLiveFixtures();
       const tokenManager = new TokenManager();
-      const selectedCases = getSelectedLiveCases(fixtures, getSelectedLiveTools());
+      const selectedCases = getSelectedLiveCases(
+        fixtures,
+        getSelectedLiveTools(),
+        getToolTimeoutMs,
+      );
+      const maxParallel = getLiveMaxParallel(fixtures);
       const defaultToolTimeoutMs = getLiveToolTimeoutMs();
       const results: ToolRunSummary[] = [];
       const failures: ToolRunFailure[] = [];
       const skips: ToolRunSkip[] = [];
 
-      for (const [index, selectedCase] of selectedCases.entries()) {
-        const { toolName, caseName, arguments: args, skipReason } = selectedCase;
+      console.info(
+        `[live] running ${selectedCases.length} case(s) with maxParallel=${maxParallel}`,
+      );
 
-        if (skipReason) {
-          skips.push({ toolName, caseName, reason: skipReason });
-          console.info(
-            `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} skipped (${skipReason})`,
-          );
+      const outcomes = await mapWithConcurrencyLimit(
+        selectedCases,
+        maxParallel,
+        async (selectedCase, index) =>
+          runLiveToolCase(
+            selectedCase,
+            index,
+            selectedCases.length,
+            tokenManager,
+            defaultToolTimeoutMs,
+          ),
+      );
+
+      for (const outcome of outcomes) {
+        if (outcome.kind === "success") {
+          results.push(outcome.summary);
           continue;
         }
 
-        const client = new DynamicsClient(tokenManager);
-        const recorder = installRequestRecorder(client);
-        const harness = await createConnectedLiveClient(client);
-        const effectiveToolTimeoutMs = Math.max(defaultToolTimeoutMs, selectedCase.timeoutMs ?? 0);
-
-        console.info(
-          `[live] [${index + 1}/${selectedCases.length}] starting ${toolName} / ${caseName}`,
-        );
-
-        try {
-          const response = (await withTimeout(
-            harness.client.callTool(
-              {
-                name: toolName,
-                arguments: args ?? {},
-              },
-              undefined,
-              {
-                timeout: effectiveToolTimeoutMs,
-                maxTotalTimeout: effectiveToolTimeoutMs,
-              },
-            ) as Promise<ToolResponse>,
-            effectiveToolTimeoutMs,
-            `Tool '${toolName}'`,
-          )) as ToolResponse;
-          const requests = recorder.getAll();
-          const error = getToolResponseError(response);
-
-          if (error) {
-            failures.push({
-              toolName,
-              caseName,
-              arguments: args ?? {},
-              error,
-              requests,
-            });
-            console.info(
-              `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} failed`,
-            );
-            continue;
-          }
-
-          if (requests.length === 0) {
-            failures.push({
-              toolName,
-              caseName,
-              arguments: args ?? {},
-              error: "Tool completed without any recorded CRM request.",
-              requests,
-            });
-            console.info(
-              `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} failed`,
-            );
-            continue;
-          }
-
-          results.push({
-            toolName,
-            caseName,
-            requestCount: requests.length,
-            requests,
-          });
-
-          console.info(
-            `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} ok (${requests.length} request(s))`,
-          );
-        } catch (error) {
-          const requests = recorder.getAll();
-          failures.push({
-            toolName,
-            caseName,
-            arguments: args ?? {},
-            error: error instanceof Error ? error.message : String(error),
-            requests,
-          });
-          console.info(
-            `[live] [${index + 1}/${selectedCases.length}] ${toolName} / ${caseName} failed`,
-          );
-        } finally {
-          await Promise.race([
-            harness.close(),
-            new Promise((resolve) => setTimeout(resolve, 1000)),
-          ]);
+        if (outcome.kind === "failure") {
+          failures.push(outcome.failure);
+          continue;
         }
+
+        skips.push(outcome.skip);
       }
 
       logCoverageSummary(results);

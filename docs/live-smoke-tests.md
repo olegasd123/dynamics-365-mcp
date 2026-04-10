@@ -32,6 +32,7 @@ Start from:
 
 The file is tool-first:
 
+- optional `execution.maxParallel` sets how many cases can run at the same time
 - `tools.<toolName>` is an array of test cases for one tool
 - each case has `arguments` with real tool input
 - one tool can have several cases with different data
@@ -49,6 +50,7 @@ Optional:
 
 - Set `D365_MCP_LIVE_FIXTURES` when your fixture file is in another path.
 - Set `D365_MCP_LIVE_TOOL_TIMEOUT_MS` when one tool needs a longer timeout.
+- Set `execution.maxParallel` in `live-fixtures.json` when you want bounded parallel runs.
 
 If your environment has no Custom APIs or no cloud flows:
 
@@ -61,7 +63,8 @@ The list tool can still run without a name filter.
 ## What The Suite Does
 
 - builds a real MCP server in memory
-- calls every configured tool case one by one
+- runs configured tool cases with the `execution.maxParallel` limit
+- default behavior is one case at a time
 - clears the response cache before each tool
 - records `query`, `queryPath`, and `getPath` calls
 - prints which CRM requests each tool used
