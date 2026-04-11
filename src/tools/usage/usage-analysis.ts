@@ -1,7 +1,7 @@
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
-import { listWebResourcesWithContentQuery } from "../../queries/web-resource-queries.js";
+import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
 import {
@@ -14,6 +14,7 @@ import { fetchViewDetails, listViews, type ViewDetails } from "../views/view-met
 import { fetchCustomApiInventory, listCustomApis } from "../custom-apis/custom-api-metadata.js";
 import { fetchFlowDetails, listCloudFlows, type CloudFlowDetails } from "../flows/flow-metadata.js";
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
+import { chunkValues } from "../../utils/query-batching.js";
 
 const TEXT_WEB_RESOURCE_TYPES = new Set([1, 2, 3, 4, 9, 12]);
 const MAX_USAGE_DETAIL_ITEMS = 50;
@@ -403,11 +404,7 @@ export async function findWebResourceUsageData(
       getWebResourceContentByNameQuery(resourceName),
     ),
     listForms(env, client),
-    client.query<Record<string, unknown>>(
-      env,
-      "webresourceset",
-      listWebResourcesWithContentQuery(),
-    ),
+    client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery()),
   ]);
 
   if (resourceRecords.length === 0) {
@@ -415,21 +412,33 @@ export async function findWebResourceUsageData(
   }
 
   const formCandidates = forms.slice(0, MAX_USAGE_DETAIL_ITEMS);
-  const resourceCandidates = allResources.slice(0, MAX_WEB_RESOURCE_CONTENT_SCAN);
+  const textResources = allResources.filter((resource) =>
+    TEXT_WEB_RESOURCE_TYPES.has(Number(resource.webresourcetype || 0)),
+  );
+  const resourceCandidates = textResources
+    .filter((resource) => String(resource.name || "") !== resourceName)
+    .slice(0, MAX_WEB_RESOURCE_CONTENT_SCAN);
   if (forms.length > MAX_USAGE_DETAIL_ITEMS) {
     warnings.push(
       `Form detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} forms per request while checking web resource usage.`,
     );
   }
-  if (allResources.length > MAX_WEB_RESOURCE_CONTENT_SCAN) {
+  if (textResources.length > MAX_WEB_RESOURCE_CONTENT_SCAN) {
     warnings.push(
       `Referenced web resource content scan is limited to ${MAX_WEB_RESOURCE_CONTENT_SCAN} resources per request.`,
     );
   }
 
-  const formDetails = await Promise.all(
-    formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.formid)),
-  );
+  const [formDetails, resourceDetails] = await Promise.all([
+    Promise.all(
+      formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.formid)),
+    ),
+    fetchWebResourceContentsByName(
+      env,
+      client,
+      resourceCandidates.map((resource) => String(resource.name || "")).filter(Boolean),
+    ),
+  ]);
 
   return {
     resourceName,
@@ -442,8 +451,7 @@ export async function findWebResourceUsageData(
         typeLabel: form.typeLabel,
         usage: form.summary.libraries.includes(resourceName) ? "library" : "form xml",
       })),
-    webResources: resourceCandidates
-      .filter((resource) => String(resource.name || "") !== resourceName)
+    webResources: resourceDetails
       .filter((resource) => webResourceContainsReference(resource, resourceName))
       .map((resource) => ({
         name: String(resource.name || ""),
@@ -800,6 +808,42 @@ function webResourceContainsReference(
 
   const decoded = Buffer.from(content, "base64").toString("utf-8");
   return decoded.includes(resourceName);
+}
+
+async function fetchWebResourceContentsByName(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  resourceNames: string[],
+): Promise<Record<string, unknown>[]> {
+  const uniqueNames = [...new Set(resourceNames.filter(Boolean))];
+  if (uniqueNames.length === 0) {
+    return [];
+  }
+
+  const results: Record<string, unknown>[] = [];
+
+  for (const batch of chunkValues(uniqueNames, 10)) {
+    const batchResults = await Promise.all(
+      batch.map(async (resourceName) => {
+        const resources = await client.query<Record<string, unknown>>(
+          env,
+          "webresourceset",
+          getWebResourceContentByNameQuery(resourceName),
+        );
+        return (
+          resources.find((resource) => String(resource.name || "") === resourceName) ||
+          resources[0] ||
+          null
+        );
+      }),
+    );
+
+    results.push(
+      ...batchResults.filter((resource): resource is Record<string, unknown> => resource !== null),
+    );
+  }
+
+  return results;
 }
 
 function flowJsonIncludesValue(flow: CloudFlowDetails, value: string): boolean {

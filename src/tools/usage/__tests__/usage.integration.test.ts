@@ -185,6 +185,43 @@ describe("usage tools", () => {
     expect(webResourceResponse.content[0].text).toContain("contoso_/pages/page.html");
   });
 
+  it("avoids bulk web resource content scans when finding usage", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        systemforms: [],
+        webresourceset: [
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/app.js",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('app');").toString("base64"),
+          },
+          {
+            webresourceid: "wr-2",
+            name: "contoso_/pages/page.html",
+            webresourcetype: 1,
+            content: Buffer.from("<script src='contoso_/scripts/app.js'></script>").toString(
+              "base64",
+            ),
+          },
+        ],
+      },
+    });
+
+    registerFindWebResourceUsage(server as never, config, client);
+
+    const response = await server.getHandler("find_web_resource_usage")({
+      name: "contoso_/scripts/app.js",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(calls.map((call) => call.queryParams)).not.toContain(
+      "$select=webresourceid,name,displayname,webresourcetype,ismanaged,modifiedon,content&$orderby=name asc",
+    );
+  });
+
   it("analyzes direct update triggers without guessing from system-managed fields", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
