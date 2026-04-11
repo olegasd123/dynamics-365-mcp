@@ -448,9 +448,9 @@ describeLive("live tool smoke tests", () => {
       });
 
       const { results, failures, skips } = getOrderedRunBuckets(completedOutcomes);
-      logCoverageSummary(results);
       logSkipSummary(skips);
       logFailureSummary(failures, requestLogOptions);
+      logCoverageSummary(results);
 
       expect(
         failures.length,
