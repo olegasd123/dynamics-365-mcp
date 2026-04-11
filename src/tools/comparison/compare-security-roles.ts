@@ -6,7 +6,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { diffCollections } from "../../utils/diff.js";
 import { formatNamedDiffSection } from "./diff-section.js";
-import { fetchRolePrivileges } from "../security/role-metadata.js";
+import { fetchRolePrivilegesForComparison } from "../security/role-metadata.js";
 
 export function registerCompareSecurityRoles(
   server: McpServer,
@@ -44,8 +44,8 @@ export function registerCompareSecurityRoles(
         const sourceEnv = getEnvironment(config, sourceEnvironment);
         const targetEnv = getEnvironment(config, targetEnvironment);
         const [sourceRole, targetRole] = await Promise.all([
-          fetchRolePrivileges(sourceEnv, client, roleName, sourceBusinessUnit),
-          fetchRolePrivileges(targetEnv, client, roleName, targetBusinessUnit),
+          fetchRolePrivilegesForComparison(sourceEnv, client, roleName, sourceBusinessUnit),
+          fetchRolePrivilegesForComparison(targetEnv, client, roleName, targetBusinessUnit),
         ]);
 
         const roleDiff = diffCollections(
@@ -62,6 +62,10 @@ export function registerCompareSecurityRoles(
         );
 
         const lines: string[] = [];
+        const warnings = [...sourceRole.warnings, ...targetRole.warnings];
+        if (warnings.length > 0) {
+          lines.push(...warnings.map((warning) => `Warning: ${warning}`), "");
+        }
         lines.push("## Security Role Comparison");
         lines.push(
           `- Source: ${sourceEnvironment} :: ${sourceRole.role.name} [${sourceRole.role.businessUnitName}]`,
@@ -98,6 +102,7 @@ export function registerCompareSecurityRoles(
             sourceEnvironment,
             targetEnvironment,
             roleName,
+            warnings,
             sourceBusinessUnit: sourceRole.role.businessUnitName || null,
             targetBusinessUnit: targetRole.role.businessUnitName || null,
             roleComparison: roleDiff,

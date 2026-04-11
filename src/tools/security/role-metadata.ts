@@ -64,6 +64,18 @@ export interface RolePrivilegeDetails {
   privileges: RolePrivilegeRecord[];
 }
 
+export interface RoleResolutionResult {
+  role: SecurityRoleRecord;
+  warnings: string[];
+}
+
+interface ResolvedRoleMatches {
+  exactId: SecurityRoleRecord[];
+  narrowedExact: SecurityRoleRecord[];
+  matches: SecurityRoleRecord[];
+  ambiguous: SecurityRoleRecord[];
+}
+
 export interface RolePrivilegeInventory {
   roles: SecurityRoleRecord[];
   privilegesByRoleId: Map<string, RolePrivilegeRecord[]>;
@@ -89,42 +101,57 @@ export async function resolveSecurityRole(
   roleRef: string,
   businessUnit?: string,
 ): Promise<SecurityRoleRecord> {
-  const resolvedBusinessUnit = await resolveRoleBusinessUnitName(env, client, businessUnit);
-  const roles = await listSecurityRoles(env, client);
-  const exactId = roles.filter((role) => role.roleid === roleRef);
-  if (exactId.length === 1) {
-    return exactId[0];
+  const resolvedMatches = await collectResolvedRoleMatches(env, client, roleRef, businessUnit);
+  if (resolvedMatches.exactId.length === 1) {
+    return resolvedMatches.exactId[0];
   }
 
-  const exactName = roles.filter((role) => role.name === roleRef);
-  const narrowedExact = resolvedBusinessUnit
-    ? exactName.filter((role) => role.businessUnitName === resolvedBusinessUnit)
-    : exactName;
-  if (narrowedExact.length === 1) {
-    return narrowedExact[0];
+  if (resolvedMatches.narrowedExact.length === 1) {
+    return resolvedMatches.narrowedExact[0];
   }
 
-  const needle = roleRef.trim().toLowerCase();
-  const matches = uniqueRoles(
-    roles.filter(
-      (role) =>
-        role.name.toLowerCase().includes(needle) &&
-        (!resolvedBusinessUnit ||
-          role.businessUnitName.toLowerCase() === resolvedBusinessUnit.toLowerCase()),
-    ),
-  );
-
-  if (matches.length === 1) {
-    return matches[0];
+  if (resolvedMatches.matches.length === 1) {
+    return resolvedMatches.matches[0];
   }
 
-  if (matches.length > 1 || narrowedExact.length > 1) {
-    const ambiguous = uniqueRoles([...matches, ...narrowedExact]);
+  if (resolvedMatches.ambiguous.length > 1) {
     throw new Error(
-      `Security role '${roleRef}' is ambiguous in '${env.name}'. Matches: ${ambiguous
+      `Security role '${roleRef}' is ambiguous in '${env.name}'. Matches: ${resolvedMatches.ambiguous
         .map((role) => `${role.name} [${role.businessUnitName}]`)
         .join(", ")}.`,
     );
+  }
+
+  throw new Error(`Security role '${roleRef}' not found in '${env.name}'.`);
+}
+
+export async function resolveSecurityRoleForComparison(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  roleRef: string,
+  businessUnit?: string,
+): Promise<RoleResolutionResult> {
+  const resolvedMatches = await collectResolvedRoleMatches(env, client, roleRef, businessUnit);
+  if (resolvedMatches.exactId.length === 1) {
+    return { role: resolvedMatches.exactId[0], warnings: [] };
+  }
+
+  if (resolvedMatches.narrowedExact.length === 1) {
+    return { role: resolvedMatches.narrowedExact[0], warnings: [] };
+  }
+
+  if (resolvedMatches.matches.length === 1) {
+    return { role: resolvedMatches.matches[0], warnings: [] };
+  }
+
+  if (resolvedMatches.ambiguous.length > 1) {
+    const selectedRole = pickMostRecentlyModifiedRole(resolvedMatches.ambiguous);
+    return {
+      role: selectedRole,
+      warnings: [
+        `Found ${resolvedMatches.ambiguous.length} matching security roles for '${roleRef}' in '${env.name}'. Using the most recently modified role '${selectedRole.name}' [${selectedRole.businessUnitName}]${formatModifiedOnSuffix(selectedRole.modifiedon)}.`,
+      ],
+    };
   }
 
   throw new Error(`Security role '${roleRef}' not found in '${env.name}'.`);
@@ -142,6 +169,27 @@ export async function fetchRolePrivileges(
   return {
     role,
     privileges: privileges.get(role.roleid) || [],
+  };
+}
+
+export async function fetchRolePrivilegesForComparison(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  roleRef: string,
+  businessUnit?: string,
+): Promise<RolePrivilegeDetails & { warnings: string[] }> {
+  const { role, warnings } = await resolveSecurityRoleForComparison(
+    env,
+    client,
+    roleRef,
+    businessUnit,
+  );
+  const privileges = await fetchPrivilegesForRoleIds(env, client, [role.roleid]);
+
+  return {
+    role,
+    privileges: privileges.get(role.roleid) || [],
+    warnings,
   };
 }
 
@@ -182,6 +230,37 @@ async function fetchDefaultGlobalBusinessUnitName(
   return fetchDefaultGlobalBusinessUnitNameMetadata(env, client);
 }
 
+async function collectResolvedRoleMatches(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  roleRef: string,
+  businessUnit?: string,
+): Promise<ResolvedRoleMatches> {
+  const resolvedBusinessUnit = await resolveRoleBusinessUnitName(env, client, businessUnit);
+  const roles = await listSecurityRoles(env, client);
+  const exactId = roles.filter((role) => role.roleid === roleRef);
+  const exactName = roles.filter((role) => role.name === roleRef);
+  const narrowedExact = resolvedBusinessUnit
+    ? exactName.filter((role) => role.businessUnitName === resolvedBusinessUnit)
+    : exactName;
+  const needle = roleRef.trim().toLowerCase();
+  const matches = uniqueRoles(
+    roles.filter(
+      (role) =>
+        role.name.toLowerCase().includes(needle) &&
+        (!resolvedBusinessUnit ||
+          role.businessUnitName.toLowerCase() === resolvedBusinessUnit.toLowerCase()),
+    ),
+  );
+
+  return {
+    exactId,
+    narrowedExact,
+    matches,
+    ambiguous: uniqueRoles([...matches, ...narrowedExact]),
+  };
+}
+
 function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
   return {
     ...record,
@@ -198,6 +277,32 @@ function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
     ismanaged: Boolean(record.ismanaged),
     modifiedon: String(record.modifiedon || ""),
   };
+}
+
+function pickMostRecentlyModifiedRole(roles: SecurityRoleRecord[]): SecurityRoleRecord {
+  return [...roles].sort(compareRolesByModifiedOnDesc)[0];
+}
+
+function compareRolesByModifiedOnDesc(left: SecurityRoleRecord, right: SecurityRoleRecord): number {
+  const timeDiff = parseModifiedOn(right.modifiedon) - parseModifiedOn(left.modifiedon);
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  return right.roleid.localeCompare(left.roleid);
+}
+
+function parseModifiedOn(value: string): number {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatModifiedOnSuffix(modifiedOn: string): string {
+  return modifiedOn ? `, modified on ${modifiedOn}` : "";
 }
 
 async function fetchPrivilegesForRoleIds(
