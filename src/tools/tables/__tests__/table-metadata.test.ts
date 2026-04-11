@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
-import { fetchTableSchema, listTables, resolveTable } from "../table-metadata.js";
+import {
+  fetchTableSchema,
+  listTables,
+  resolveTable,
+  searchColumnsByLogicalName,
+} from "../table-metadata.js";
 
 describe("table metadata", () => {
   const env: EnvironmentConfig = {
@@ -271,5 +276,65 @@ describe("table metadata", () => {
       }),
     ]);
     expect(schema.relationships).toHaveLength(3);
+  });
+
+  it("filters searched columns in memory for metadata paths", async () => {
+    const { client, calls } = createRecordingClient({
+      dev: {
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "col-1",
+            LogicalName: "name",
+            SchemaName: "Name",
+            DisplayName: { UserLocalizedLabel: { Label: "Account Name" } },
+            Description: { UserLocalizedLabel: { Label: "Main account name" } },
+            AttributeType: "String",
+            AttributeTypeName: { Value: "StringType" },
+            RequiredLevel: { Value: "ApplicationRequired" },
+            IsPrimaryId: false,
+            IsPrimaryName: true,
+            IsAuditEnabled: { Value: true },
+            IsValidForAdvancedFind: true,
+            IsValidForCreate: { Value: true },
+            IsValidForRead: { Value: true },
+            IsValidForUpdate: { Value: true },
+            IsCustomAttribute: false,
+            IsSecured: false,
+          },
+          {
+            MetadataId: "col-2",
+            LogicalName: "accountnumber",
+            SchemaName: "AccountNumber",
+            DisplayName: { UserLocalizedLabel: { Label: "Account Number" } },
+            Description: { UserLocalizedLabel: { Label: "Customer number" } },
+            AttributeType: "String",
+            AttributeTypeName: { Value: "StringType" },
+            RequiredLevel: { Value: "None" },
+            IsPrimaryId: false,
+            IsPrimaryName: false,
+            IsAuditEnabled: { Value: true },
+            IsValidForAdvancedFind: true,
+            IsValidForCreate: { Value: true },
+            IsValidForRead: { Value: true },
+            IsValidForUpdate: { Value: true },
+            IsCustomAttribute: false,
+            IsSecured: false,
+          },
+        ],
+      },
+    });
+
+    const columns = await searchColumnsByLogicalName(env, client, "account", "number");
+
+    expect(columns).toHaveLength(1);
+    expect(columns[0]?.logicalName).toBe("accountnumber");
+    expect(calls).toEqual([
+      {
+        environment: "dev",
+        entitySet: "EntityDefinitions(LogicalName='account')/Attributes",
+        queryParams:
+          "$select=MetadataId,LogicalName,SchemaName,DisplayName,Description,AttributeType,AttributeTypeName,RequiredLevel,IsPrimaryId,IsPrimaryName,IsAuditEnabled,IsValidForAdvancedFind,IsValidForCreate,IsValidForRead,IsValidForUpdate,IsCustomAttribute,IsSecured&$filter=AttributeOf eq null&$orderby=LogicalName asc",
+      },
+    ]);
   });
 });

@@ -376,6 +376,34 @@ export async function fetchColumnsByLogicalName(
     .sort((left, right) => left.logicalName.localeCompare(right.logicalName));
 }
 
+export async function searchColumnsByLogicalName(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  logicalName: string,
+  nameFilter: string,
+): Promise<TableColumnRecord[]> {
+  const needle = nameFilter.trim().toLowerCase();
+  if (!needle) {
+    return [];
+  }
+
+  const columns = await client.queryPath<Record<string, unknown>>(
+    env,
+    tableColumnsPath(logicalName),
+    listTableColumnsQuery(),
+  );
+
+  return columns
+    .map((column) => normalizeColumn(column))
+    .filter(
+      (column) =>
+        column.logicalName.toLowerCase().includes(needle) ||
+        column.schemaName.toLowerCase().includes(needle) ||
+        column.displayName.toLowerCase().includes(needle),
+    )
+    .sort((left, right) => left.logicalName.localeCompare(right.logicalName));
+}
+
 export async function listColumnsByMetadataIds(
   env: EnvironmentConfig,
   client: DynamicsClient,

@@ -9,7 +9,7 @@ import {
 function createDiscoveryHarness() {
   const server = new FakeServer();
   const config = createTestConfig(["dev"]);
-  const { client } = createRecordingClient({
+  const { client, calls } = createRecordingClient({
     dev: {
       EntityDefinitions: [
         {
@@ -322,12 +322,12 @@ function createDiscoveryHarness() {
 
   registerFindMetadata(server as never, config, client);
 
-  return server;
+  return { server, calls };
 }
 
 describe("find_metadata tool", () => {
   it("ranks exact matches before partial matches and includes next tools", async () => {
-    const server = createDiscoveryHarness();
+    const { server } = createDiscoveryHarness();
 
     const response = await server.getHandler("find_metadata")({ query: "account" });
 
@@ -365,7 +365,7 @@ describe("find_metadata tool", () => {
   });
 
   it("supports component type filters", async () => {
-    const server = createDiscoveryHarness();
+    const { server } = createDiscoveryHarness();
 
     const response = await server.getHandler("find_metadata")({
       query: "sync",
@@ -389,7 +389,7 @@ describe("find_metadata tool", () => {
   });
 
   it("returns multiple matches for ambiguous searches instead of failing", async () => {
-    const server = createDiscoveryHarness();
+    const { server } = createDiscoveryHarness();
 
     const response = await server.getHandler("find_metadata")({ query: "sync" });
 
@@ -409,7 +409,7 @@ describe("find_metadata tool", () => {
   });
 
   it("returns an empty success result when nothing matches", async () => {
-    const server = createDiscoveryHarness();
+    const { server } = createDiscoveryHarness();
 
     const response = await server.getHandler("find_metadata")({ query: "missing-item" });
 
@@ -423,5 +423,16 @@ describe("find_metadata tool", () => {
         items: [],
       },
     });
+  });
+
+  it("limits broad column discovery to tables that match the query", async () => {
+    const { server, calls } = createDiscoveryHarness();
+
+    const response = await server.getHandler("find_metadata")({ query: "account" });
+
+    expect(response.isError).toBeUndefined();
+    expect(
+      calls.map((call) => call.entitySet).filter((entitySet) => entitySet.includes("/Attributes")),
+    ).toEqual(["EntityDefinitions(LogicalName='account')/Attributes"]);
   });
 });

@@ -11,7 +11,7 @@ import type { PluginClassRecord } from "../plugins/plugin-inventory.js";
 import { listSolutions, type SolutionRecord } from "../solutions/solution-inventory.js";
 import {
   listTables,
-  fetchColumnsByLogicalName,
+  searchColumnsByLogicalName,
   type TableColumnRecord,
   type TableRecord,
 } from "../tables/table-metadata.js";
@@ -129,7 +129,7 @@ export async function findMetadata(
   }
 
   const limit = normalizeLimit(options.limit);
-  const candidates = await loadCandidates(env, client, options.componentType);
+  const candidates = await loadCandidates(env, client, query, options.componentType);
   const ranked = candidates
     .map((candidate) => rankCandidate(candidate, query))
     .filter((candidate): candidate is RankedCandidate => candidate !== null)
@@ -157,6 +157,7 @@ export async function findMetadata(
 async function loadCandidates(
   env: EnvironmentConfig,
   client: DynamicsClient,
+  query: string,
   componentType?: MetadataComponentType,
 ): Promise<CandidateMatch[]> {
   const tablesNeeded =
@@ -220,10 +221,11 @@ async function loadCandidates(
   }
 
   if (shouldLoad("column", componentType)) {
+    const columnSearchTables = selectColumnSearchTables(tables, query, componentType);
     const columnGroups = await Promise.all(
-      tables.map(async (table) => ({
+      columnSearchTables.map(async (table) => ({
         table,
-        columns: await fetchColumnsByLogicalName(env, client, table.logicalName),
+        columns: await searchColumnsByLogicalName(env, client, table.logicalName, query),
       })),
     );
 
@@ -589,6 +591,29 @@ function normalizeLimit(limit?: number): number {
   }
 
   return Math.max(1, Math.min(MAX_LIMIT, Math.floor(Number(limit))));
+}
+
+function selectColumnSearchTables(
+  tables: TableRecord[],
+  rawQuery: string,
+  componentType?: MetadataComponentType,
+): TableRecord[] {
+  if (componentType === "column") {
+    return tables;
+  }
+
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) {
+    return [];
+  }
+
+  return tables.filter((table) => {
+    const fields = [table.logicalName, table.schemaName, table.displayName, table.entitySetName]
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+
+    return fields.some((value) => value.includes(query) || query.includes(value));
+  });
 }
 
 async function loadSolutionsForMatches(
