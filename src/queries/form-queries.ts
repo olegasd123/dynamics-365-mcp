@@ -90,3 +90,11 @@ export function listFormsByIdsQuery(formIds: string[]): string {
     orderby: "objecttypecode asc,name asc",
   });
 }
+
+export function listFormDetailsByIdsQuery(formIds: string[]): string {
+  return buildQueryString({
+    select: FORM_DETAILS_SELECT,
+    filter: buildOrStringFilter("formid", formIds),
+    orderby: "objecttypecode asc,name asc",
+  });
+}

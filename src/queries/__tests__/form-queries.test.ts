@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getFormDetailsByIdentityQuery,
+  listFormDetailsByIdsQuery,
   listFormsByIdsQuery,
   listFormsQuery,
 } from "../form-queries.js";
@@ -44,5 +45,12 @@ describe("form queries", () => {
     const query = listFormsByIdsQuery(["id-1", "id-2"]);
 
     expect(query).toContain("formid eq 'id-1' or formid eq 'id-2'");
+  });
+
+  it("builds the bulk form details query", () => {
+    const query = listFormDetailsByIdsQuery(["id-1", "id-2"]);
+
+    expect(query).toContain("formid eq 'id-1' or formid eq 'id-2'");
+    expect(query).toContain("formxml");
   });
 });

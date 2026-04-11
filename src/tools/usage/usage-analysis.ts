@@ -9,7 +9,12 @@ import {
   resolveTable,
   type TableRelationshipRecord,
 } from "../tables/table-metadata.js";
-import { fetchFormDetails, listForms, type FormDetails } from "../forms/form-metadata.js";
+import {
+  fetchFormDetails,
+  fetchFormDetailsByIds,
+  listForms,
+  type FormDetails,
+} from "../forms/form-metadata.js";
 import { fetchViewDetails, listViews, type ViewDetails } from "../views/view-metadata.js";
 import { fetchCustomApiInventory, listCustomApis } from "../custom-apis/custom-api-metadata.js";
 import { fetchFlowDetails, listCloudFlows, type CloudFlowDetails } from "../flows/flow-metadata.js";
@@ -411,18 +416,12 @@ export async function findWebResourceUsageData(
     throw new Error(`Web resource '${resourceName}' not found in '${env.name}'.`);
   }
 
-  const formCandidates = forms.slice(0, MAX_USAGE_DETAIL_ITEMS);
   const textResources = allResources.filter((resource) =>
     TEXT_WEB_RESOURCE_TYPES.has(Number(resource.webresourcetype || 0)),
   );
   const resourceCandidates = textResources
     .filter((resource) => String(resource.name || "") !== resourceName)
     .slice(0, MAX_WEB_RESOURCE_CONTENT_SCAN);
-  if (forms.length > MAX_USAGE_DETAIL_ITEMS) {
-    warnings.push(
-      `Form detail scan is limited to ${MAX_USAGE_DETAIL_ITEMS} forms per request while checking web resource usage.`,
-    );
-  }
   if (textResources.length > MAX_WEB_RESOURCE_CONTENT_SCAN) {
     warnings.push(
       `Referenced web resource content scan is limited to ${MAX_WEB_RESOURCE_CONTENT_SCAN} resources per request.`,
@@ -430,9 +429,7 @@ export async function findWebResourceUsageData(
   }
 
   const [formDetails, resourceDetails] = await Promise.all([
-    Promise.all(
-      formCandidates.map((form) => fetchFormDetails(env, client, form.uniquename || form.formid)),
-    ),
+    fetchFormDetailsByIds(env, client, forms.map((form) => form.formid).filter(Boolean)),
     fetchWebResourceContentsByName(
       env,
       client,

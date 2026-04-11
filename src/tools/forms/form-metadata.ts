@@ -2,6 +2,7 @@ import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
   getFormDetailsByIdentityQuery,
+  listFormDetailsByIdsQuery,
   listFormsByIdsQuery,
   listFormsQuery,
   type FormType,
@@ -174,6 +175,23 @@ export async function fetchFormDetails(
   }
 
   return normalizeFormDetails(details);
+}
+
+export async function fetchFormDetailsByIds(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  formIds: string[],
+): Promise<FormDetails[]> {
+  const records = await queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "systemforms",
+    formIds,
+    "formid",
+    listFormDetailsByIdsQuery,
+  );
+
+  return records.map(normalizeFormDetails).sort(compareForms);
 }
 
 function normalizeForm(form: Record<string, unknown>): FormRecord {

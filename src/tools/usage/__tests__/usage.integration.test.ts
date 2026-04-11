@@ -553,7 +553,7 @@ describe("usage tools", () => {
     });
   });
 
-  it("warns when web resource usage needs a broad form scan", async () => {
+  it("scans all forms for web resource usage instead of stopping at 50", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
     const forms = Array.from({ length: 55 }, (_, index) => ({
@@ -562,7 +562,8 @@ describe("usage tools", () => {
       objecttypecode: "account",
       type: 2,
       uniquename: `contoso_account_main_${index + 1}`,
-      formxml: "<form />",
+      formxml:
+        index === 54 ? "<form><Library name='contoso_/scripts/app.js' /></form>" : "<form />",
     }));
     const { client } = createRecordingClient({
       dev: {
@@ -584,12 +585,13 @@ describe("usage tools", () => {
     });
 
     expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain(
-      "Warnings: Form detail scan is limited to 50 forms per request while checking web resource usage.",
-    );
+    expect(response.content[0].text).toContain("Account Main 55");
     expect(response.structuredContent).toMatchObject({
       data: {
-        warnings: [expect.stringContaining("Form detail scan is limited to 50 forms per request")],
+        warnings: [],
+        usage: {
+          forms: [expect.objectContaining({ name: "Account Main 55" })],
+        },
       },
     });
   });
