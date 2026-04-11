@@ -23,8 +23,8 @@ import {
 } from "./live-test-support.js";
 
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
-const DEFAULT_TOOL_TIMEOUT_MS = 90_000;
-const RELEASE_GATE_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_TOOL_TIMEOUT_MS = 180_000;
+const RELEASE_GATE_TIMEOUT_MS = 20 * 60 * 1000;
 
 interface RecordedRequest {
   method: "query" | "queryPath" | "getPath";
