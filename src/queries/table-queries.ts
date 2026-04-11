@@ -2,6 +2,7 @@ import { buildQueryString, odataEq, odataStringLiteral } from "../utils/odata-he
 
 const TABLE_SELECT = [
   "MetadataId",
+  "ObjectTypeCode",
   "LogicalName",
   "SchemaName",
   "DisplayName",

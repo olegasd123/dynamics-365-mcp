@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
-import { fetchFormDetails, listForms } from "../form-metadata.js";
+import { fetchFormDetails, listForms, resolveForm } from "../form-metadata.js";
 
 describe("form metadata", () => {
   const env: EnvironmentConfig = {
@@ -90,5 +90,140 @@ describe("form metadata", () => {
 
     expect(details.formid).toBe("form-1");
     expect(details.objecttypecode).toBe("account");
+  });
+
+  it("matches solution forms by resolved table metadata when object type code differs", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "core" }],
+        solutioncomponents: [
+          { solutioncomponentid: "sc-1", objectid: "form-1", componenttype: 60 },
+          { solutioncomponentid: "sc-2", objectid: "table-1", componenttype: 1 },
+        ],
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            ObjectTypeCode: 10042,
+            LogicalName: "mso_candidat",
+            SchemaName: "mso_Candidat",
+            DisplayName: { UserLocalizedLabel: { Label: "Candidat" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Candidats" } },
+            EntitySetName: "mso_candidats",
+          },
+        ],
+        systemforms: [
+          {
+            formid: "form-1",
+            name: "Candidat",
+            objecttypecode: "10042",
+            type: 2,
+            uniquename: "mso_candidat_main",
+            formactivationstate: 1,
+            isdefault: true,
+            ismanaged: false,
+            formxml: "<form />",
+          },
+        ],
+      },
+    });
+
+    const forms = await listForms(env, client, { solution: "Core", table: "mso_candidat" });
+
+    expect(forms).toHaveLength(1);
+    expect(forms[0]).toMatchObject({
+      name: "Candidat",
+      objecttypecode: "10042",
+    });
+  });
+
+  it("falls back to a global exact match before solution partial matches", async () => {
+    const client = {
+      async query<T>(
+        _env: EnvironmentConfig,
+        entitySet: string,
+        queryParams?: string,
+      ): Promise<T[]> {
+        if (entitySet === "solutions") {
+          return [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "core" }] as T[];
+        }
+
+        if (entitySet === "solutioncomponents") {
+          return [
+            { solutioncomponentid: "sc-1", objectid: "form-old", componenttype: 60 },
+            { solutioncomponentid: "sc-2", objectid: "form-old-2", componenttype: 60 },
+          ] as T[];
+        }
+
+        if (entitySet === "systemforms") {
+          if (queryParams?.includes("formid eq")) {
+            return [
+              {
+                formid: "form-old",
+                name: "Old_Candidat",
+                objecttypecode: "mso_candidat",
+                type: 2,
+                uniquename: "",
+                formactivationstate: 1,
+                isdefault: false,
+                ismanaged: false,
+              },
+              {
+                formid: "form-old-2",
+                name: "Archive Candidat",
+                objecttypecode: "mso_candidat",
+                type: 2,
+                uniquename: "",
+                formactivationstate: 1,
+                isdefault: false,
+                ismanaged: false,
+              },
+            ] as T[];
+          }
+
+          return [
+            {
+              formid: "form-current",
+              name: "Candidat",
+              objecttypecode: "mso_candidat",
+              type: 2,
+              uniquename: "",
+              formactivationstate: 1,
+              isdefault: true,
+              ismanaged: false,
+            },
+          ] as T[];
+        }
+
+        if (entitySet === "EntityDefinitions") {
+          return [
+            {
+              MetadataId: "table-1",
+              ObjectTypeCode: 10042,
+              LogicalName: "mso_candidat",
+              SchemaName: "mso_candidat",
+              DisplayName: { UserLocalizedLabel: { Label: "Candidat" } },
+              DisplayCollectionName: { UserLocalizedLabel: { Label: "Candidats" } },
+              EntitySetName: "mso_candidats",
+            },
+          ] as T[];
+        }
+
+        return [] as T[];
+      },
+      async queryPath<T>(): Promise<T[]> {
+        return [] as T[];
+      },
+      async getPath<T>(): Promise<T | null> {
+        return null;
+      },
+    } as never;
+
+    const form = await resolveForm(env, client, "Candidat", {
+      solution: "Core",
+      table: "mso_candidat",
+    });
+
+    expect(form.formid).toBe("form-current");
+    expect(form.name).toBe("Candidat");
   });
 });

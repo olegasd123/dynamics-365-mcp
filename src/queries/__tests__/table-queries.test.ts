@@ -25,7 +25,7 @@ describe("table queries", () => {
     const query = listTablesQuery();
 
     expect(query).toContain(
-      "$select=MetadataId,LogicalName,SchemaName,DisplayName,DisplayCollectionName,Description,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType,IsCustomEntity,IsManaged,IsActivity,IsAuditEnabled,IsValidForAdvancedFind,ChangeTrackingEnabled",
+      "$select=MetadataId,ObjectTypeCode,LogicalName,SchemaName,DisplayName,DisplayCollectionName,Description,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,OwnershipType,IsCustomEntity,IsManaged,IsActivity,IsAuditEnabled,IsValidForAdvancedFind,ChangeTrackingEnabled",
     );
     expect(query).not.toContain("$orderby=");
   });

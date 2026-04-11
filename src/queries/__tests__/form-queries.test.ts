@@ -38,7 +38,8 @@ describe("form queries", () => {
       table: "account",
     });
 
-    expect(query).toContain("$filter=formid eq 'form-1' and objecttypecode eq 'account'");
+    expect(query).toContain("$filter=formid eq 'form-1'");
+    expect(query).not.toContain("objecttypecode eq 'account'");
   });
 
   it("builds the bulk form query", () => {

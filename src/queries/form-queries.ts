@@ -67,14 +67,16 @@ export function getFormDetailsByIdentityQuery(options: {
 
   if (options.formId) {
     filters.push(odataEq("formid", options.formId));
-  } else if (options.uniqueName) {
-    filters.push(odataEq("uniquename", options.uniqueName));
-  } else if (options.formName) {
-    filters.push(odataEq("name", options.formName));
-  }
+  } else {
+    if (options.uniqueName) {
+      filters.push(odataEq("uniquename", options.uniqueName));
+    } else if (options.formName) {
+      filters.push(odataEq("name", options.formName));
+    }
 
-  if (options.table) {
-    filters.push(odataEq("objecttypecode", options.table));
+    if (options.table) {
+      filters.push(odataEq("objecttypecode", options.table));
+    }
   }
 
   return buildQueryString({

@@ -38,6 +38,7 @@ const CHOICE_ATTRIBUTE_TYPES: ChoiceAttributeMetadataType[] = [
 
 export interface TableRecord extends Record<string, unknown> {
   metadataId: string;
+  objectTypeCode: string;
   logicalName: string;
   schemaName: string;
   displayName: string;
@@ -529,6 +530,7 @@ function normalizeTable(table: Record<string, unknown>): TableRecord {
   return {
     ...table,
     metadataId: String(table.MetadataId || ""),
+    objectTypeCode: String(table.ObjectTypeCode || ""),
     logicalName: String(table.LogicalName || ""),
     schemaName: String(table.SchemaName || ""),
     displayName: getLabelText(table.DisplayName),
