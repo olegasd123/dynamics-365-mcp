@@ -48,6 +48,12 @@ The file is tool-first:
 npm run test:live
 ```
 
+or for individual
+
+```bash
+D365_MCP_LIVE_TOOLS=find_metadata npm run test:live
+```
+
 Optional:
 
 - Set `D365_MCP_LIVE_FIXTURES` when your fixture file is in another path.
