@@ -1,13 +1,17 @@
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listDashboardsQuery } from "../../queries/dashboard-queries.js";
+import { listFormsByIdsQuery } from "../../queries/form-queries.js";
 import {
   listAppModulesQuery,
   listConnectionReferencesQuery,
   listEnvironmentVariableDefinitionsQuery,
   listEnvironmentVariableValuesForDefinitionsQuery,
 } from "../../queries/alm-queries.js";
-import { fetchSolutionInventory } from "../solutions/solution-inventory.js";
+import {
+  fetchSolutionComponentSets,
+  fetchSolutionInventory,
+} from "../solutions/solution-inventory.js";
 import {
   getAppModuleStateLabel,
   getConnectionReferenceStateLabel,
@@ -26,7 +30,10 @@ import {
   type EnvironmentVariableDefinitionRecord,
   type EnvironmentVariableValueRecord,
 } from "./alm-shared.js";
-import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
+import {
+  queryRecordsByFieldValuesInChunks,
+  queryRecordsByIdsInChunks,
+} from "../../utils/query-batching.js";
 
 export interface EnvironmentVariableRecord extends EnvironmentVariableDefinitionRecord {
   typeLabel: string;
@@ -203,7 +210,7 @@ export async function listDashboards(
   },
 ): Promise<DashboardSummaryRecord[]> {
   const records = options?.solution
-    ? (await fetchSolutionInventory(env, client, options.solution)).dashboards
+    ? await fetchSolutionDashboards(env, client, options.solution)
     : (
         await client.query<Record<string, unknown>>(
           env,
@@ -295,6 +302,30 @@ function extendDashboard(record: DashboardRecord): DashboardSummaryRecord {
     ...record,
     typeLabel: getDashboardTypeLabel(record.type),
   };
+}
+
+async function fetchSolutionDashboards(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  solutionRef: string,
+): Promise<DashboardRecord[]> {
+  const componentSets = await fetchSolutionComponentSets(env, client, solutionRef);
+  const dashboardIds = [...componentSets.dashboardIds];
+
+  if (dashboardIds.length === 0) {
+    return [];
+  }
+
+  const records = await queryRecordsByIdsInChunks<Record<string, unknown>>(
+    env,
+    client,
+    "systemforms",
+    dashboardIds,
+    "formid",
+    listFormsByIdsQuery,
+  );
+
+  return records.filter((record) => Number(record.type || 0) === 0).map(normalizeDashboard);
 }
 
 function filterEnvironmentVariableDefinitions(
