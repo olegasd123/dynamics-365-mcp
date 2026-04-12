@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { diffCollections, type DiffResult } from "../../utils/diff.js";
 import { fetchSolutionInventory } from "../solutions/solution-inventory.js";
@@ -91,149 +92,156 @@ export async function compareSolutionsData(
   };
 }
 
+const compareSolutionsSchema = {
+  sourceEnvironment: z.string().describe("Source environment name"),
+  targetEnvironment: z.string().describe("Target environment name"),
+  solution: z.string().describe("Source solution display name or unique name"),
+  targetSolution: z
+    .string()
+    .optional()
+    .describe("Optional target solution display name or unique name"),
+};
+
+type CompareSolutionsParams = ToolParams<typeof compareSolutionsSchema>;
+
+export async function handleCompareSolutions(
+  { sourceEnvironment, targetEnvironment, solution, targetSolution }: CompareSolutionsParams,
+  { config, client }: ToolContext,
+) {
+  try {
+    const {
+      sourceInventory,
+      targetInventory,
+      pluginComparison,
+      formComparison,
+      viewComparison,
+      pluginStepComparison,
+      pluginImageComparison,
+      workflowComparison,
+      webResourceComparison,
+    } = await compareSolutionsData(
+      config,
+      client,
+      sourceEnvironment,
+      targetEnvironment,
+      solution,
+      targetSolution,
+    );
+
+    const lines: string[] = [];
+    lines.push("## Solution Comparison");
+    lines.push(`- **Source**: ${sourceEnvironment} :: ${sourceInventory.solution.friendlyname}`);
+    lines.push(`- **Target**: ${targetEnvironment} :: ${targetInventory.solution.friendlyname}`);
+    lines.push(
+      `- **Solutions**: ${sourceInventory.solution.uniquename} -> ${targetInventory.solution.uniquename}`,
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Plugin Assemblies",
+        result: pluginComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "name",
+      }),
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Forms",
+        result: formComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "name",
+      }),
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Views",
+        result: viewComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "name",
+      }),
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Plugin Steps",
+        result: pluginStepComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "displayName",
+      }),
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Plugin Images",
+        result: pluginImageComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "displayName",
+      }),
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Workflows",
+        result: workflowComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "name",
+      }),
+    );
+    lines.push("");
+    lines.push(
+      formatNamedDiffSection({
+        title: "Web Resources",
+        result: webResourceComparison,
+        sourceLabel: sourceEnvironment,
+        targetLabel: targetEnvironment,
+        nameField: "name",
+      }),
+    );
+
+    return createToolSuccessResponse(
+      "compare_solutions",
+      lines.join("\n"),
+      `Compared solution '${solution}' between '${sourceEnvironment}' and '${targetEnvironment}'.`,
+      {
+        sourceEnvironment,
+        targetEnvironment,
+        solution,
+        targetSolution: targetSolution || null,
+        pluginComparison,
+        formComparison,
+        viewComparison,
+        pluginStepComparison,
+        pluginImageComparison,
+        workflowComparison,
+        webResourceComparison,
+      },
+    );
+  } catch (error) {
+    return createToolErrorResponse("compare_solutions", error);
+  }
+}
+
+export const compareSolutionsTool = defineTool({
+  name: "compare_solutions",
+  description: "Compare supported solution components between two environments for one solution.",
+  schema: compareSolutionsSchema,
+  handler: handleCompareSolutions,
+});
+
 export function registerCompareSolutions(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "compare_solutions",
-    "Compare supported solution components between two environments for one solution.",
-    {
-      sourceEnvironment: z.string().describe("Source environment name"),
-      targetEnvironment: z.string().describe("Target environment name"),
-      solution: z.string().describe("Source solution display name or unique name"),
-      targetSolution: z
-        .string()
-        .optional()
-        .describe("Optional target solution display name or unique name"),
-    },
-    async ({ sourceEnvironment, targetEnvironment, solution, targetSolution }) => {
-      try {
-        const {
-          sourceInventory,
-          targetInventory,
-          pluginComparison,
-          formComparison,
-          viewComparison,
-          pluginStepComparison,
-          pluginImageComparison,
-          workflowComparison,
-          webResourceComparison,
-        } = await compareSolutionsData(
-          config,
-          client,
-          sourceEnvironment,
-          targetEnvironment,
-          solution,
-          targetSolution,
-        );
-
-        const lines: string[] = [];
-        lines.push("## Solution Comparison");
-        lines.push(
-          `- **Source**: ${sourceEnvironment} :: ${sourceInventory.solution.friendlyname}`,
-        );
-        lines.push(
-          `- **Target**: ${targetEnvironment} :: ${targetInventory.solution.friendlyname}`,
-        );
-        lines.push(
-          `- **Solutions**: ${sourceInventory.solution.uniquename} -> ${targetInventory.solution.uniquename}`,
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Plugin Assemblies",
-            result: pluginComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "name",
-          }),
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Forms",
-            result: formComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "name",
-          }),
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Views",
-            result: viewComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "name",
-          }),
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Plugin Steps",
-            result: pluginStepComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "displayName",
-          }),
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Plugin Images",
-            result: pluginImageComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "displayName",
-          }),
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Workflows",
-            result: workflowComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "name",
-          }),
-        );
-        lines.push("");
-        lines.push(
-          formatNamedDiffSection({
-            title: "Web Resources",
-            result: webResourceComparison,
-            sourceLabel: sourceEnvironment,
-            targetLabel: targetEnvironment,
-            nameField: "name",
-          }),
-        );
-
-        return createToolSuccessResponse(
-          "compare_solutions",
-          lines.join("\n"),
-          `Compared solution '${solution}' between '${sourceEnvironment}' and '${targetEnvironment}'.`,
-          {
-            sourceEnvironment,
-            targetEnvironment,
-            solution,
-            targetSolution: targetSolution || null,
-            pluginComparison,
-            formComparison,
-            viewComparison,
-            pluginStepComparison,
-            pluginImageComparison,
-            workflowComparison,
-            webResourceComparison,
-          },
-        );
-      } catch (error) {
-        return createToolErrorResponse("compare_solutions", error);
-      }
-    },
-  );
+  registerTool(server, compareSolutionsTool, { config, client });
 }
 
 function buildPluginStepComparisonKey(item: Record<string, unknown>): string {

@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
@@ -44,155 +45,160 @@ interface MatrixFilters {
   compareContent?: boolean;
 }
 
+const compareEnvironmentMatrixSchema = {
+  baselineEnvironment: z
+    .string()
+    .optional()
+    .describe("Baseline environment name. Default: configured default environment"),
+  targetEnvironments: z
+    .array(z.string())
+    .optional()
+    .describe("Target environment names. Default: all configured environments except baseline"),
+  componentType: z
+    .enum(["plugins", "workflows", "web_resources", "all"])
+    .optional()
+    .describe(
+      "Component type to compare. 'plugins' means plugin assemblies with steps and images. Default: all",
+    ),
+  assemblyName: z.string().optional().describe("Filter to one plugin assembly"),
+  workflowName: z.string().optional().describe("Filter workflows by name"),
+  category: z
+    .enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"])
+    .optional()
+    .describe("Workflow category filter"),
+  type: z
+    .enum(["html", "css", "js", "xml", "png", "jpg", "gif", "xap", "xsl", "ico", "svg", "resx"])
+    .optional()
+    .describe("Web resource type filter"),
+  nameFilter: z.string().optional().describe("Web resource name contains filter"),
+  compareContent: z.boolean().optional().describe("For web resources, compare content hashes too"),
+  maxRows: z
+    .number()
+    .int()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe("Max drift rows per component. Default: 30"),
+};
+
+type CompareEnvironmentMatrixParams = ToolParams<typeof compareEnvironmentMatrixSchema>;
+
+export async function handleCompareEnvironmentMatrix(
+  {
+    baselineEnvironment,
+    targetEnvironments,
+    componentType,
+    assemblyName,
+    workflowName,
+    category,
+    type,
+    nameFilter,
+    compareContent,
+    maxRows,
+  }: CompareEnvironmentMatrixParams,
+  { config, client }: ToolContext,
+) {
+  try {
+    const baselineName = baselineEnvironment || config.defaultEnvironment;
+    getEnvironment(config, baselineName);
+
+    const resolvedTargetNames = resolveTargetEnvironments(config, baselineName, targetEnvironments);
+
+    if (resolvedTargetNames.length === 0) {
+      return createToolErrorResponse(
+        "compare_environment_matrix",
+        `No target environments found for baseline '${baselineName}'.`,
+      );
+    }
+
+    const selectedComponents = resolveComponentTypes(componentType);
+    const filters: MatrixFilters = {
+      assemblyName,
+      workflowName,
+      category: category as WorkflowCategory | undefined,
+      type: type as WebResourceType | undefined,
+      nameFilter,
+      compareContent,
+    };
+    const rowLimit = maxRows ?? 30;
+
+    const sections = await Promise.all(
+      selectedComponents.map((selectedComponent) =>
+        buildComponentSection(
+          config,
+          client,
+          selectedComponent,
+          baselineName,
+          resolvedTargetNames,
+          filters,
+          rowLimit,
+        ),
+      ),
+    );
+
+    const lines: string[] = [];
+    lines.push("## Environment Matrix");
+    lines.push(`- **Baseline**: ${baselineName}`);
+    lines.push(`- **Targets**: ${resolvedTargetNames.join(", ")}`);
+    lines.push(
+      `- **Components**: ${selectedComponents
+        .map((component) => COMPONENT_TYPE_LABELS[component])
+        .join(", ")}`,
+    );
+
+    const activeFilters = describeFilters(filters);
+    if (activeFilters.length > 0) {
+      lines.push(`- **Filters**: ${activeFilters.join("; ")}`);
+    }
+
+    for (const section of sections) {
+      lines.push("");
+      lines.push(section.text);
+    }
+
+    return createToolSuccessResponse(
+      "compare_environment_matrix",
+      lines.join("\n"),
+      `Compared baseline '${baselineName}' against ${resolvedTargetNames.length} environment(s).`,
+      {
+        baselineEnvironment: baselineName,
+        targetEnvironments: resolvedTargetNames,
+        componentTypes: selectedComponents,
+        filters: {
+          assemblyName: assemblyName || null,
+          workflowName: workflowName || null,
+          category: category || null,
+          type: type || null,
+          nameFilter: nameFilter || null,
+          compareContent: compareContent || false,
+        },
+        maxRows: rowLimit,
+        sections: sections.map((section) => ({
+          componentType: section.componentType,
+          title: section.title,
+          reports: section.reports,
+        })),
+      },
+    );
+  } catch (error) {
+    return createToolErrorResponse("compare_environment_matrix", error);
+  }
+}
+
+export const compareEnvironmentMatrixTool = defineTool({
+  name: "compare_environment_matrix",
+  description:
+    "Compare one baseline environment against many target environments and show a drift matrix for plugin assemblies with their steps and images, workflows, or web resources.",
+  schema: compareEnvironmentMatrixSchema,
+  handler: handleCompareEnvironmentMatrix,
+});
+
 export function registerCompareEnvironmentMatrix(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "compare_environment_matrix",
-    "Compare one baseline environment against many target environments and show a drift matrix for plugin assemblies with their steps and images, workflows, or web resources.",
-    {
-      baselineEnvironment: z
-        .string()
-        .optional()
-        .describe("Baseline environment name. Default: configured default environment"),
-      targetEnvironments: z
-        .array(z.string())
-        .optional()
-        .describe("Target environment names. Default: all configured environments except baseline"),
-      componentType: z
-        .enum(["plugins", "workflows", "web_resources", "all"])
-        .optional()
-        .describe(
-          "Component type to compare. 'plugins' means plugin assemblies with steps and images. Default: all",
-        ),
-      assemblyName: z.string().optional().describe("Filter to one plugin assembly"),
-      workflowName: z.string().optional().describe("Filter workflows by name"),
-      category: z
-        .enum(["workflow", "dialog", "businessrule", "action", "bpf", "modernflow"])
-        .optional()
-        .describe("Workflow category filter"),
-      type: z
-        .enum(["html", "css", "js", "xml", "png", "jpg", "gif", "xap", "xsl", "ico", "svg", "resx"])
-        .optional()
-        .describe("Web resource type filter"),
-      nameFilter: z.string().optional().describe("Web resource name contains filter"),
-      compareContent: z
-        .boolean()
-        .optional()
-        .describe("For web resources, compare content hashes too"),
-      maxRows: z
-        .number()
-        .int()
-        .min(1)
-        .max(200)
-        .optional()
-        .describe("Max drift rows per component. Default: 30"),
-    },
-    async ({
-      baselineEnvironment,
-      targetEnvironments,
-      componentType,
-      assemblyName,
-      workflowName,
-      category,
-      type,
-      nameFilter,
-      compareContent,
-      maxRows,
-    }) => {
-      try {
-        const baselineName = baselineEnvironment || config.defaultEnvironment;
-        getEnvironment(config, baselineName);
-
-        const resolvedTargetNames = resolveTargetEnvironments(
-          config,
-          baselineName,
-          targetEnvironments,
-        );
-
-        if (resolvedTargetNames.length === 0) {
-          return createToolErrorResponse(
-            "compare_environment_matrix",
-            `No target environments found for baseline '${baselineName}'.`,
-          );
-        }
-
-        const selectedComponents = resolveComponentTypes(componentType);
-        const filters: MatrixFilters = {
-          assemblyName,
-          workflowName,
-          category: category as WorkflowCategory | undefined,
-          type: type as WebResourceType | undefined,
-          nameFilter,
-          compareContent,
-        };
-        const rowLimit = maxRows ?? 30;
-
-        const sections = await Promise.all(
-          selectedComponents.map((selectedComponent) =>
-            buildComponentSection(
-              config,
-              client,
-              selectedComponent,
-              baselineName,
-              resolvedTargetNames,
-              filters,
-              rowLimit,
-            ),
-          ),
-        );
-
-        const lines: string[] = [];
-        lines.push("## Environment Matrix");
-        lines.push(`- **Baseline**: ${baselineName}`);
-        lines.push(`- **Targets**: ${resolvedTargetNames.join(", ")}`);
-        lines.push(
-          `- **Components**: ${selectedComponents
-            .map((component) => COMPONENT_TYPE_LABELS[component])
-            .join(", ")}`,
-        );
-
-        const activeFilters = describeFilters(filters);
-        if (activeFilters.length > 0) {
-          lines.push(`- **Filters**: ${activeFilters.join("; ")}`);
-        }
-
-        for (const section of sections) {
-          lines.push("");
-          lines.push(section.text);
-        }
-
-        return createToolSuccessResponse(
-          "compare_environment_matrix",
-          lines.join("\n"),
-          `Compared baseline '${baselineName}' against ${resolvedTargetNames.length} environment(s).`,
-          {
-            baselineEnvironment: baselineName,
-            targetEnvironments: resolvedTargetNames,
-            componentTypes: selectedComponents,
-            filters: {
-              assemblyName: assemblyName || null,
-              workflowName: workflowName || null,
-              category: category || null,
-              type: type || null,
-              nameFilter: nameFilter || null,
-              compareContent: compareContent || false,
-            },
-            maxRows: rowLimit,
-            sections: sections.map((section) => ({
-              componentType: section.componentType,
-              title: section.title,
-              reports: section.reports,
-            })),
-          },
-        );
-      } catch (error) {
-        return createToolErrorResponse("compare_environment_matrix", error);
-      }
-    },
-  );
+  registerTool(server, compareEnvironmentMatrixTool, { config, client });
 }
 
 async function buildComponentSection(
