@@ -556,13 +556,20 @@ function filterByExactName<T extends Record<string, unknown>>(items: T[], name?:
   return items.filter((item) => String(item.name) === name);
 }
 
-function filterByNameContains<T extends Record<string, unknown>>(items: T[], nameFilter?: string): T[] {
+function filterByNameContains<T extends Record<string, unknown>>(
+  items: T[],
+  nameFilter?: string,
+): T[] {
   if (!nameFilter) {
     return items;
   }
 
   const needle = nameFilter.toLowerCase();
-  return items.filter((item) => String(item.name || "").toLowerCase().includes(needle));
+  return items.filter((item) =>
+    String(item.name || "")
+      .toLowerCase()
+      .includes(needle),
+  );
 }
 
 function filterCustomApis(items: CustomApiRecord[], apiName?: string): CustomApiRecord[] {

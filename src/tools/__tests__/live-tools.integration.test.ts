@@ -21,31 +21,23 @@ import {
   type SelectedLiveToolCase,
   type ToolName,
 } from "./live-test-support.js";
+import {
+  formatFailuresAssertionMessage,
+  getRequestSampleLines,
+  type LiveRequestLogOptions,
+  type LiveRecordedRequest,
+  type LiveToolRunFailure,
+} from "./live-test-reporting.js";
 
 const LIVE_FLAG = process.env.D365_MCP_ENABLE_LIVE === "1";
 const DEFAULT_TOOL_TIMEOUT_MS = 180_000;
 const RELEASE_GATE_TIMEOUT_MS = 20 * 60 * 1000;
 
-interface RecordedRequest {
-  method: "query" | "queryPath" | "getPath";
-  environment: string;
-  resourcePath: string;
-  queryParams?: string;
-}
-
 interface ToolRunSummary {
   toolName: ToolName;
   caseName: string;
   requestCount: number;
-  requests: RecordedRequest[];
-}
-
-interface ToolRunFailure {
-  toolName: ToolName;
-  caseName: string;
-  arguments: Record<string, unknown>;
-  error: string;
-  requests: RecordedRequest[];
+  requests: LiveRecordedRequest[];
 }
 
 interface ToolRunSkip {
@@ -98,7 +90,7 @@ function getToolTimeoutMs(toolName: ToolName, toolCase: { timeoutMs?: number }):
 }
 
 function installRequestRecorder(client: DynamicsClient) {
-  const recordedRequests: RecordedRequest[] = [];
+  const recordedRequests: LiveRecordedRequest[] = [];
 
   const originalQuery = client.query.bind(client);
   const originalQueryPath = client.queryPath.bind(client);
@@ -138,7 +130,7 @@ function installRequestRecorder(client: DynamicsClient) {
     reset() {
       recordedRequests.length = 0;
     },
-    getAll(): RecordedRequest[] {
+    getAll(): LiveRecordedRequest[] {
       return [...recordedRequests];
     },
   };
@@ -161,20 +153,6 @@ function getToolResponseError(response: ToolResponse): string | null {
   return null;
 }
 
-function formatRecordedRequest(request: RecordedRequest): string {
-  return `${request.method} ${request.environment} ${request.resourcePath}${
-    request.queryParams ? `?${request.queryParams}` : ""
-  }`;
-}
-
-function truncateText(text: string, maxChars: number): string {
-  if (text.length <= maxChars) {
-    return text;
-  }
-
-  return `${text.slice(0, Math.max(0, maxChars - 3))}...`;
-}
-
 function logCoverageSummary(results: ToolRunSummary[]) {
   console.info("");
   console.info("[live] CRM request coverage");
@@ -187,8 +165,8 @@ function logCoverageSummary(results: ToolRunSummary[]) {
 }
 
 function logFailureSummary(
-  failures: ToolRunFailure[],
-  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+  failures: LiveToolRunFailure[],
+  requestLogOptions: LiveRequestLogOptions,
 ) {
   if (failures.length === 0) {
     return;
@@ -206,31 +184,19 @@ function logFailureSummary(
 }
 
 function logFailureDetails(
-  failure: ToolRunFailure,
-  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+  failure: LiveToolRunFailure,
+  requestLogOptions: LiveRequestLogOptions,
 ): void {
   console.info(`[live]   error: ${failure.error}`);
   logRequestSample(failure.requests, requestLogOptions);
 }
 
 function logRequestSample(
-  requests: RecordedRequest[],
-  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+  requests: LiveRecordedRequest[],
+  requestLogOptions: LiveRequestLogOptions,
 ): void {
-  if (requests.length === 0) {
-    console.info("[live]   requests: none");
-    return;
-  }
-
-  const shownRequests = requests.slice(0, requestLogOptions.maxLoggedRequests);
-  console.info(`[live]   requests: ${requests.length} recorded, showing ${shownRequests.length}`);
-  for (const request of shownRequests) {
-    console.info(
-      `[live]   request: ${truncateText(formatRecordedRequest(request), requestLogOptions.maxLoggedRequestChars)}`,
-    );
-  }
-  if (requests.length > shownRequests.length) {
-    console.info(`[live]   requests: ${requests.length - shownRequests.length} more not shown`);
+  for (const line of getRequestSampleLines(requests, requestLogOptions)) {
+    console.info(`[live]   ${line}`);
   }
 }
 
@@ -268,19 +234,19 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
 
 type ToolRunOutcome =
   | { kind: "success"; summary: ToolRunSummary }
-  | { kind: "failure"; failure: ToolRunFailure }
+  | { kind: "failure"; failure: LiveToolRunFailure }
   | { kind: "skip"; skip: ToolRunSkip };
 
 function getOrderedRunBuckets(
   completedOutcomes: Array<{ index: number; outcome: ToolRunOutcome }>,
 ): {
   results: ToolRunSummary[];
-  failures: ToolRunFailure[];
+  failures: LiveToolRunFailure[];
   skips: ToolRunSkip[];
 } {
   const orderedOutcomes = [...completedOutcomes].sort((left, right) => left.index - right.index);
   const results: ToolRunSummary[] = [];
-  const failures: ToolRunFailure[] = [];
+  const failures: LiveToolRunFailure[] = [];
   const skips: ToolRunSkip[] = [];
 
   for (const { outcome } of orderedOutcomes) {
@@ -306,7 +272,7 @@ async function runLiveToolCase(
   totalCases: number,
   tokenManager: TokenManager,
   defaultToolTimeoutMs: number,
-  requestLogOptions: { maxLoggedRequests: number; maxLoggedRequestChars: number },
+  requestLogOptions: LiveRequestLogOptions,
 ): Promise<ToolRunOutcome> {
   const { toolName, caseName, arguments: args, skipReason } = selectedCase;
 
@@ -347,7 +313,7 @@ async function runLiveToolCase(
     const error = getToolResponseError(response);
 
     if (error) {
-      const failure: ToolRunFailure = {
+      const failure: LiveToolRunFailure = {
         toolName,
         caseName,
         arguments: args ?? {},
@@ -363,7 +329,7 @@ async function runLiveToolCase(
     }
 
     if (requests.length === 0) {
-      const failure: ToolRunFailure = {
+      const failure: LiveToolRunFailure = {
         toolName,
         caseName,
         arguments: args ?? {},
@@ -392,7 +358,7 @@ async function runLiveToolCase(
     };
   } catch (error) {
     const requests = recorder.getAll();
-    const failure: ToolRunFailure = {
+    const failure: LiveToolRunFailure = {
       toolName,
       caseName,
       arguments: args ?? {},
@@ -423,7 +389,7 @@ describeLive("live tool smoke tests", () => {
       const configuredCaseCount = countConfiguredLiveCases(fixtures, selectedTools);
       const runnableCaseCount = countRunnableLiveCases(selectedCases);
       const maxParallel = getLiveMaxParallel(fixtures);
-      const requestLogOptions = {
+      const requestLogOptions: LiveRequestLogOptions = {
         maxLoggedRequests: getMaxLoggedRequests(fixtures),
         maxLoggedRequestChars: getMaxLoggedRequestChars(fixtures),
       };
@@ -452,22 +418,7 @@ describeLive("live tool smoke tests", () => {
       logFailureSummary(failures, requestLogOptions);
       logCoverageSummary(results);
 
-      expect(
-        failures.length,
-        failures
-          .map((failure) =>
-            [
-              `Tool '${failure.toolName}' case '${failure.caseName}' failed.`,
-              `Arguments: ${JSON.stringify(failure.arguments)}`,
-              `Error: ${failure.error}`,
-              "Recorded CRM requests:",
-              ...(failure.requests.length === 0
-                ? ["- none"]
-                : failure.requests.map((request) => `- ${formatRecordedRequest(request)}`)),
-            ].join("\n"),
-          )
-          .join("\n\n"),
-      ).toBe(0);
+      expect(failures.length, formatFailuresAssertionMessage(failures, requestLogOptions)).toBe(0);
     },
     20 * 60 * 1000,
   );

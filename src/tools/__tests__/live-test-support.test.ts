@@ -12,6 +12,7 @@ import {
   mapWithConcurrencyLimit,
   type LiveFixtures,
 } from "./live-test-support.js";
+import { formatFailuresAssertionMessage } from "./live-test-reporting.js";
 
 describe("live test support", () => {
   it("defaults live parallelism to one", () => {
@@ -136,5 +137,41 @@ describe("live test support", () => {
 
     expect(results).toEqual([0, 2, 4, 6, 8]);
     expect(peak).toBe(2);
+  });
+
+  it("limits request details in live failure messages", () => {
+    const message = formatFailuresAssertionMessage(
+      [
+        {
+          toolName: "analyze_impact",
+          caseName: "big request log",
+          arguments: { environment: "dev" },
+          error: "expected 1 to be +0",
+          requests: [
+            {
+              method: "queryPath",
+              environment: "synergie-dev",
+              resourcePath: "EntityDefinitions(LogicalName='account')/Attributes",
+              queryParams: "$select=LogicalName&$orderby=LogicalName asc",
+            },
+            {
+              method: "queryPath",
+              environment: "synergie-dev",
+              resourcePath: "EntityDefinitions(LogicalName='contact')/Attributes",
+              queryParams: "$select=LogicalName&$orderby=LogicalName asc",
+            },
+          ],
+        },
+      ],
+      {
+        maxLoggedRequests: 1,
+        maxLoggedRequestChars: 40,
+      },
+    );
+
+    expect(message).toContain("requests: 2 recorded, showing 1");
+    expect(message).toContain("requests: 1 more not shown");
+    expect(message).toContain("request: queryPath synergie-dev EntityDefiniti...");
+    expect(message).not.toContain("contact");
   });
 });
