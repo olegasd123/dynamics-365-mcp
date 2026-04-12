@@ -1,6 +1,6 @@
 # Dynamics 365 CRM MCP Server
 
-An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. It supports tables, forms, views, workflows, actions, cloud flows, web resources, solutions, ALM objects, plugins, and cross-environment comparison across multiple environments (dev, test, pre-prod, prod, etc.).
+An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM metadata through conversational tools. It supports tables, forms, views, workflows, actions, cloud flows, web resources, solutions, ALM objects, plugins, business units, security roles, impact analysis, release checks, and cross-environment comparison across multiple environments like `dev`, `test`, `pre-prod`, and `prod`.
 
 ## Docs
 
@@ -14,7 +14,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - **Runtime**: Node.js 18+ (ESM)
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
-- **Transport**: stdio
+- **Transport**: `stdio` and Streamable HTTP
 - **Auth**: Azure AD OAuth2 — client secret or interactive device code
 - **Package manager**: npm
 
@@ -22,111 +22,37 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 
 ```
 src/
-  index.ts                          # Entry point: McpServer + StdioServerTransport
-  config/
-    types.ts                        # Environment config interfaces
-    environments.ts                 # Config loader (JSON file, connection string envs)
-  auth/
-    token-manager.ts                # OAuth2 token flows + per-env in-memory cache
-    os-keychain.ts                  # OS keychain storage for device-code tokens
-  prompts/
-    index.ts                        # MCP prompts for common Dynamics 365 tasks
-  resources/
-    index.ts                        # MCP resources for guides and reusable context
-  client/
-    dynamics-client.ts              # Dataverse Web API HTTP client (auth, retry, pagination)
+  index.ts                    # Bootstraps config, auth, tools, prompts, resources, and transport
+  config/                     # Config loading and runtime env support
+  auth/                       # Client-secret and device-code token flows
+  client/                     # Dataverse HTTP client, retry policy, and response cache
+  http/                       # Streamable HTTP session runtime and health state
+  logging/                    # Per-tool request logging and runtime error capture
+  prompts/                    # Built-in MCP prompts for common Dynamics tasks
+  resources/                  # Built-in MCP resources and environment starter guides
   tools/
-    index.ts                        # Tool registration barrel
-    alm/
-      list-environment-variables.ts
-      get-environment-variable-details.ts
-      list-connection-references.ts
-      get-connection-reference-details.ts
-      list-app-modules.ts
-      get-app-module-details.ts
-      list-dashboards.ts
-      get-dashboard-details.ts
-    tables/
-      list-tables.ts
-      get-table-schema.ts
-      list-table-columns.ts
-      list-table-relationships.ts
-    discovery/
-      find-metadata.ts
-    forms/
-      list-forms.ts
-      get-form-details.ts
-    views/
-      list-views.ts
-      get-view-details.ts
-      get-view-fetchxml.ts
-    custom-apis/
-      list-custom-apis.ts
-      get-custom-api-details.ts
-    flows/
-      list-cloud-flows.ts
-      get-flow-details.ts
-    security/
-      list-security-roles.ts
-      get-role-privileges.ts
-    usage/
-      find-table-usage.ts
-      find-column-usage.ts
-      find-web-resource-usage.ts
-    health/
-      environment-health-report.ts
-    plugins/
-      list-plugins.ts
-      list-plugin-steps.ts
-      get-plugin-details.ts
-      list-plugin-assemblies.ts
-      list-plugin-assembly-steps.ts
-      list-plugin-assembly-images.ts
-      get-plugin-assembly-details.ts
-      plugin-class-metadata.ts
-    workflows/
-      list-workflows.ts
-      list-actions.ts
-      get-workflow-details.ts
-    web-resources/
-      list-web-resources.ts
-      get-web-resource-content.ts
-    solutions/
-      list-solutions.ts
-      get-solution-details.ts
-      get-solution-dependencies.ts
-    comparison/
-      compare-table-schema.ts
-      compare-forms.ts
-      compare-views.ts
-      compare-custom-apis.ts
-      compare-security-roles.ts
-      compare-plugin-assemblies.ts
-      compare-solutions.ts
-      compare-workflows.ts
-      compare-web-resources.ts
-      compare-environment-matrix.ts
-  queries/
-    table-queries.ts                # Dataverse table metadata query builders
-    form-queries.ts                 # Form metadata query builders
-    view-queries.ts                 # View metadata query builders
-    custom-api-queries.ts           # Custom API metadata query builders
-    flow-queries.ts                 # Cloud flow query builders on workflow metadata
-    alm-queries.ts                  # Environment variables, connection references, and app module query builders
-    dashboard-queries.ts            # Dashboard query builders on system forms
-    security-queries.ts             # Security role and privilege query builders
-    plugin-queries.ts               # OData query builders for plugin assemblies, types, steps, and images
-    workflow-queries.ts             # OData query builders for workflows
-    web-resource-queries.ts         # OData query builders for web resources
-    solution-queries.ts             # OData query builders for solutions and solution components
-    dependency-queries.ts           # Dataverse dependency function query helpers
-  utils/
-    odata-helpers.ts                # $select, $filter, $expand builder utilities
-    diff.ts                         # Generic diff engine for cross-environment comparison
-    formatters.ts                   # Result formatting for MCP text responses
-  http/
-    http-runtime.ts                 # HTTP session store, request routing, and shutdown cleanup
+    manifest.ts               # Single source of truth for tool grouping and README tables
+    discovery/                # Broad metadata search and next-tool hints
+    alm/                      # Solutions, environment variables, connection references, apps, dashboards
+    tables/                   # Table schema, columns, and relationships
+    forms/                    # Form inventory and normalized form detail
+    views/                    # View inventory, summaries, and FetchXML
+    workflows/                # Workflows, dialogs, business rules, actions, flows
+    web-resources/            # Web resource inventory and content reads
+    custom-apis/              # Custom API inventory and detail
+    flows/                    # Cloud flow metadata and parsed summaries
+    security/                 # Business units, security roles, and privileges
+    usage/                    # Usage search and trigger analysis
+    impact/                   # Cross-component impact reports
+    health/                   # Environment health and release gate reports
+    plugins/                  # Plugin classes, assemblies, steps, and images
+    comparison/               # Pairwise compare tools and drift matrix
+  queries/                    # Dataverse query builders by metadata area
+  utils/                      # Diff, formatting, XML metadata, batching, OData helpers
+  tool-call-compatibility.ts  # Compatibility layer for MCP tool call payloads
 ```
+
+The tool table below is generated from [`src/tools/manifest.ts`](./src/tools/manifest.ts), so the README tool list stays aligned with the registered tool surface.
 
 ## Dynamics 365 Entity Map
 

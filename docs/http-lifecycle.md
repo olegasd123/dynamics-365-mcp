@@ -17,15 +17,20 @@
 
 The health endpoint now includes:
 
+- service info like version, host, port, path, pid, and uptime
+- configured environment names and environment count
 - request totals
 - active request count
 - error counters
+- last error message and time
 - active session count
 - pending session count
-- session limit and idle timeout settings
+- session limit, idle timeout, and cleanup interval settings
 - expired, evicted, and rejected session counters
-- oldest session age and longest idle time
+- oldest session age, longest idle time, and last expiry time
 - shutdown state
+- auth cache state
+- Dataverse client cache state
 
 ## Test Coverage
 

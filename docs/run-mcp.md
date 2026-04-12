@@ -1,9 +1,13 @@
 # Run The MCP After Cloning From GitHub
 
-This guide shows two ways to run the Dynamics 365 MCP server on a local machine after cloning the repository:
+This guide shows two ways to run the Dynamics 365 MCP server on a local machine after cloning the repository.
+
+The server supports two transports:
 
 - manual run with `stdio`
 - script run as an HTTP service
+
+Default transport is `stdio`.
 
 ## 1. Requirements
 
@@ -203,9 +207,20 @@ The `/health` endpoint returns JSON with:
 - auth cache info from the token manager
 - client cache info from the Dataverse client
 
+The HTTP runtime reads these settings from CLI args or env vars:
+
+- `MCP_TRANSPORT=http`
+- `MCP_PORT`
+- `MCP_HOST`
+- `MCP_PATH`
+- `MCP_SESSION_IDLE_TIMEOUT_MS`
+- `MCP_MAX_ACTIVE_SESSIONS`
+- `MCP_SESSION_CLEANUP_INTERVAL_MS`
+
 The scripts auto-load the repo `.env` file if it exists. This is useful for:
 
 - `D365_MCP_CONFIG`
+- `MCP_TRANSPORT`
 - `D365_MCP_LOG_ENABLED`
 - `D365_MCP_LOG_DIR`
 - `D365_MCP_LOG_MAX_BODY_CHARS`
@@ -230,6 +245,7 @@ Example `.env`:
 
 ```bash
 D365_MCP_CONFIG=~/.dynamics-365-mcp/config.json
+MCP_TRANSPORT=http
 MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp
@@ -252,6 +268,22 @@ Each file can include:
 - Dataverse request and response data
 - formatted tool success or error response
 - runtime errors seen during that tool call
+
+### Run HTTP Mode Without Helper Scripts
+
+Use this when you want the built server process itself to listen on HTTP.
+
+With npm:
+
+```bash
+npm start -- --transport=http --port=3003 --host=127.0.0.1 --path=/mcp
+```
+
+With node:
+
+```bash
+node dist/index.js --transport=http --port=3003 --host=127.0.0.1 --path=/mcp
+```
 
 macOS / Linux:
 
@@ -301,16 +333,28 @@ If you use another port or path, update the URL to match your script settings.
 
 ## 9. Useful Commands
 
-Build:
+Format:
 
 ```bash
-npm run build
+npm run format
+```
+
+Run lint:
+
+```bash
+npm run lint
 ```
 
 Run tests:
 
 ```bash
 npm test
+```
+
+Build:
+
+```bash
+npm run build
 ```
 
 Run the transport smoke tests only:
@@ -323,12 +367,6 @@ Run the MCP contract tests only:
 
 ```bash
 npm run test:contracts
-```
-
-Run lint:
-
-```bash
-npm run lint
 ```
 
 Run in dev mode:

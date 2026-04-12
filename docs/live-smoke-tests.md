@@ -6,7 +6,7 @@ Do not run them on each code change.
 
 ## Goal
 
-The live suite calls every MCP tool with fixed tool arguments.
+By default, the live suite tries every registered MCP tool that has cases in `live-fixtures.json`.
 
 It does not use chat prompts.
 
@@ -38,6 +38,7 @@ The file is tool-first:
 - `tools.<toolName>` is an array of test cases for one tool
 - each case has `arguments` with real tool input
 - one tool can have several cases with different data
+- one runnable case can set `timeoutMs` when that case needs more time
 - set `enabled` to `false` to disable one case
 - use `name` to make logs easy to read
 - use `skipReason` when one detail tool has no real object in the environment
@@ -52,6 +53,12 @@ or for individual
 
 ```bash
 D365_MCP_LIVE_TOOLS=find_metadata npm run test:live
+```
+
+or for a short list
+
+```bash
+D365_MCP_LIVE_TOOLS=find_metadata,list_tables npm run test:live
 ```
 
 Optional:
@@ -88,4 +95,4 @@ The list tool can still run without a name filter.
 - Normal `npm test` does not run it.
 - If one case has bad data, only that case should fail.
 - If a shared CRM query is wrong, many tools can fail. This is useful signal.
-- If you select a tool with `D365_MCP_LIVE_TOOLS`, that tool must have at least one case in `live-fixtures.json`.
+- If you select one or more tools with `D365_MCP_LIVE_TOOLS`, each selected tool must have at least one case in `live-fixtures.json`.
