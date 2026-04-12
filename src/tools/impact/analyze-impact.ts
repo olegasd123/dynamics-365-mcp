@@ -3,63 +3,76 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { analyzeImpact, type ImpactAnalysisResult } from "./impact-analysis.js";
+
+const analyzeImpactSchema = {
+  environment: z.string().optional().describe("Environment name"),
+  componentType: z
+    .enum(["table", "column", "plugin", "workflow", "flow", "web_resource", "solution"])
+    .describe("Component type to analyze. Use 'plugin' for plugin assembly impact."),
+  name: z.string().describe("Component name, unique name, or other main identifier"),
+  table: z
+    .string()
+    .optional()
+    .describe("Optional table for column impact. You can also use table.column in 'name'."),
+  solution: z.string().optional().describe("Optional solution filter for cloud flow impact"),
+  maxDependencies: z
+    .number()
+    .int()
+    .min(1)
+    .max(200)
+    .optional()
+    .describe("Max dependency rows to include. Default: 100"),
+};
+
+type AnalyzeImpactParams = ToolParams<typeof analyzeImpactSchema>;
+
+export async function handleAnalyzeImpact(
+  { environment, componentType, name, table, solution, maxDependencies }: AnalyzeImpactParams,
+  { config, client }: ToolContext,
+) {
+  try {
+    const env = getEnvironment(config, environment);
+    const result = await analyzeImpact(env, client, {
+      componentType,
+      name,
+      table,
+      solution,
+      maxDependencies,
+    });
+    const text = renderImpactText(env.name, result);
+
+    return createToolSuccessResponse(
+      "analyze_impact",
+      text,
+      `Analyzed ${componentType} impact for '${result.target.displayName}' in '${env.name}'.`,
+      {
+        environment: env.name,
+        analysis: result,
+      },
+    );
+  } catch (error) {
+    return createToolErrorResponse("analyze_impact", error);
+  }
+}
+
+export const analyzeImpactTool = defineTool({
+  name: "analyze_impact",
+  description:
+    "Analyze likely impact for a table, column, plugin assembly, workflow, cloud flow, web resource, or solution.",
+  schema: analyzeImpactSchema,
+  handler: handleAnalyzeImpact,
+});
 
 export function registerAnalyzeImpact(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "analyze_impact",
-    "Analyze likely impact for a table, column, plugin assembly, workflow, cloud flow, web resource, or solution.",
-    {
-      environment: z.string().optional().describe("Environment name"),
-      componentType: z
-        .enum(["table", "column", "plugin", "workflow", "flow", "web_resource", "solution"])
-        .describe("Component type to analyze. Use 'plugin' for plugin assembly impact."),
-      name: z.string().describe("Component name, unique name, or other main identifier"),
-      table: z
-        .string()
-        .optional()
-        .describe("Optional table for column impact. You can also use table.column in 'name'."),
-      solution: z.string().optional().describe("Optional solution filter for cloud flow impact"),
-      maxDependencies: z
-        .number()
-        .int()
-        .min(1)
-        .max(200)
-        .optional()
-        .describe("Max dependency rows to include. Default: 100"),
-    },
-    async ({ environment, componentType, name, table, solution, maxDependencies }) => {
-      try {
-        const env = getEnvironment(config, environment);
-        const result = await analyzeImpact(env, client, {
-          componentType,
-          name,
-          table,
-          solution,
-          maxDependencies,
-        });
-        const text = renderImpactText(env.name, result);
-
-        return createToolSuccessResponse(
-          "analyze_impact",
-          text,
-          `Analyzed ${componentType} impact for '${result.target.displayName}' in '${env.name}'.`,
-          {
-            environment: env.name,
-            analysis: result,
-          },
-        );
-      } catch (error) {
-        return createToolErrorResponse("analyze_impact", error);
-      }
-    },
-  );
+  registerTool(server, analyzeImpactTool, { config, client });
 }
 
 function renderImpactText(environment: string, result: ImpactAnalysisResult): string {

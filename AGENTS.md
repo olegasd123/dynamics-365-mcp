@@ -1,0 +1,5 @@
+- Execute:
+  - `npm run format`
+  - `npm run lint`
+  - `npm test`
+  - `npm run build`

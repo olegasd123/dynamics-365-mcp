@@ -1,18 +1,31 @@
 #!/usr/bin/env node
 
-import type { IncomingMessage, Server, ServerResponse } from "node:http";
+import type { Server } from "node:http";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig } from "./config/environments.js";
 import { loadEnvFiles } from "./config/runtime-env.js";
 import { TokenManager } from "./auth/token-manager.js";
 import { DynamicsClient } from "./client/dynamics-client.js";
 import { instrumentServerToolLogging, requestLogger } from "./logging/request-logger.js";
 import { registerAllTools } from "./tools/index.js";
+import { registerAllPrompts } from "./prompts/index.js";
+import { registerAllResources } from "./resources/index.js";
+import { installToolCallCompatibility } from "./tool-call-compatibility.js";
+import {
+  createHttpHealthState,
+  HttpRuntime,
+  type HttpHealthState,
+  type HttpRuntimeOptions,
+  type HttpRequest,
+  type HttpResponse,
+} from "./http/http-runtime.js";
+
+export { createHttpHealthState };
+export type { HttpHealthState };
 
 type TransportMode = "stdio" | "http";
 
@@ -21,25 +34,14 @@ interface RuntimeOptions {
   port: number;
   host: string;
   path: string;
+  sessionIdleTimeoutMs: number;
+  maxActiveSessions: number;
+  sessionCleanupIntervalMs: number;
 }
 
-interface HttpRequest extends IncomingMessage {
-  body?: unknown;
-}
-
-interface HttpResponse extends ServerResponse {
-  json(body: unknown): HttpResponse;
-  status(code: number): HttpResponse;
-}
-
-export interface HttpHealthState {
-  startedAt: string;
-  requestCount: number;
-  activeRequestCount: number;
-  errorCount: number;
-  lastErrorMessage: string | null;
-  lastErrorAt: string | null;
-}
+const DEFAULT_HTTP_SESSION_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const DEFAULT_HTTP_MAX_ACTIVE_SESSIONS = 25;
+const DEFAULT_HTTP_SESSION_CLEANUP_INTERVAL_MS = 30 * 1000;
 
 function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClient): McpServer {
   const server = new McpServer({
@@ -49,6 +51,9 @@ function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClie
 
   instrumentServerToolLogging(server);
   registerAllTools(server, config, client);
+  installToolCallCompatibility(server);
+  registerAllPrompts(server, config);
+  registerAllResources(server, config);
   return server;
 }
 
@@ -80,23 +85,33 @@ export function parseRuntimeOptions(argv: string[], env: NodeJS.ProcessEnv): Run
   const host = args.get("host") || env.MCP_HOST || "127.0.0.1";
   const rawPath = args.get("path") || env.MCP_PATH || "/mcp";
   const path = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+  const sessionIdleTimeoutMs = parsePositiveInteger(
+    args.get("session-idle-timeout-ms") ||
+      env.MCP_SESSION_IDLE_TIMEOUT_MS ||
+      String(DEFAULT_HTTP_SESSION_IDLE_TIMEOUT_MS),
+    "session idle timeout",
+  );
+  const maxActiveSessions = parsePositiveInteger(
+    args.get("max-active-sessions") ||
+      env.MCP_MAX_ACTIVE_SESSIONS ||
+      String(DEFAULT_HTTP_MAX_ACTIVE_SESSIONS),
+    "max active sessions",
+  );
+  const sessionCleanupIntervalMs = parsePositiveInteger(
+    args.get("session-cleanup-interval-ms") ||
+      env.MCP_SESSION_CLEANUP_INTERVAL_MS ||
+      String(Math.min(DEFAULT_HTTP_SESSION_CLEANUP_INTERVAL_MS, sessionIdleTimeoutMs)),
+    "session cleanup interval",
+  );
 
   return {
     transport: transportValue,
     port,
     host,
     path,
-  };
-}
-
-export function createHttpHealthState(): HttpHealthState {
-  return {
-    startedAt: new Date().toISOString(),
-    requestCount: 0,
-    activeRequestCount: 0,
-    errorCount: 0,
-    lastErrorMessage: null,
-    lastErrorAt: null,
+    sessionIdleTimeoutMs,
+    maxActiveSessions,
+    sessionCleanupIntervalMs,
   };
 }
 
@@ -133,12 +148,26 @@ export function buildHealthPayload(
       lastErrorMessage: healthState.lastErrorMessage,
       lastErrorAt: healthState.lastErrorAt,
     },
+    sessions: {
+      active: healthState.activeSessionCount,
+      pending: healthState.pendingSessionCount,
+      maxActive: options.maxActiveSessions,
+      idleTimeoutMs: options.sessionIdleTimeoutMs,
+      cleanupIntervalMs: options.sessionCleanupIntervalMs,
+      evicted: healthState.evictedSessionCount,
+      expired: healthState.expiredSessionCount,
+      rejected: healthState.rejectedSessionCount,
+      oldestAgeSeconds: toWholeSeconds(healthState.oldestSessionAgeMs),
+      longestIdleSeconds: toWholeSeconds(healthState.longestIdleSessionMs),
+      lastExpiredAt: healthState.lastExpiredAt,
+      shuttingDown: healthState.shuttingDown,
+    },
     auth: tokenManager.getHealthSnapshot(),
     client: client.getHealthSnapshot(),
   };
 }
 
-function installShutdownHandlers(server: Server): void {
+function installShutdownHandlers(server: Server, runtime: HttpRuntime): void {
   let shuttingDown = false;
 
   const shutdown = () => {
@@ -147,14 +176,15 @@ function installShutdownHandlers(server: Server): void {
     }
 
     shuttingDown = true;
-    server.close((error) => {
-      if (error) {
+    void runtime
+      .shutdown(server)
+      .then(() => {
+        process.exit(0);
+      })
+      .catch((error) => {
         console.error("Failed to stop HTTP server cleanly:", error);
         process.exit(1);
-      }
-
-      process.exit(0);
-    });
+      });
   };
 
   process.on("SIGINT", shutdown);
@@ -169,77 +199,34 @@ async function startHttpServer(
 ): Promise<void> {
   const app = createMcpExpressApp({ host: options.host });
   const healthState = createHttpHealthState();
+  const runtimeOptions: HttpRuntimeOptions = {
+    sessionIdleTimeoutMs: options.sessionIdleTimeoutMs,
+    maxActiveSessions: options.maxActiveSessions,
+    sessionCleanupIntervalMs: options.sessionCleanupIntervalMs,
+  };
+  const runtime = new HttpRuntime(
+    () => buildServer(config, client),
+    healthState,
+    runtimeOptions,
+    (error, context) => {
+      requestLogger.logError("http-request", error, context);
+    },
+  );
 
   app.get("/health", (_req: HttpRequest, res: HttpResponse) => {
     res.json(buildHealthPayload(config, options, tokenManager, client, healthState));
   });
 
   app.post(options.path, async (req: HttpRequest, res: HttpResponse) => {
-    const server = buildServer(config, client);
-    healthState.requestCount += 1;
-    healthState.activeRequestCount += 1;
-
-    const releaseRequest = () => {
-      healthState.activeRequestCount = Math.max(healthState.activeRequestCount - 1, 0);
-    };
-
-    try {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
-
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-
-      res.on("close", () => {
-        releaseRequest();
-        void transport.close();
-        void server.close();
-      });
-    } catch (error) {
-      releaseRequest();
-      healthState.errorCount += 1;
-      healthState.lastErrorMessage = error instanceof Error ? error.message : String(error);
-      healthState.lastErrorAt = new Date().toISOString();
-      requestLogger.logError("http-request", error, { requestBody: req.body });
-
-      console.error("Error handling MCP HTTP request:", error);
-
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          error: {
-            code: -32603,
-            message: "Internal server error",
-          },
-          id: null,
-        });
-      }
-
-      void server.close();
-    }
+    await runtime.handleRequest(req, res);
   });
 
-  app.get(options.path, (_req: HttpRequest, res: HttpResponse) => {
-    res.status(405).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Method not allowed.",
-      },
-      id: null,
-    });
+  app.get(options.path, async (req: HttpRequest, res: HttpResponse) => {
+    await runtime.handleRequest(req, res);
   });
 
-  app.delete(options.path, (_req: HttpRequest, res: HttpResponse) => {
-    res.status(405).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Method not allowed.",
-      },
-      id: null,
-    });
+  app.delete(options.path, async (req: HttpRequest, res: HttpResponse) => {
+    await runtime.handleRequest(req, res);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -247,7 +234,7 @@ async function startHttpServer(
       console.error(
         `Dynamics 365 MCP server listening on http://${options.host}:${options.port}${options.path}`,
       );
-      installShutdownHandlers(httpServer);
+      installShutdownHandlers(httpServer, runtime);
       resolve();
     });
 
@@ -282,6 +269,19 @@ export function loadRuntimeEnv(env: NodeJS.ProcessEnv, cwd: string): string[] {
 
 function isEntrypoint(): boolean {
   return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+function parsePositiveInteger(rawValue: string, label: string): number {
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`Invalid ${label} '${rawValue}'. Use an integer greater than 0.`);
+  }
+
+  return parsed;
+}
+
+function toWholeSeconds(valueMs: number | null): number | null {
+  return valueMs === null ? null : Math.floor(valueMs / 1000);
 }
 
 if (isEntrypoint()) {

@@ -1,8 +1,6 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthenticationError, TokenManager } from "../token-manager.js";
+import type { DeviceCodeSecretStore, StoredDeviceCodeToken } from "../os-keychain.js";
 
 const originalFetch = global.fetch;
 
@@ -29,12 +27,30 @@ function createJsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
-const tempDirs: string[] = [];
+function createMemorySecretStore(
+  seed?: Iterable<[string, StoredDeviceCodeToken]>,
+): DeviceCodeSecretStore {
+  const tokens = new Map(seed);
 
-function createTempCachePath(): string {
-  const dir = mkdtempSync(join(tmpdir(), "d365-mcp-token-test-"));
-  tempDirs.push(dir);
-  return join(dir, "token-cache.json");
+  return {
+    async load(environmentName) {
+      return tokens.get(environmentName);
+    },
+    async save(token) {
+      tokens.set(token.environmentName, token);
+    },
+    async delete(environmentName) {
+      tokens.delete(environmentName);
+    },
+    getHealthSnapshot() {
+      return {
+        storageType: "osKeychain",
+        provider: "test-keychain",
+        serviceName: "dynamics-365-mcp-test",
+        available: true,
+      };
+    },
+  };
 }
 
 function createImmediateTimeoutSpy() {
@@ -49,9 +65,6 @@ function createImmediateTimeoutSpy() {
 afterEach(() => {
   global.fetch = originalFetch;
   vi.restoreAllMocks();
-  for (const dir of tempDirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 describe("TokenManager", () => {
@@ -108,7 +121,6 @@ describe("TokenManager", () => {
   });
 
   it("supports device code auth without a client secret", async () => {
-    const cachePath = createTempCachePath();
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const timeoutSpy = createImmediateTimeoutSpy();
 
@@ -126,7 +138,7 @@ describe("TokenManager", () => {
 
     global.fetch = fetchMock;
 
-    const manager = new TokenManager(cachePath);
+    const manager = new TokenManager({ secretStore: createMemorySecretStore() });
 
     await expect(
       manager.getToken({
@@ -152,9 +164,9 @@ describe("TokenManager", () => {
   });
 
   it("persists device code tokens and reuses them after restart", async () => {
-    const cachePath = createTempCachePath();
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const timeoutSpy = createImmediateTimeoutSpy();
+    const secretStore = createMemorySecretStore();
 
     global.fetch = vi
       .fn<typeof fetch>()
@@ -174,7 +186,7 @@ describe("TokenManager", () => {
         }),
       );
 
-    const firstManager = new TokenManager(cachePath);
+    const firstManager = new TokenManager({ secretStore });
     await expect(
       firstManager.getToken({
         name: "interactive",
@@ -184,7 +196,7 @@ describe("TokenManager", () => {
       }),
     ).resolves.toBe("interactive-token");
 
-    const secondManager = new TokenManager(cachePath);
+    const secondManager = new TokenManager({ secretStore });
     const fetchMock = vi.fn<typeof fetch>();
     global.fetch = fetchMock;
 
@@ -203,11 +215,11 @@ describe("TokenManager", () => {
   });
 
   it("uses the persisted refresh token before starting a new device code flow", async () => {
-    const cachePath = createTempCachePath();
     const nowSpy = vi.spyOn(Date, "now");
     const now = 1_700_000_000_000;
     nowSpy.mockReturnValue(now);
     const timeoutSpy = createImmediateTimeoutSpy();
+    const secretStore = createMemorySecretStore();
 
     global.fetch = vi
       .fn<typeof fetch>()
@@ -227,7 +239,7 @@ describe("TokenManager", () => {
         }),
       );
 
-    const firstManager = new TokenManager(cachePath);
+    const firstManager = new TokenManager({ secretStore });
     await firstManager.getToken({
       name: "interactive",
       url: "https://org.crm.dynamics.com",
@@ -245,7 +257,7 @@ describe("TokenManager", () => {
     );
     global.fetch = fetchMock;
 
-    const secondManager = new TokenManager(cachePath);
+    const secondManager = new TokenManager({ secretStore });
     await expect(
       secondManager.getToken({
         name: "interactive",

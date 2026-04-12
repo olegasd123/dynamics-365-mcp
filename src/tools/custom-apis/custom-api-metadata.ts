@@ -7,6 +7,7 @@ import {
   listCustomApiResponsePropertiesQuery,
   listCustomApisQuery,
 } from "../../queries/custom-api-queries.js";
+import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
 
 const BINDING_TYPE_LABELS: Record<number, string> = {
   0: "Global",
@@ -208,15 +209,21 @@ export async function fetchCustomApiInventory(
 
   const apiIds = apis.map((api) => api.customapiid).filter(Boolean);
   const [requestParameters, responseProperties] = await Promise.all([
-    client.query<Record<string, unknown>>(
+    queryRecordsByFieldValuesInChunks<Record<string, unknown>>(
       env,
+      client,
       "customapirequestparameters",
-      listCustomApiRequestParametersForApisQuery(apiIds),
+      apiIds,
+      "_customapiid_value",
+      listCustomApiRequestParametersForApisQuery,
     ),
-    client.query<Record<string, unknown>>(
+    queryRecordsByFieldValuesInChunks<Record<string, unknown>>(
       env,
+      client,
       "customapiresponseproperties",
-      listCustomApiResponsePropertiesForApisQuery(apiIds),
+      apiIds,
+      "_customapiid_value",
+      listCustomApiResponsePropertiesForApisQuery,
     ),
   ]);
 

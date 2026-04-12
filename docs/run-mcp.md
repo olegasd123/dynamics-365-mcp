@@ -1,9 +1,13 @@
 # Run The MCP After Cloning From GitHub
 
-This guide shows two ways to run the Dynamics 365 MCP server on a local machine after cloning the repository:
+This guide shows two ways to run the Dynamics 365 MCP server on a local machine after cloning the repository.
+
+The server supports two transports:
 
 - manual run with `stdio`
 - script run as an HTTP service
+
+Default transport is `stdio`.
 
 ## 1. Requirements
 
@@ -103,8 +107,8 @@ Optional:
 
 - Add `clientId` if your team has its own public client app.
 - If `clientId` is missing, the server uses a Microsoft public client ID.
-- Device-code tokens are stored in `~/.dynamics-365-mcp/token-cache.json` by default.
-- Set `D365_MCP_TOKEN_CACHE` if you want another token-cache path.
+- Device-code tokens are stored in the OS keychain.
+- macOS uses Keychain Access, Linux uses Secret Service, and Windows uses Credential Manager.
 
 ## 6. Where To Get Tenant ID And Client ID
 
@@ -167,7 +171,7 @@ The server uses `stdio`, so it waits for MCP client input. This is normal.
 
 If you use `deviceCode` auth, the server prints sign-in instructions when a tool needs a token. Open the URL shown in the terminal, enter the code, and finish sign-in.
 
-After the first sign-in, the server stores device-code tokens on disk when the auth response allows it. This means a restart often does not need a new browser sign-in.
+After the first sign-in, the server stores device-code tokens in the OS keychain when the auth response allows it. This means a restart often does not need a new browser sign-in.
 
 Example MCP client config:
 
@@ -203,10 +207,20 @@ The `/health` endpoint returns JSON with:
 - auth cache info from the token manager
 - client cache info from the Dataverse client
 
+The HTTP runtime reads these settings from CLI args or env vars:
+
+- `MCP_TRANSPORT=http`
+- `MCP_PORT`
+- `MCP_HOST`
+- `MCP_PATH`
+- `MCP_SESSION_IDLE_TIMEOUT_MS`
+- `MCP_MAX_ACTIVE_SESSIONS`
+- `MCP_SESSION_CLEANUP_INTERVAL_MS`
+
 The scripts auto-load the repo `.env` file if it exists. This is useful for:
 
 - `D365_MCP_CONFIG`
-- `D365_MCP_TOKEN_CACHE`
+- `MCP_TRANSPORT`
 - `D365_MCP_LOG_ENABLED`
 - `D365_MCP_LOG_DIR`
 - `D365_MCP_LOG_MAX_BODY_CHARS`
@@ -216,6 +230,9 @@ The scripts auto-load the repo `.env` file if it exists. This is useful for:
 - `MCP_PORT`
 - `MCP_HOST`
 - `MCP_PATH`
+- `MCP_SESSION_IDLE_TIMEOUT_MS`
+- `MCP_MAX_ACTIVE_SESSIONS`
+- `MCP_SESSION_CLEANUP_INTERVAL_MS`
 - `NODE_BIN`
 
 Priority order:
@@ -228,10 +245,13 @@ Example `.env`:
 
 ```bash
 D365_MCP_CONFIG=~/.dynamics-365-mcp/config.json
-D365_MCP_TOKEN_CACHE=~/.dynamics-365-mcp/token-cache.json
+MCP_TRANSPORT=http
 MCP_PORT=3003
 MCP_HOST=127.0.0.1
 MCP_PATH=/mcp
+MCP_SESSION_IDLE_TIMEOUT_MS=900000
+MCP_MAX_ACTIVE_SESSIONS=25
+MCP_SESSION_CLEANUP_INTERVAL_MS=30000
 D365_MCP_LOG_ENABLED=false
 D365_MCP_LOG_DIR=~/.dynamics-365-mcp/logs
 D365_MCP_LOG_MAX_BODY_CHARS=0
@@ -248,6 +268,22 @@ Each file can include:
 - Dataverse request and response data
 - formatted tool success or error response
 - runtime errors seen during that tool call
+
+### Run HTTP Mode Without Helper Scripts
+
+Use this when you want the built server process itself to listen on HTTP.
+
+With npm:
+
+```bash
+npm start -- --transport=http --port=3003 --host=127.0.0.1 --path=/mcp
+```
+
+With node:
+
+```bash
+node dist/index.js --transport=http --port=3003 --host=127.0.0.1 --path=/mcp
+```
 
 macOS / Linux:
 
@@ -297,16 +333,28 @@ If you use another port or path, update the URL to match your script settings.
 
 ## 9. Useful Commands
 
-Build:
+Format:
 
 ```bash
-npm run build
+npm run format
+```
+
+Run lint:
+
+```bash
+npm run lint
 ```
 
 Run tests:
 
 ```bash
 npm test
+```
+
+Build:
+
+```bash
+npm run build
 ```
 
 Run the transport smoke tests only:
@@ -319,12 +367,6 @@ Run the MCP contract tests only:
 
 ```bash
 npm run test:contracts
-```
-
-Run lint:
-
-```bash
-npm run lint
 ```
 
 Run in dev mode:

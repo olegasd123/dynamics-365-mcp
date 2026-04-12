@@ -19,7 +19,6 @@ const FORM_SELECT = [
   "isdefault",
   "ismanaged",
   "publishedon",
-  "modifiedon",
 ];
 
 const FORM_DETAILS_SELECT = [...FORM_SELECT, "formxml"];
@@ -59,20 +58,25 @@ export function listFormsQuery(options?: {
 }
 
 export function getFormDetailsByIdentityQuery(options: {
+  formId?: string;
   table?: string;
   formName?: string;
   uniqueName?: string;
 }): string {
   const filters: string[] = [];
 
-  if (options.uniqueName) {
-    filters.push(odataEq("uniquename", options.uniqueName));
-  } else if (options.formName) {
-    filters.push(odataEq("name", options.formName));
-  }
+  if (options.formId) {
+    filters.push(odataEq("formid", options.formId));
+  } else {
+    if (options.uniqueName) {
+      filters.push(odataEq("uniquename", options.uniqueName));
+    } else if (options.formName) {
+      filters.push(odataEq("name", options.formName));
+    }
 
-  if (options.table) {
-    filters.push(odataEq("objecttypecode", options.table));
+    if (options.table) {
+      filters.push(odataEq("objecttypecode", options.table));
+    }
   }
 
   return buildQueryString({
@@ -84,6 +88,14 @@ export function getFormDetailsByIdentityQuery(options: {
 export function listFormsByIdsQuery(formIds: string[]): string {
   return buildQueryString({
     select: FORM_SELECT,
+    filter: buildOrStringFilter("formid", formIds),
+    orderby: "objecttypecode asc,name asc",
+  });
+}
+
+export function listFormDetailsByIdsQuery(formIds: string[]): string {
+  return buildQueryString({
+    select: FORM_DETAILS_SELECT,
     filter: buildOrStringFilter("formid", formIds),
     orderby: "objecttypecode asc,name asc",
   });

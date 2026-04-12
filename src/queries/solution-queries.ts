@@ -26,6 +26,7 @@ export function listSolutionComponentsQuery(solutionId: string): string {
   return buildQueryString({
     select: [
       "solutioncomponentid",
+      "_solutionid_value",
       "objectid",
       "componenttype",
       "rootsolutioncomponentid",
@@ -43,6 +44,7 @@ export function listSolutionComponentsByObjectIdsQuery(
   return buildQueryString({
     select: [
       "solutioncomponentid",
+      "_solutionid_value",
       "objectid",
       "componenttype",
       "rootsolutioncomponentid",

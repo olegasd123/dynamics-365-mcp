@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
-import type { DynamicsClient } from "../../client/dynamics-client.js";
+import { DynamicsApiError, type DynamicsClient } from "../../client/dynamics-client.js";
+import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listPluginAssembliesByIdsQuery } from "../../queries/plugin-queries.js";
@@ -78,245 +79,344 @@ interface NormalizedDependencyRecord {
   dependencyType: number;
 }
 
+export interface SolutionDependencySummaryRow {
+  direction: "required" | "dependents";
+  sourceComponentName: string;
+  sourceComponentType: string;
+  otherComponentName: string;
+  otherComponentType: string;
+  dependencyType: string;
+}
+
+export interface SolutionDependencySummary {
+  selectedComponents: number;
+  counts: {
+    required: number;
+    dependents: number;
+    external: number;
+    externalRequired: number;
+    externalDependents: number;
+    total: number;
+  };
+  externalRows: SolutionDependencySummaryRow[];
+}
+
+export async function summarizeSolutionDependencies(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  solution: string,
+  maxSampleRows = 10,
+): Promise<SolutionDependencySummary> {
+  const inventory = await fetchSolutionInventory(env, client, solution);
+  const allComponents = listSupportedComponents(inventory);
+  const solutionComponentKeySet = new Set(
+    inventory.components.map((component) =>
+      createComponentKey(component.componenttype, component.objectid),
+    ),
+  );
+  const namedComponentMap = new Map(
+    allComponents.map((component) => [
+      createComponentKey(component.componenttype, component.objectid),
+      component.displayName,
+    ]),
+  );
+
+  const dependencyRecords = deduplicateDependencyRecords(
+    (
+      await Promise.all(
+        allComponents.map((component) =>
+          fetchDependenciesForComponent(
+            env,
+            client,
+            component,
+            "both",
+            solutionComponentKeySet,
+            namedComponentMap,
+          ),
+        ),
+      )
+    ).flat(),
+  );
+  await resolveExternalSupportedComponentNames(env, client, dependencyRecords, namedComponentMap);
+
+  const externalRows = dependencyRecords
+    .filter((record) => !record.otherInSolution)
+    .slice(0, maxSampleRows)
+    .map((record) => ({
+      direction: record.direction,
+      sourceComponentName: record.sourceComponent.displayName,
+      sourceComponentType: getSolutionComponentTypeLabel(record.sourceComponent.componenttype),
+      otherComponentName: record.otherDisplayName,
+      otherComponentType: getSolutionComponentTypeLabel(record.otherComponentType),
+      dependencyType:
+        DEPENDENCY_TYPE_LABELS[record.dependencyType] || String(record.dependencyType),
+    }));
+
+  return {
+    selectedComponents: allComponents.length,
+    counts: {
+      required: dependencyRecords.filter((record) => record.direction === "required").length,
+      dependents: dependencyRecords.filter((record) => record.direction === "dependents").length,
+      external: dependencyRecords.filter((record) => !record.otherInSolution).length,
+      externalRequired: countDirection(dependencyRecords, "required", false),
+      externalDependents: countDirection(dependencyRecords, "dependents", false),
+      total: dependencyRecords.length,
+    },
+    externalRows,
+  };
+}
+
+const getSolutionDependenciesSchema = {
+  environment: z.string().optional().describe("Environment name"),
+  solution: z.string().describe("Solution display name or unique name"),
+  direction: z
+    .enum(["required", "dependents", "both"])
+    .optional()
+    .describe("Show required components, dependents, or both. Default: both"),
+  componentType: z
+    .enum([
+      "table",
+      "column",
+      "security_role",
+      "form",
+      "view",
+      "workflow",
+      "dashboard",
+      "web_resource",
+      "app_module",
+      "plugin_assembly",
+      "plugin_step",
+      "plugin_image",
+      "connection_reference",
+      "environment_variable_definition",
+      "environment_variable_value",
+    ])
+    .optional()
+    .describe("Optional component type filter"),
+  componentName: z.string().optional().describe("Optional component name or display name filter"),
+  maxRows: z
+    .number()
+    .int()
+    .min(1)
+    .max(500)
+    .optional()
+    .describe("Max dependency rows to show. Default: 100"),
+};
+
+type GetSolutionDependenciesParams = ToolParams<typeof getSolutionDependenciesSchema>;
+
+export async function handleGetSolutionDependencies(
+  {
+    environment,
+    solution,
+    direction,
+    componentType,
+    componentName,
+    maxRows,
+  }: GetSolutionDependenciesParams,
+  { config, client }: ToolContext,
+) {
+  try {
+    const env = getEnvironment(config, environment);
+    const inventory = await fetchSolutionInventory(env, client, solution);
+    const selectedDirection = (direction || "both") as DependencyDirection;
+    const rowLimit = maxRows ?? 100;
+    const allComponents = listSupportedComponents(inventory);
+    const selectedComponents = selectComponents(
+      allComponents,
+      componentType
+        ? TOOL_COMPONENT_TYPES[componentType as keyof typeof TOOL_COMPONENT_TYPES]
+        : undefined,
+      componentName,
+    );
+
+    if (selectedComponents.length === 0) {
+      const text = `No supported solution components matched in '${env.name}' for solution '${solution}'.`;
+      return createToolSuccessResponse("get_solution_dependencies", text, text, {
+        environment: env.name,
+        solution,
+        direction: selectedDirection,
+        filters: {
+          componentType: componentType || null,
+          componentName: componentName || null,
+          maxRows: rowLimit,
+        },
+        count: 0,
+        items: [],
+      });
+    }
+
+    const solutionComponentKeySet = new Set(
+      inventory.components.map((component) =>
+        createComponentKey(component.componenttype, component.objectid),
+      ),
+    );
+    const namedComponentMap = new Map(
+      allComponents.map((component) => [
+        createComponentKey(component.componenttype, component.objectid),
+        component.displayName,
+      ]),
+    );
+
+    const dependencyRecords = deduplicateDependencyRecords(
+      (
+        await Promise.all(
+          selectedComponents.map((component) =>
+            fetchDependenciesForComponent(
+              env,
+              client,
+              component,
+              selectedDirection,
+              solutionComponentKeySet,
+              namedComponentMap,
+            ),
+          ),
+        )
+      ).flat(),
+    );
+    await resolveExternalSupportedComponentNames(env, client, dependencyRecords, namedComponentMap);
+
+    const requiredCount = dependencyRecords.filter(
+      (record) => record.direction === "required",
+    ).length;
+    const dependentCount = dependencyRecords.filter(
+      (record) => record.direction === "dependents",
+    ).length;
+    const externalCount = dependencyRecords.filter((record) => !record.otherInSolution).length;
+
+    const lines: string[] = [];
+    lines.push("## Solution Dependencies");
+    lines.push(`- **Environment**: ${env.name}`);
+    lines.push(
+      `- **Solution**: ${inventory.solution.friendlyname} (${inventory.solution.uniquename})`,
+    );
+    lines.push(`- **Direction**: ${selectedDirection}`);
+    lines.push(`- **Components Scanned**: ${selectedComponents.length}`);
+    lines.push(`- **Dependency Rows**: ${dependencyRecords.length}`);
+    lines.push(`- **External Links**: ${externalCount}`);
+
+    if (componentType || componentName) {
+      const activeFilters = [
+        componentType ? `componentType=${componentType}` : "",
+        componentName ? `componentName='${componentName}'` : "",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      lines.push(`- **Filters**: ${activeFilters}`);
+    }
+
+    lines.push("");
+    lines.push("### Summary");
+    lines.push(
+      formatTable(
+        ["Direction", "Count", "External"],
+        [
+          [
+            "Required",
+            String(requiredCount),
+            String(countDirection(dependencyRecords, "required", false)),
+          ],
+          [
+            "Dependents",
+            String(dependentCount),
+            String(countDirection(dependencyRecords, "dependents", false)),
+          ],
+        ],
+      ),
+    );
+
+    if (dependencyRecords.length === 0) {
+      lines.push("");
+      lines.push("No dependency rows found for the selected scope.");
+      return createToolSuccessResponse(
+        "get_solution_dependencies",
+        lines.join("\n\n"),
+        `No dependency rows found for solution '${solution}' in '${env.name}'.`,
+        {
+          environment: env.name,
+          solution,
+          direction: selectedDirection,
+          filters: {
+            componentType: componentType || null,
+            componentName: componentName || null,
+            maxRows: rowLimit,
+          },
+          selectedComponents,
+          counts: {
+            required: requiredCount,
+            dependents: dependentCount,
+            external: externalCount,
+          },
+          dependencyRows: [],
+        },
+      );
+    }
+
+    const rows = dependencyRecords
+      .slice(0, rowLimit)
+      .map((record) => [
+        record.direction === "required" ? "Requires" : "Used By",
+        `${record.sourceComponent.displayName} (${getSolutionComponentTypeLabel(record.sourceComponent.componenttype)})`,
+        `${record.otherDisplayName} (${getSolutionComponentTypeLabel(record.otherComponentType)})`,
+        record.otherInSolution ? "Yes" : "No",
+        DEPENDENCY_TYPE_LABELS[record.dependencyType] || String(record.dependencyType),
+      ]);
+
+    lines.push("");
+    lines.push("### Dependency Rows");
+    lines.push(
+      formatTable(
+        ["Relation", "Component", "Other Component", "In Solution", "Dependency Type"],
+        rows,
+      ),
+    );
+
+    if (dependencyRecords.length > rowLimit) {
+      lines.push("");
+      lines.push(`Showing ${rowLimit} of ${dependencyRecords.length} rows.`);
+    }
+
+    return createToolSuccessResponse(
+      "get_solution_dependencies",
+      lines.join("\n\n"),
+      `Loaded dependency rows for solution '${solution}' in '${env.name}'.`,
+      {
+        environment: env.name,
+        solution,
+        direction: selectedDirection,
+        filters: {
+          componentType: componentType || null,
+          componentName: componentName || null,
+          maxRows: rowLimit,
+        },
+        selectedComponents,
+        counts: {
+          required: requiredCount,
+          dependents: dependentCount,
+          external: externalCount,
+          total: dependencyRecords.length,
+        },
+        dependencyRows: dependencyRecords,
+      },
+    );
+  } catch (error) {
+    return createToolErrorResponse("get_solution_dependencies", error);
+  }
+}
+
+export const getSolutionDependenciesTool = defineTool({
+  name: "get_solution_dependencies",
+  description: "Show Dataverse dependency links for supported components in one solution.",
+  schema: getSolutionDependenciesSchema,
+  handler: handleGetSolutionDependencies,
+});
+
 export function registerGetSolutionDependencies(
   server: McpServer,
   config: AppConfig,
   client: DynamicsClient,
 ) {
-  server.tool(
-    "get_solution_dependencies",
-    "Show Dataverse dependency links for supported components in one solution.",
-    {
-      environment: z.string().optional().describe("Environment name"),
-      solution: z.string().describe("Solution display name or unique name"),
-      direction: z
-        .enum(["required", "dependents", "both"])
-        .optional()
-        .describe("Show required components, dependents, or both. Default: both"),
-      componentType: z
-        .enum([
-          "table",
-          "column",
-          "security_role",
-          "form",
-          "view",
-          "workflow",
-          "dashboard",
-          "web_resource",
-          "app_module",
-          "plugin_assembly",
-          "plugin_step",
-          "plugin_image",
-          "connection_reference",
-          "environment_variable_definition",
-          "environment_variable_value",
-        ])
-        .optional()
-        .describe("Optional component type filter"),
-      componentName: z
-        .string()
-        .optional()
-        .describe("Optional component name or display name filter"),
-      maxRows: z
-        .number()
-        .int()
-        .min(1)
-        .max(500)
-        .optional()
-        .describe("Max dependency rows to show. Default: 100"),
-    },
-    async ({ environment, solution, direction, componentType, componentName, maxRows }) => {
-      try {
-        const env = getEnvironment(config, environment);
-        const inventory = await fetchSolutionInventory(env, client, solution);
-        const selectedDirection = (direction || "both") as DependencyDirection;
-        const rowLimit = maxRows ?? 100;
-        const allComponents = listSupportedComponents(inventory);
-        const selectedComponents = selectComponents(
-          allComponents,
-          componentType ? TOOL_COMPONENT_TYPES[componentType] : undefined,
-          componentName,
-        );
-
-        if (selectedComponents.length === 0) {
-          const text = `No supported solution components matched in '${env.name}' for solution '${solution}'.`;
-          return createToolSuccessResponse("get_solution_dependencies", text, text, {
-            environment: env.name,
-            solution,
-            direction: selectedDirection,
-            filters: {
-              componentType: componentType || null,
-              componentName: componentName || null,
-              maxRows: rowLimit,
-            },
-            count: 0,
-            items: [],
-          });
-        }
-
-        const solutionComponentKeySet = new Set(
-          inventory.components.map((component) =>
-            createComponentKey(component.componenttype, component.objectid),
-          ),
-        );
-        const namedComponentMap = new Map(
-          allComponents.map((component) => [
-            createComponentKey(component.componenttype, component.objectid),
-            component.displayName,
-          ]),
-        );
-
-        const dependencyRecords = deduplicateDependencyRecords(
-          (
-            await Promise.all(
-              selectedComponents.map((component) =>
-                fetchDependenciesForComponent(
-                  env,
-                  client,
-                  component,
-                  selectedDirection,
-                  solutionComponentKeySet,
-                  namedComponentMap,
-                ),
-              ),
-            )
-          ).flat(),
-        );
-        await resolveExternalSupportedComponentNames(
-          env,
-          client,
-          dependencyRecords,
-          namedComponentMap,
-        );
-
-        const requiredCount = dependencyRecords.filter(
-          (record) => record.direction === "required",
-        ).length;
-        const dependentCount = dependencyRecords.filter(
-          (record) => record.direction === "dependents",
-        ).length;
-        const externalCount = dependencyRecords.filter((record) => !record.otherInSolution).length;
-
-        const lines: string[] = [];
-        lines.push("## Solution Dependencies");
-        lines.push(`- **Environment**: ${env.name}`);
-        lines.push(
-          `- **Solution**: ${inventory.solution.friendlyname} (${inventory.solution.uniquename})`,
-        );
-        lines.push(`- **Direction**: ${selectedDirection}`);
-        lines.push(`- **Components Scanned**: ${selectedComponents.length}`);
-        lines.push(`- **Dependency Rows**: ${dependencyRecords.length}`);
-        lines.push(`- **External Links**: ${externalCount}`);
-
-        if (componentType || componentName) {
-          const activeFilters = [
-            componentType ? `componentType=${componentType}` : "",
-            componentName ? `componentName='${componentName}'` : "",
-          ]
-            .filter(Boolean)
-            .join(", ");
-          lines.push(`- **Filters**: ${activeFilters}`);
-        }
-
-        lines.push("");
-        lines.push("### Summary");
-        lines.push(
-          formatTable(
-            ["Direction", "Count", "External"],
-            [
-              [
-                "Required",
-                String(requiredCount),
-                String(countDirection(dependencyRecords, "required", false)),
-              ],
-              [
-                "Dependents",
-                String(dependentCount),
-                String(countDirection(dependencyRecords, "dependents", false)),
-              ],
-            ],
-          ),
-        );
-
-        if (dependencyRecords.length === 0) {
-          lines.push("");
-          lines.push("No dependency rows found for the selected scope.");
-          return createToolSuccessResponse(
-            "get_solution_dependencies",
-            lines.join("\n\n"),
-            `No dependency rows found for solution '${solution}' in '${env.name}'.`,
-            {
-              environment: env.name,
-              solution,
-              direction: selectedDirection,
-              filters: {
-                componentType: componentType || null,
-                componentName: componentName || null,
-                maxRows: rowLimit,
-              },
-              selectedComponents,
-              counts: {
-                required: requiredCount,
-                dependents: dependentCount,
-                external: externalCount,
-              },
-              dependencyRows: [],
-            },
-          );
-        }
-
-        const rows = dependencyRecords
-          .slice(0, rowLimit)
-          .map((record) => [
-            record.direction === "required" ? "Requires" : "Used By",
-            `${record.sourceComponent.displayName} (${getSolutionComponentTypeLabel(record.sourceComponent.componenttype)})`,
-            `${record.otherDisplayName} (${getSolutionComponentTypeLabel(record.otherComponentType)})`,
-            record.otherInSolution ? "Yes" : "No",
-            DEPENDENCY_TYPE_LABELS[record.dependencyType] || String(record.dependencyType),
-          ]);
-
-        lines.push("");
-        lines.push("### Dependency Rows");
-        lines.push(
-          formatTable(
-            ["Relation", "Component", "Other Component", "In Solution", "Dependency Type"],
-            rows,
-          ),
-        );
-
-        if (dependencyRecords.length > rowLimit) {
-          lines.push("");
-          lines.push(`Showing ${rowLimit} of ${dependencyRecords.length} rows.`);
-        }
-
-        return createToolSuccessResponse(
-          "get_solution_dependencies",
-          lines.join("\n\n"),
-          `Loaded dependency rows for solution '${solution}' in '${env.name}'.`,
-          {
-            environment: env.name,
-            solution,
-            direction: selectedDirection,
-            filters: {
-              componentType: componentType || null,
-              componentName: componentName || null,
-              maxRows: rowLimit,
-            },
-            selectedComponents,
-            counts: {
-              required: requiredCount,
-              dependents: dependentCount,
-              external: externalCount,
-              total: dependencyRecords.length,
-            },
-            dependencyRows: dependencyRecords,
-          },
-        );
-      } catch (error) {
-        return createToolErrorResponse("get_solution_dependencies", error);
-      }
-    },
-  );
+  registerTool(server, getSolutionDependenciesTool, { config, client });
 }
 
 function listSupportedComponents(inventory: SolutionInventory): NamedSolutionComponent[] {
@@ -559,10 +659,10 @@ async function fetchDependenciesForComponent(
   const results: NormalizedDependencyRecord[] = [];
 
   if (direction === "required" || direction === "both") {
-    const dependencies = await client.query<Record<string, unknown>>(
+    const dependencies = await queryDependenciesSafely(
       env,
+      client,
       retrieveRequiredComponentsPath(component.solutioncomponentid, component.componenttype),
-      dependencySelectQuery(),
     );
     results.push(
       ...dependencies.map((dependency) =>
@@ -578,10 +678,10 @@ async function fetchDependenciesForComponent(
   }
 
   if (direction === "dependents" || direction === "both") {
-    const dependencies = await client.query<Record<string, unknown>>(
+    const dependencies = await queryDependenciesSafely(
       env,
+      client,
       retrieveDependentComponentsPath(component.solutioncomponentid, component.componenttype),
-      dependencySelectQuery(),
     );
     results.push(
       ...dependencies.map((dependency) =>
@@ -597,6 +697,31 @@ async function fetchDependenciesForComponent(
   }
 
   return results;
+}
+
+async function queryDependenciesSafely(
+  env: AppConfig["environments"][number],
+  client: DynamicsClient,
+  resourcePath: string,
+): Promise<Record<string, unknown>[]> {
+  try {
+    return await client.query<Record<string, unknown>>(env, resourcePath, dependencySelectQuery());
+  } catch (error) {
+    if (isMissingDependencyNodeError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+function isMissingDependencyNodeError(error: unknown): boolean {
+  return (
+    error instanceof DynamicsApiError &&
+    error.statusCode === 400 &&
+    error.message.includes("DependencyNode") &&
+    error.message.includes("Count = 0")
+  );
 }
 
 async function resolveExternalSupportedComponentNames(

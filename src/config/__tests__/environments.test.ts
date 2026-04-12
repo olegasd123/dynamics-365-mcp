@@ -168,7 +168,9 @@ describe("environments config", () => {
     const dir = createTempDir();
     const { loadConfig } = await importEnvironmentsModule(dir);
 
-    expect(() => loadConfig()).toThrow("No Dynamics 365 configuration found");
+    expect(() => loadConfig()).toThrow(
+      "No Dynamics 365 configuration found. Set D365_MCP_CONFIG, D365_CONNECTION_STRINGS, or D365_CONNECTION_STRING. See docs/run-mcp.md for setup examples.",
+    );
   });
 
   it("loads device code auth from the JSON config file", async () => {

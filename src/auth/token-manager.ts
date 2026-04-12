@@ -1,8 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, resolve } from "node:path";
 import type { EnvironmentConfig } from "../config/types.js";
 import { requestLogger } from "../logging/request-logger.js";
+import {
+  createOsKeychainSecretStore,
+  type DeviceCodeSecretStore,
+  type StoredDeviceCodeToken,
+} from "./os-keychain.js";
 
 interface CachedToken {
   accessToken: string;
@@ -24,28 +26,16 @@ interface DeviceCodeResponse {
   verification_uri?: string;
 }
 
-interface PersistedDeviceCodeToken {
-  environmentName: string;
-  tenantId: string;
-  url: string;
-  clientId: string;
-  accessToken?: string;
-  accessTokenExpiresAt?: number;
-  refreshToken?: string;
-  updatedAt: number;
-}
-
-interface PersistedTokenStore {
-  deviceCodeTokens?: PersistedDeviceCodeToken[];
-}
-
 interface TokenRequestOptions {
   forceRefresh?: boolean;
 }
 
 const DEFAULT_DEVICE_CODE_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 const EXPIRY_BUFFER_SECONDS = 300;
-const DEFAULT_TOKEN_CACHE_PATH = resolve(homedir(), ".dynamics-365-mcp", "token-cache.json");
+
+interface TokenManagerOptions {
+  secretStore?: DeviceCodeSecretStore;
+}
 
 export class AuthenticationError extends Error {
   constructor(
@@ -61,12 +51,12 @@ export class AuthenticationError extends Error {
 export class TokenManager {
   private cache = new Map<string, CachedToken>();
   private pendingRequests = new Map<string, Promise<string>>();
-  private persistedDeviceCodeTokens = new Map<string, PersistedDeviceCodeToken>();
-  private persistedTokensLoaded = false;
-  private readonly tokenCachePath: string;
+  private persistedDeviceCodeTokens = new Map<string, StoredDeviceCodeToken>();
+  private loadedPersistedDeviceCodeEnvironments = new Set<string>();
+  private readonly secretStore: DeviceCodeSecretStore;
 
-  constructor(tokenCachePath?: string) {
-    this.tokenCachePath = resolveTokenCachePath(tokenCachePath);
+  constructor(options: TokenManagerOptions = {}) {
+    this.secretStore = options.secretStore || createOsKeychainSecretStore();
   }
 
   async getToken(env: EnvironmentConfig, options?: TokenRequestOptions): Promise<string> {
@@ -93,15 +83,23 @@ export class TokenManager {
   }
 
   getHealthSnapshot(): {
-    cachePath: string;
+    storageType: "osKeychain";
+    storageProvider: string;
+    storageServiceName: string;
+    storageAvailable: boolean;
+    storageLastError?: string;
     inMemoryEnvironments: string[];
     persistedDeviceCodeEnvironments: string[];
     pendingEnvironmentCount: number;
   } {
-    this.ensurePersistedTokensLoaded();
+    const storage = this.secretStore.getHealthSnapshot();
 
     return {
-      cachePath: this.tokenCachePath,
+      storageType: storage.storageType,
+      storageProvider: storage.provider,
+      storageServiceName: storage.serviceName,
+      storageAvailable: storage.available,
+      storageLastError: storage.lastError,
       inMemoryEnvironments: [...this.cache.keys()].sort(),
       persistedDeviceCodeEnvironments: [...this.persistedDeviceCodeTokens.keys()].sort(),
       pendingEnvironmentCount: this.pendingRequests.size,
@@ -157,7 +155,7 @@ export class TokenManager {
     env: EnvironmentConfig,
     options?: TokenRequestOptions,
   ): Promise<string> {
-    const persisted = this.getPersistedDeviceCodeToken(env);
+    const persisted = await this.getPersistedDeviceCodeToken(env);
     const now = Date.now();
 
     if (
@@ -179,7 +177,7 @@ export class TokenManager {
         return this.storeToken(env, refreshed);
       } catch (error) {
         if (error instanceof AuthenticationError && isRecoverableRefreshFailure(error.errorCode)) {
-          this.updatePersistedDeviceCodeToken(env, {
+          await this.updatePersistedDeviceCodeToken(env, {
             accessToken: undefined,
             accessTokenExpiresAt: undefined,
             refreshToken: undefined,
@@ -461,7 +459,7 @@ export class TokenManager {
     }
   }
 
-  private storeToken(env: EnvironmentConfig, data: TokenResponse): string {
+  private async storeToken(env: EnvironmentConfig, data: TokenResponse): Promise<string> {
     const expiresAt = Date.now() + computeExpiresInMs(data.expires_in);
     this.cache.set(env.name, {
       accessToken: data.access_token,
@@ -469,20 +467,21 @@ export class TokenManager {
     });
 
     if (env.authType === "deviceCode") {
-      this.updatePersistedDeviceCodeToken(env, {
+      const persisted = await this.getPersistedDeviceCodeToken(env);
+      await this.updatePersistedDeviceCodeToken(env, {
         accessToken: data.access_token,
         accessTokenExpiresAt: expiresAt,
-        refreshToken: data.refresh_token || this.getPersistedDeviceCodeToken(env)?.refreshToken,
+        refreshToken: data.refresh_token || persisted?.refreshToken,
       });
     }
 
     return data.access_token;
   }
 
-  private getPersistedDeviceCodeToken(
+  private async getPersistedDeviceCodeToken(
     env: EnvironmentConfig,
-  ): PersistedDeviceCodeToken | undefined {
-    this.ensurePersistedTokensLoaded();
+  ): Promise<StoredDeviceCodeToken | undefined> {
+    await this.loadPersistedDeviceCodeToken(env.name);
     const persisted = this.persistedDeviceCodeTokens.get(env.name);
     if (!persisted) {
       return undefined;
@@ -500,17 +499,17 @@ export class TokenManager {
     return persisted;
   }
 
-  private updatePersistedDeviceCodeToken(
+  private async updatePersistedDeviceCodeToken(
     env: EnvironmentConfig,
     update: {
       accessToken?: string;
       accessTokenExpiresAt?: number;
       refreshToken?: string;
     },
-  ): void {
-    this.ensurePersistedTokensLoaded();
-    const existing = this.getPersistedDeviceCodeToken(env);
-    const persisted: PersistedDeviceCodeToken = {
+  ): Promise<void> {
+    await this.loadPersistedDeviceCodeToken(env.name);
+    const existing = this.persistedDeviceCodeTokens.get(env.name);
+    const persisted: StoredDeviceCodeToken = {
       environmentName: env.name,
       tenantId: env.tenantId,
       url: env.url,
@@ -523,7 +522,7 @@ export class TokenManager {
 
     if (!persisted.accessToken && !persisted.refreshToken && !existing?.refreshToken) {
       this.persistedDeviceCodeTokens.delete(env.name);
-      this.writePersistedTokens();
+      await this.secretStore.delete(env.name);
       return;
     }
 
@@ -532,43 +531,18 @@ export class TokenManager {
     }
 
     this.persistedDeviceCodeTokens.set(env.name, persisted);
-    this.writePersistedTokens();
+    await this.secretStore.save(persisted);
   }
 
-  private ensurePersistedTokensLoaded(): void {
-    if (this.persistedTokensLoaded) {
+  private async loadPersistedDeviceCodeToken(environmentName: string): Promise<void> {
+    if (this.loadedPersistedDeviceCodeEnvironments.has(environmentName)) {
       return;
     }
 
-    this.persistedTokensLoaded = true;
-    if (!existsSync(this.tokenCachePath)) {
-      return;
-    }
-
-    try {
-      const raw = readFileSync(this.tokenCachePath, "utf-8");
-      const parsed = JSON.parse(raw) as PersistedTokenStore;
-      for (const token of parsed.deviceCodeTokens || []) {
-        if (token.environmentName) {
-          this.persistedDeviceCodeTokens.set(token.environmentName, token);
-        }
-      }
-    } catch {
-      this.persistedDeviceCodeTokens.clear();
-    }
-  }
-
-  private writePersistedTokens(): void {
-    try {
-      mkdirSync(dirname(this.tokenCachePath), { recursive: true });
-      const payload: PersistedTokenStore = {
-        deviceCodeTokens: [...this.persistedDeviceCodeTokens.values()].sort((left, right) =>
-          left.environmentName.localeCompare(right.environmentName),
-        ),
-      };
-      writeFileSync(this.tokenCachePath, JSON.stringify(payload, null, 2));
-    } catch {
-      // Persistence is best-effort. The token should still be usable in memory.
+    this.loadedPersistedDeviceCodeEnvironments.add(environmentName);
+    const persisted = await this.secretStore.load(environmentName);
+    if (persisted?.environmentName) {
+      this.persistedDeviceCodeTokens.set(environmentName, persisted);
     }
   }
 
@@ -582,11 +556,6 @@ export class TokenManager {
 function computeExpiresInMs(expiresInSeconds: number): number {
   const bufferedSeconds = Math.max(expiresInSeconds - EXPIRY_BUFFER_SECONDS, 60);
   return bufferedSeconds * 1000;
-}
-
-function resolveTokenCachePath(tokenCachePath?: string): string {
-  const configuredPath = tokenCachePath || process.env.D365_MCP_TOKEN_CACHE;
-  return resolve((configuredPath || DEFAULT_TOKEN_CACHE_PATH).replace(/^~/, homedir()));
 }
 
 function isRecoverableRefreshFailure(errorCode?: string): boolean {

@@ -3,6 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerAllTools } from "../index.js";
+import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
   EXPECTED_TOOL_NAMES,
   REMOVED_LEGACY_TOOL_NAMES,
@@ -22,6 +23,7 @@ async function createConnectedToolClient(
   const config = createTestConfig(environmentNames);
   const { client: dynamicsClient } = createRecordingClient(datasets);
   registerAllTools(server, config, dynamicsClient);
+  installToolCallCompatibility(server);
 
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({
@@ -60,6 +62,62 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         nameFilter: expect.any(Object),
         solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        query: expect.any(Object),
+        componentType: expect.any(Object),
+        limit: expect.any(Object),
+      });
+      expect(toolsByName.list_environment_variables.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_environment_variable_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        variableName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_connection_references.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_connection_reference_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        referenceName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_app_modules.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_app_module_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        appName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_dashboards.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.get_dashboard_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        dashboardName: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_business_units.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+      });
+      expect(toolsByName.get_business_units_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        businessUnitName: expect.any(Object),
       });
       expect(toolsByName.analyze_create_triggers.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -85,6 +143,39 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         filter: expect.any(Object),
         solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_views.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        scope: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_solutions.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_workflows.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        category: expect.any(Object),
+        status: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_web_resources.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        type: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
       });
       expect(toolsByName.list_plugin_steps.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -123,6 +214,12 @@ describe("tool contracts", () => {
         solution: expect.any(Object),
         direction: expect.any(Object),
         componentType: expect.any(Object),
+      });
+      expect(toolsByName.release_gate_report.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        solution: expect.any(Object),
+        targetEnvironment: expect.any(Object),
+        strict: expect.any(Object),
       });
       expect(REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName))).toBe(
         true,
@@ -237,10 +334,15 @@ describe("tool contracts", () => {
         version: "1",
         tool: "list_tables",
         ok: true,
-        summary: "Found 1 table(s) in 'dev'.",
+        summary: "Found 1 table. Environment: 'dev'.",
         data: {
           environment: "dev",
-          count: 1,
+          limit: 50,
+          cursor: null,
+          returnedCount: 1,
+          totalCount: 1,
+          hasMore: false,
+          nextCursor: null,
         },
       });
       expect(listTablesResult.content[0]?.type).toBe("text");
@@ -288,6 +390,45 @@ describe("tool contracts", () => {
           message: "Environment 'missing' not found. Available: dev",
         },
       });
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("maps legacy commentary tool calls to the canonical tool name before dispatch", async () => {
+    const harness = await createConnectedToolClient(
+      {
+        dev: {
+          EntityDefinitions: [],
+        },
+      },
+      ["dev"],
+    );
+
+    try {
+      const result = await harness.client.callTool({
+        name: "list_tablescommentary",
+        arguments: {
+          environment: "dev",
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        tool: "list_tables",
+        ok: true,
+        data: {
+          environment: "dev",
+          limit: 50,
+          cursor: null,
+          returnedCount: 0,
+          totalCount: 0,
+          hasMore: false,
+          nextCursor: null,
+          items: [],
+        },
+      });
+      expect(result.content[0]?.text).toContain("No tables found");
     } finally {
       await harness.close();
     }

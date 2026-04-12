@@ -12,6 +12,12 @@ describe("compare_security_roles", () => {
     const config = createTestConfig(["prod", "dev"]);
     const { client } = createRecordingClient({
       prod: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-1",
@@ -38,6 +44,12 @@ describe("compare_security_roles", () => {
         ],
       },
       dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-2",
@@ -76,5 +88,104 @@ describe("compare_security_roles", () => {
     expect(response.content[0].text).toContain("Privileges");
     expect(response.content[0].text).toContain("prvReadAccount");
     expect(response.content[0].text).toContain("depthDisplay");
+  });
+
+  it("uses the most recently modified role when more than one matches", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["prod", "dev"]);
+    const { client } = createRecordingClient({
+      prod: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-1",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+            modifiedon: "2026-01-01T00:00:00Z",
+          },
+          {
+            roleid: "role-2",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+            modifiedon: "2026-02-01T00:00:00Z",
+          },
+        ],
+        roleprivilegescollection: [
+          {
+            roleprivilegeid: "rp-2",
+            roleid: "role-2",
+            privilegeid: "priv-2",
+            privilegedepthmask: 8,
+          },
+        ],
+        privileges: [
+          {
+            privilegeid: "priv-2",
+            name: "prvWriteAccount",
+            accessright: 3,
+          },
+        ],
+      },
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-3",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+            modifiedon: "2026-03-01T00:00:00Z",
+          },
+        ],
+        roleprivilegescollection: [
+          {
+            roleprivilegeid: "rp-3",
+            roleid: "role-3",
+            privilegeid: "priv-2",
+            privilegedepthmask: 8,
+          },
+        ],
+        privileges: [
+          {
+            privilegeid: "priv-2",
+            name: "prvWriteAccount",
+            accessright: 3,
+          },
+        ],
+      },
+    });
+
+    registerCompareSecurityRoles(server as never, config, client);
+    const response = await server.getHandler("compare_security_roles")({
+      sourceEnvironment: "prod",
+      targetEnvironment: "dev",
+      roleName: "Salesperson",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Warning:");
+    expect(response.content[0].text).toContain("Found 2 matching security roles");
+    expect(response.content[0].text).toContain("modified on 2026-02-01T00:00:00Z");
+    expect(response.structuredContent).toMatchObject({
+      ok: true,
+      data: {
+        warnings: [expect.stringContaining("Found 2 matching security roles")],
+      },
+    });
   });
 });

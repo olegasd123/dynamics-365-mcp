@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DynamicsApiError } from "../../../client/dynamics-client.js";
 import { registerGetSolutionDependencies } from "../get-solution-dependencies.js";
 import {
   FakeServer,
@@ -289,5 +290,63 @@ describe("get_solution_dependencies tool", () => {
     expect(response.content[0].text).toContain("contoso_BaseUrl");
     expect(response.content[0].text).toContain("Shared Office 365");
     expect(response.content[0].text).toContain("Connection Reference");
+  });
+
+  it("skips components without dependency nodes", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        solutions: [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "contoso_core" }],
+        solutioncomponents: [
+          { solutioncomponentid: "sc-app", objectid: "app-1", componenttype: 80 },
+          { solutioncomponentid: "sc-wr", objectid: "wr-1", componenttype: 61 },
+        ],
+        EntityDefinitions: [],
+        appmodules: [
+          {
+            appmoduleid: "app-1",
+            name: "Sales Hub",
+            uniquename: "contoso_saleshub",
+            statecode: 0,
+            ismanaged: false,
+          },
+        ],
+        webresourceset: [
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/app.js",
+            webresourcetype: 3,
+            ismanaged: false,
+          },
+        ],
+      },
+    });
+
+    const originalQuery = client.query.bind(client);
+    client.query = (async (env, entitySet, queryParams, options) => {
+      if (
+        entitySet === retrieveDependentComponentsPath("sc-app", 80) ||
+        entitySet === retrieveRequiredComponentsPath("sc-app", 80)
+      ) {
+        throw new DynamicsApiError(
+          env.name,
+          400,
+          undefined,
+          "There must be one DependencyNode for the given Id(app-1), ComponentType(AppModule) in the database. Count = 0",
+        );
+      }
+
+      return originalQuery(env, entitySet, queryParams, options);
+    }) as typeof client.query;
+
+    registerGetSolutionDependencies(server as never, config, client);
+
+    const response = await server.getHandler("get_solution_dependencies")({
+      solution: "Core",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("## Solution Dependencies");
   });
 });

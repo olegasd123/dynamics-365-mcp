@@ -14,6 +14,18 @@ const SECURITY_ROLE_SELECT = [
   "modifiedon",
 ];
 
+const BUSINESS_UNIT_SELECT = [
+  "businessunitid",
+  "name",
+  "_parentbusinessunitid_value",
+  "_organizationid_value",
+  "isdisabled",
+  "createdon",
+  "modifiedon",
+];
+
+const ROOT_BUSINESS_UNIT_SELECT = ["businessunitid", "name", "_parentbusinessunitid_value"];
+
 const ROLE_PRIVILEGE_SELECT = [
   "roleprivilegeid",
   "roleid",
@@ -47,6 +59,25 @@ export function listSecurityRolesByIdsQuery(roleIds: string[]): string {
   return buildQueryString({
     select: SECURITY_ROLE_SELECT,
     filter: buildOrFilter("roleid", roleIds),
+    orderby: "name asc",
+  });
+}
+
+export function listRootBusinessUnitsQuery(): string {
+  return buildQueryString({
+    select: ROOT_BUSINESS_UNIT_SELECT,
+    filter: "_parentbusinessunitid_value eq null",
+    orderby: "name asc",
+    top: 2,
+  });
+}
+
+export function listBusinessUnitsQuery(nameFilter?: string): string {
+  const filter = nameFilter ? odataContains("name", nameFilter) : undefined;
+
+  return buildQueryString({
+    select: BUSINESS_UNIT_SELECT,
+    filter,
     orderby: "name asc",
   });
 }

@@ -26,7 +26,7 @@ describe("solution queries", () => {
     const query = listSolutionComponentsQuery("sol-1");
 
     expect(query).toContain(
-      "$select=solutioncomponentid,objectid,componenttype,rootsolutioncomponentid,rootcomponentbehavior",
+      "$select=solutioncomponentid,_solutionid_value,objectid,componenttype,rootsolutioncomponentid,rootcomponentbehavior",
     );
     expect(query).toContain("$filter=_solutionid_value eq 'sol-1'");
   });

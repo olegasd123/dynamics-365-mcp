@@ -16,6 +16,7 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test:contracts": "vitest run src/tools/__tests__/tool-contracts.integration.test.ts",
+    "test:live": "tsx scripts/run-live-tests.ts",
     "test:transport": "vitest run src/__tests__/runtime-transports.test.ts",
     "test": "vitest run",
     "test:watch": "vitest"
