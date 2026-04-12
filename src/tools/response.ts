@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { AuthenticationError } from "../auth/token-manager.js";
+import { DynamicsApiError, DynamicsRequestError } from "../client/errors.js";
+import { EnvironmentNotFoundError } from "../config/environments.js";
 import { requestLogger } from "../logging/request-logger.js";
 
 interface ToolTextContent {
@@ -39,6 +42,14 @@ export interface ToolErrorPayload {
   error: {
     name: string;
     message: string;
+    code?: string;
+    environment?: string;
+    statusCode?: number;
+    odataErrorCode?: string;
+    kind?: "timeout" | "network";
+    errorCode?: string;
+    availableEnvironments?: string[];
+    retryable?: boolean;
   };
 }
 
@@ -158,6 +169,7 @@ export function createToolErrorResponse(
 ): ToolResponse<Record<string, unknown>> {
   const normalizedError =
     error instanceof Error ? error : new Error(typeof error === "string" ? error : String(error));
+  const structuredError = normalizeToolError(normalizedError);
 
   const response: ToolResponse<Record<string, unknown>> = {
     content: [{ type: "text", text: `Error: ${normalizedError.message}` }],
@@ -165,10 +177,7 @@ export function createToolErrorResponse(
       version: "1",
       tool,
       ok: false,
-      error: {
-        name: normalizedError.name,
-        message: normalizedError.message,
-      },
+      error: structuredError,
     },
     isError: true,
   };
@@ -176,6 +185,60 @@ export function createToolErrorResponse(
   requestLogger.logToolResponse(tool, response);
   requestLogger.logError(`tool-response:${tool}`, normalizedError);
   return response;
+}
+
+function normalizeToolError(error: Error): ToolErrorPayload["error"] {
+  const baseError: ToolErrorPayload["error"] = {
+    name: error.name,
+    message: error.message,
+  };
+
+  if (error instanceof EnvironmentNotFoundError) {
+    return {
+      ...baseError,
+      code: "environment_not_found",
+      environment: error.environment,
+      availableEnvironments: error.availableEnvironments,
+      retryable: false,
+    };
+  }
+
+  if (error instanceof AuthenticationError) {
+    return {
+      ...baseError,
+      code: "authentication_failed",
+      environment: error.environment,
+      errorCode: error.errorCode,
+      retryable: false,
+    };
+  }
+
+  if (error instanceof DynamicsApiError) {
+    return {
+      ...baseError,
+      code: "dynamics_api_error",
+      environment: error.environment,
+      statusCode: error.statusCode,
+      odataErrorCode: error.odataErrorCode,
+      retryable: isRetryableStatusCode(error.statusCode),
+    };
+  }
+
+  if (error instanceof DynamicsRequestError) {
+    return {
+      ...baseError,
+      code: error.kind === "timeout" ? "dynamics_request_timeout" : "dynamics_request_network",
+      environment: error.environment,
+      kind: error.kind,
+      retryable: true,
+    };
+  }
+
+  return baseError;
+}
+
+function isRetryableStatusCode(statusCode: number): boolean {
+  return [408, 429, 500, 502, 503, 504].includes(statusCode);
 }
 
 function resolveListLimit(limit: number | undefined): number {

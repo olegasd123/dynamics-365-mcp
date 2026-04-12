@@ -15,6 +15,16 @@ interface ConnectionStringsEnvPayload {
 
 const CONFIG_HELP_DOC = "docs/run-mcp.md";
 
+export class EnvironmentNotFoundError extends Error {
+  constructor(
+    public readonly environment: string,
+    public readonly availableEnvironments: string[],
+  ) {
+    super(`Environment '${environment}' not found. Available: ${availableEnvironments.join(", ")}`);
+    this.name = "EnvironmentNotFoundError";
+  }
+}
+
 function parseConnectionString(connStr: string): EnvironmentConfig {
   const parts = new Map<string, string>();
   for (const segment of connStr.split(";")) {
@@ -173,8 +183,10 @@ export function getEnvironment(config: AppConfig, name?: string): EnvironmentCon
   const envName = name || config.defaultEnvironment;
   const env = config.environments.find((e) => e.name === envName);
   if (!env) {
-    const available = config.environments.map((e) => e.name).join(", ");
-    throw new Error(`Environment '${envName}' not found. Available: ${available}`);
+    throw new EnvironmentNotFoundError(
+      envName,
+      config.environments.map((environment) => environment.name),
+    );
   }
   return env;
 }

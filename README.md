@@ -670,6 +670,7 @@ Use this when you want one report that combines direct usage and dependency risk
 - **Transient failures**: Retry `408`, `429`, `500`, `502`, `503`, `504`, plus selected timeout and network errors with backoff
 - **Rate limits**: Respect `Retry-After` when Dataverse returns it
 - **Timeouts and network errors**: Use `DynamicsRequestError` with clear environment and request URL details
+- **Tool error envelopes**: `structuredContent.error` keeps `name` and `message`, and adds machine-readable fields for known errors like `code`, `environment`, `statusCode`, `odataErrorCode`, `kind`, and `retryable`
 
 ## Optional Request Logs
 

@@ -386,7 +386,11 @@ describe("tool contracts", () => {
         tool: "list_solutions",
         ok: false,
         error: {
-          name: "Error",
+          name: "EnvironmentNotFoundError",
+          code: "environment_not_found",
+          environment: "missing",
+          availableEnvironments: ["dev"],
+          retryable: false,
           message: "Environment 'missing' not found. Available: dev",
         },
       });
