@@ -1,4 +1,4 @@
-import { contains, eq, inList, isNull, query } from "../utils/odata-helpers.js";
+import { contains, eq, inList, isNull, query } from "../utils/odata-builder.js";
 
 const SECURITY_ROLE_SELECT = [
   "roleid",

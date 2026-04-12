@@ -1,4 +1,4 @@
-import { and, contains, eq, query } from "../utils/odata-helpers.js";
+import { and, contains, eq, query } from "../utils/odata-builder.js";
 
 const DASHBOARD_SELECT = [
   "formid",

@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, query } from "../utils/odata-helpers.js";
+import { and, contains, eq, inList, query } from "../utils/odata-builder.js";
 
 export const VIEW_SCOPE = {
   system: "system",

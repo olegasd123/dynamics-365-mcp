@@ -1,4 +1,4 @@
-import { contains, inList, or, query } from "../utils/odata-helpers.js";
+import { contains, inList, or, query } from "../utils/odata-builder.js";
 
 const ENVIRONMENT_VARIABLE_DEFINITION_SELECT = [
   "environmentvariabledefinitionid",

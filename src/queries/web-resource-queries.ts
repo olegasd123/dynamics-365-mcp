@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, query } from "../utils/odata-helpers.js";
+import { and, contains, eq, inList, query } from "../utils/odata-builder.js";
 
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,

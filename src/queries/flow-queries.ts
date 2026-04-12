@@ -1,4 +1,4 @@
-import { and, contains, eq, or, query } from "../utils/odata-helpers.js";
+import { and, contains, eq, or, query } from "../utils/odata-builder.js";
 import type { WorkflowState } from "./workflow-queries.js";
 import { WORKFLOW_STATE } from "./workflow-queries.js";
 

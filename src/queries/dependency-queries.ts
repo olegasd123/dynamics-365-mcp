@@ -1,4 +1,4 @@
-import { query } from "../utils/odata-helpers.js";
+import { query } from "../utils/odata-builder.js";
 
 const DEFAULT_DEPENDENCY_SELECT = [
   "dependencyid",

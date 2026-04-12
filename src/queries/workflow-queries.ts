@@ -1,4 +1,4 @@
-import { and, eq, inList, query } from "../utils/odata-helpers.js";
+import { and, eq, inList, query } from "../utils/odata-builder.js";
 
 const WORKFLOW_CATEGORY = {
   workflow: 0,

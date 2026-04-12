@@ -70,7 +70,11 @@ function formatODataPrimitive(value: ODataPrimitive): string {
   return String(value);
 }
 
-export function buildQueryString(params: {
+/**
+ * Internal serializer used by `query().toString()`.
+ * Prefer the fluent `query()` builder in calling code.
+ */
+function serializeQueryString(params: {
   select?: string[];
   filter?: QueryPart;
   expand?: QueryPart;
@@ -185,7 +189,7 @@ export class ODataQueryBuilder<Field extends string = string> {
   }
 
   toString(): string {
-    return buildQueryString(this.params);
+    return serializeQueryString(this.params);
   }
 }
 

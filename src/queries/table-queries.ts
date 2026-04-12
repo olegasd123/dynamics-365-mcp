@@ -1,4 +1,4 @@
-import { eq, inList, isNull, query, odataStringLiteral } from "../utils/odata-helpers.js";
+import { eq, inList, isNull, query, odataStringLiteral } from "../utils/odata-builder.js";
 
 const TABLE_SELECT = [
   "MetadataId",

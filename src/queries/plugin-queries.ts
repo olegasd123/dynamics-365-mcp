@@ -1,4 +1,4 @@
-import { eq, inList, query } from "../utils/odata-helpers.js";
+import { eq, inList, query } from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",

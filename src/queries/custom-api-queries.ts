@@ -1,4 +1,4 @@
-import { contains, eq, inList, or, query } from "../utils/odata-helpers.js";
+import { contains, eq, inList, or, query } from "../utils/odata-builder.js";
 
 const CUSTOM_API_SELECT = [
   "customapiid",
