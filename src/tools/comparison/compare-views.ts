@@ -2,11 +2,11 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
+import { registerTool } from "../tool-definition.js";
 import type { ViewScope } from "../../queries/view-queries.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { compareViewsData } from "./comparison-data.js";
+import { createComparisonTool } from "./comparison-tool-factory.js";
 
 const compareViewsSchema = {
   sourceEnvironment: z.string().describe("Source environment name"),
@@ -18,76 +18,55 @@ const compareViewsSchema = {
   targetSolution: z.string().optional().describe("Optional target solution for system views"),
 };
 
-type CompareViewsParams = ToolParams<typeof compareViewsSchema>;
-
-export async function handleCompareViews(
-  {
-    sourceEnvironment,
-    targetEnvironment,
-    table,
-    scope,
-    viewName,
-    solution,
-    targetSolution,
-  }: CompareViewsParams,
-  { config, client }: ToolContext,
-) {
-  try {
-    const {
-      result,
-      warnings = [],
-      sourceCandidateCount,
-      targetCandidateCount,
-      truncated,
-    } = await compareViewsData(config, client, sourceEnvironment, targetEnvironment, {
-      table,
-      scope: scope as ViewScope | undefined,
-      viewName,
-      solution,
-      targetSolution,
-    });
-
-    const lines: string[] = [];
-    if (warnings.length > 0) {
-      lines.push(...warnings.map((warning) => `Warning: ${warning}`), "");
-    }
-    lines.push(formatDiffResult(result, sourceEnvironment, targetEnvironment, "name"));
-    const text = lines.join("\n");
-    return createToolSuccessResponse(
-      "compare_views",
-      text,
-      `Compared views between '${sourceEnvironment}' and '${targetEnvironment}'.`,
-      {
-        sourceEnvironment,
-        targetEnvironment,
-        filters: {
-          table: table || null,
-          scope: scope || null,
-          viewName: viewName || null,
-          solution: solution || null,
-          targetSolution: targetSolution || null,
-        },
-        warnings,
-        sourceCandidateCount:
-          sourceCandidateCount ?? result.onlyInSource.length + result.differences.length,
-        targetCandidateCount:
-          targetCandidateCount ?? result.onlyInTarget.length + result.differences.length,
-        truncated: truncated || false,
-        comparison: result,
-      },
-    );
-  } catch (error) {
-    return createToolErrorResponse("compare_views", error);
-  }
-}
-
-export const compareViewsTool = defineTool({
+export const compareViewsTool = createComparisonTool({
   name: "compare_views",
   description:
     "Compare system or personal views between two environments using normalized XML summaries.",
   schema: compareViewsSchema,
-  handler: handleCompareViews,
+  comparisonLabel: "views",
+  nameField: "name",
+  getSourceEnvironment: (params) => params.sourceEnvironment,
+  getTargetEnvironment: (params) => params.targetEnvironment,
+  compare: (params, { config, client }) =>
+    compareViewsData(config, client, params.sourceEnvironment, params.targetEnvironment, {
+      table: params.table,
+      scope: params.scope as ViewScope | undefined,
+      viewName: params.viewName,
+      solution: params.solution,
+      targetSolution: params.targetSolution,
+    }),
+  formatText: ({ comparison, sourceEnvironment, targetEnvironment }) => {
+    const lines: string[] = [];
+    const warnings = comparison.warnings || [];
+    if (warnings.length > 0) {
+      lines.push(...warnings.map((warning) => `Warning: ${warning}`), "");
+    }
+    lines.push(formatDiffResult(comparison.result, sourceEnvironment, targetEnvironment, "name"));
+    return lines.join("\n");
+  },
+  buildData: ({ params, comparison, sourceEnvironment, targetEnvironment }) => ({
+    sourceEnvironment,
+    targetEnvironment,
+    filters: {
+      table: params.table || null,
+      scope: params.scope || null,
+      viewName: params.viewName || null,
+      solution: params.solution || null,
+      targetSolution: params.targetSolution || null,
+    },
+    warnings: comparison.warnings || [],
+    sourceCandidateCount:
+      comparison.sourceCandidateCount ??
+      comparison.result.onlyInSource.length + comparison.result.differences.length,
+    targetCandidateCount:
+      comparison.targetCandidateCount ??
+      comparison.result.onlyInTarget.length + comparison.result.differences.length,
+    truncated: comparison.truncated || false,
+    comparison: comparison.result,
+  }),
 });
+
+export const handleCompareViews = compareViewsTool.handler;
 
 export function registerCompareViews(server: McpServer, config: AppConfig, client: DynamicsClient) {
   registerTool(server, compareViewsTool, { config, client });

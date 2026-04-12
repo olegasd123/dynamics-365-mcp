@@ -2,11 +2,11 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
+import { registerTool } from "../tool-definition.js";
 import { formatDiffResult } from "../../utils/formatters.js";
 import { formatNamedDiffSection } from "./diff-section.js";
 import { compareCustomApisData } from "./comparison-data.js";
+import { createComparisonTool } from "./comparison-tool-factory.js";
 
 const compareCustomApisSchema = {
   sourceEnvironment: z.string().describe("Source environment name"),
@@ -14,21 +14,20 @@ const compareCustomApisSchema = {
   apiName: z.string().optional().describe("Optional name or unique name filter"),
 };
 
-type CompareCustomApisParams = ToolParams<typeof compareCustomApisSchema>;
-
-export async function handleCompareCustomApis(
-  { sourceEnvironment, targetEnvironment, apiName }: CompareCustomApisParams,
-  { config, client }: ToolContext,
-) {
-  try {
-    const comparison = await compareCustomApisData(
-      config,
-      client,
-      sourceEnvironment,
-      targetEnvironment,
-      { apiName },
-    );
-
+export const compareCustomApisTool = createComparisonTool({
+  name: "compare_custom_apis",
+  description:
+    "Compare Custom APIs and their request and response metadata between two environments.",
+  schema: compareCustomApisSchema,
+  comparisonLabel: "custom APIs",
+  nameField: "name",
+  getSourceEnvironment: (params) => params.sourceEnvironment,
+  getTargetEnvironment: (params) => params.targetEnvironment,
+  compare: (params, { config, client }) =>
+    compareCustomApisData(config, client, params.sourceEnvironment, params.targetEnvironment, {
+      apiName: params.apiName,
+    }),
+  formatText: ({ comparison, sourceEnvironment, targetEnvironment }) => {
     const lines: string[] = [];
     lines.push(formatDiffResult(comparison.result, sourceEnvironment, targetEnvironment, "name"));
     lines.push("");
@@ -53,32 +52,19 @@ export async function handleCompareCustomApis(
         emptyMessage: "No response properties found.",
       }),
     );
-
-    return createToolSuccessResponse(
-      "compare_custom_apis",
-      lines.join("\n"),
-      `Compared custom APIs between '${sourceEnvironment}' and '${targetEnvironment}'.`,
-      {
-        sourceEnvironment,
-        targetEnvironment,
-        apiName: apiName || null,
-        apiComparison: comparison.result,
-        requestParameterComparison: comparison.requestParameterResult,
-        responsePropertyComparison: comparison.responsePropertyResult,
-      },
-    );
-  } catch (error) {
-    return createToolErrorResponse("compare_custom_apis", error);
-  }
-}
-
-export const compareCustomApisTool = defineTool({
-  name: "compare_custom_apis",
-  description:
-    "Compare Custom APIs and their request and response metadata between two environments.",
-  schema: compareCustomApisSchema,
-  handler: handleCompareCustomApis,
+    return lines.join("\n");
+  },
+  buildData: ({ params, comparison, sourceEnvironment, targetEnvironment }) => ({
+    sourceEnvironment,
+    targetEnvironment,
+    apiName: params.apiName || null,
+    apiComparison: comparison.result,
+    requestParameterComparison: comparison.requestParameterResult,
+    responsePropertyComparison: comparison.responsePropertyResult,
+  }),
 });
+
+export const handleCompareCustomApis = compareCustomApisTool.handler;
 
 export function registerCompareCustomApis(
   server: McpServer,

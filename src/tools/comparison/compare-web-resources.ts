@@ -2,11 +2,10 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
+import { registerTool } from "../tool-definition.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
-import { formatDiffResult } from "../../utils/formatters.js";
 import { compareWebResourcesData } from "./comparison-data.js";
+import { createComparisonTool } from "./comparison-tool-factory.js";
 
 const compareWebResourcesSchema = {
   sourceEnvironment: z.string().describe("Source environment name"),
@@ -22,57 +21,33 @@ const compareWebResourcesSchema = {
     .describe("Compare content hashes (slower, requires fetching content). Default: false"),
 };
 
-type CompareWebResourcesParams = ToolParams<typeof compareWebResourcesSchema>;
-
-export async function handleCompareWebResources(
-  {
-    sourceEnvironment,
-    targetEnvironment,
-    type,
-    nameFilter,
-    compareContent,
-  }: CompareWebResourcesParams,
-  { config, client }: ToolContext,
-) {
-  try {
-    const { result } = await compareWebResourcesData(
-      config,
-      client,
-      sourceEnvironment,
-      targetEnvironment,
-      {
-        type: type as WebResourceType | undefined,
-        nameFilter,
-        compareContent,
-      },
-    );
-    const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-    return createToolSuccessResponse(
-      "compare_web_resources",
-      text,
-      `Compared web resources between '${sourceEnvironment}' and '${targetEnvironment}'.`,
-      {
-        sourceEnvironment,
-        targetEnvironment,
-        filters: {
-          type: type || null,
-          nameFilter: nameFilter || null,
-          compareContent: compareContent || false,
-        },
-        comparison: result,
-      },
-    );
-  } catch (error) {
-    return createToolErrorResponse("compare_web_resources", error);
-  }
-}
-
-export const compareWebResourcesTool = defineTool({
+export const compareWebResourcesTool = createComparisonTool({
   name: "compare_web_resources",
   description: "Compare web resources between two Dynamics 365 environments.",
   schema: compareWebResourcesSchema,
-  handler: handleCompareWebResources,
+  comparisonLabel: "web resources",
+  nameField: "name",
+  getSourceEnvironment: (params) => params.sourceEnvironment,
+  getTargetEnvironment: (params) => params.targetEnvironment,
+  compare: (params, { config, client }) =>
+    compareWebResourcesData(config, client, params.sourceEnvironment, params.targetEnvironment, {
+      type: params.type as WebResourceType | undefined,
+      nameFilter: params.nameFilter,
+      compareContent: params.compareContent,
+    }),
+  buildData: ({ params, comparison, sourceEnvironment, targetEnvironment }) => ({
+    sourceEnvironment,
+    targetEnvironment,
+    filters: {
+      type: params.type || null,
+      nameFilter: params.nameFilter || null,
+      compareContent: params.compareContent || false,
+    },
+    comparison: comparison.result,
+  }),
 });
+
+export const handleCompareWebResources = compareWebResourcesTool.handler;
 
 export function registerCompareWebResources(
   server: McpServer,

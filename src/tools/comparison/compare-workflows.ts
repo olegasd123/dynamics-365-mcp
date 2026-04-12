@@ -2,11 +2,10 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
+import { registerTool } from "../tool-definition.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
-import { formatDiffResult } from "../../utils/formatters.js";
 import { compareWorkflowsData } from "./comparison-data.js";
+import { createComparisonTool } from "./comparison-tool-factory.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
   0: "Workflow",
@@ -28,26 +27,22 @@ const compareWorkflowsSchema = {
   workflowName: z.string().optional().describe("Compare a specific workflow by name"),
 };
 
-type CompareWorkflowsParams = ToolParams<typeof compareWorkflowsSchema>;
-
-export async function handleCompareWorkflows(
-  { sourceEnvironment, targetEnvironment, category, workflowName }: CompareWorkflowsParams,
-  { config, client }: ToolContext,
-) {
-  try {
-    const { result } = await compareWorkflowsData(
-      config,
-      client,
-      sourceEnvironment,
-      targetEnvironment,
-      {
-        category: category as WorkflowCategory | undefined,
-        workflowName,
-      },
-    );
-
-    // Enhance diff output with human-readable labels
-    for (const diff of result.differences) {
+export const compareWorkflowsTool = createComparisonTool({
+  name: "compare_workflows",
+  description:
+    "Compare workflows between two Dynamics 365 environments. Useful for checking if a workflow is enabled/disabled across environments.",
+  schema: compareWorkflowsSchema,
+  comparisonLabel: "workflows",
+  nameField: "name",
+  getSourceEnvironment: (params) => params.sourceEnvironment,
+  getTargetEnvironment: (params) => params.targetEnvironment,
+  compare: (params, { config, client }) =>
+    compareWorkflowsData(config, client, params.sourceEnvironment, params.targetEnvironment, {
+      category: params.category as WorkflowCategory | undefined,
+      workflowName: params.workflowName,
+    }),
+  prepareComparison: ({ comparison }) => {
+    for (const diff of comparison.result.differences) {
       for (const change of diff.changedFields) {
         if (change.field === "statecode") {
           change.sourceValue = STATE_LABELS[change.sourceValue as number] || change.sourceValue;
@@ -59,32 +54,17 @@ export async function handleCompareWorkflows(
         }
       }
     }
-
-    const text = formatDiffResult(result, sourceEnvironment, targetEnvironment, "name");
-    return createToolSuccessResponse(
-      "compare_workflows",
-      text,
-      `Compared workflows between '${sourceEnvironment}' and '${targetEnvironment}'.`,
-      {
-        sourceEnvironment,
-        targetEnvironment,
-        category: category || null,
-        workflowName: workflowName || null,
-        comparison: result,
-      },
-    );
-  } catch (error) {
-    return createToolErrorResponse("compare_workflows", error);
-  }
-}
-
-export const compareWorkflowsTool = defineTool({
-  name: "compare_workflows",
-  description:
-    "Compare workflows between two Dynamics 365 environments. Useful for checking if a workflow is enabled/disabled across environments.",
-  schema: compareWorkflowsSchema,
-  handler: handleCompareWorkflows,
+  },
+  buildData: ({ params, comparison, sourceEnvironment, targetEnvironment }) => ({
+    sourceEnvironment,
+    targetEnvironment,
+    category: params.category || null,
+    workflowName: params.workflowName || null,
+    comparison: comparison.result,
+  }),
 });
+
+export const handleCompareWorkflows = compareWorkflowsTool.handler;
 
 export function registerCompareWorkflows(
   server: McpServer,
