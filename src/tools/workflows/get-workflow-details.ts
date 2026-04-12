@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
+import { CACHE_TIERS } from "../../client/cache-policy.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
@@ -50,6 +51,7 @@ export async function handleGetWorkflowDetails(
       env,
       "workflows",
       getWorkflowDetailsByIdentityQuery({ workflowName, uniqueName }),
+      { cacheTier: CACHE_TIERS.VOLATILE },
     );
 
     if (workflows.length === 0) {

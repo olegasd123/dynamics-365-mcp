@@ -1,3 +1,4 @@
+import { CACHE_TIERS } from "../../client/cache-policy.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import type { EnvironmentConfig } from "../../config/types.js";
 import { listPluginAssembliesQuery } from "../../queries/plugin-queries.js";
@@ -63,22 +64,31 @@ export async function analyzeReleaseHealth(
     environmentVariableDefinitions,
     environmentVariableValues,
   ] = await Promise.all([
-    client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
-    client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery()),
+    client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery(), {
+      cacheTier: CACHE_TIERS.VOLATILE,
+    }),
+    client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery(), {
+      cacheTier: CACHE_TIERS.VOLATILE,
+    }),
     listCloudFlows(env, client, solution ? { solution } : undefined),
     listCustomApis(env, client),
     listForms(env, client, solution ? { solution } : undefined),
     listViews(env, client, solution ? { solution, scope: "system" } : { scope: "system" }),
-    client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery()),
+    client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery(), {
+      cacheTier: CACHE_TIERS.VOLATILE,
+    }),
     solutionInventory
       ? Promise.resolve(solutionInventory.appModules)
-      : client.query<Record<string, unknown>>(env, "appmodules", listAppModulesQuery()),
+      : client.query<Record<string, unknown>>(env, "appmodules", listAppModulesQuery(), {
+          cacheTier: CACHE_TIERS.VOLATILE,
+        }),
     solutionInventory
       ? Promise.resolve(solutionInventory.connectionReferences)
       : client.query<Record<string, unknown>>(
           env,
           "connectionreferences",
           listConnectionReferencesQuery(),
+          { cacheTier: CACHE_TIERS.VOLATILE },
         ),
     solutionInventory
       ? Promise.resolve(solutionInventory.environmentVariableDefinitions)
@@ -86,6 +96,7 @@ export async function analyzeReleaseHealth(
           env,
           "environmentvariabledefinitions",
           listEnvironmentVariableDefinitionsQuery(),
+          { cacheTier: CACHE_TIERS.VOLATILE },
         ),
     solutionInventory
       ? Promise.resolve(solutionInventory.environmentVariableValues)
@@ -93,6 +104,7 @@ export async function analyzeReleaseHealth(
           env,
           "environmentvariablevalues",
           listEnvironmentVariableValuesQuery(),
+          { cacheTier: CACHE_TIERS.VOLATILE },
         ),
   ]);
 

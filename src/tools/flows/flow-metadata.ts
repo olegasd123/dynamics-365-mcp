@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { CACHE_TIERS } from "../../client/cache-policy.js";
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
@@ -74,6 +75,8 @@ export async function listCloudFlows(
       [...solutionComponents.workflowIds],
       "workflowid",
       listWorkflowsByIdsQuery,
+      undefined,
+      { cacheTier: CACHE_TIERS.VOLATILE },
     );
 
     return records
@@ -90,6 +93,7 @@ export async function listCloudFlows(
         status: options?.status,
         nameFilter: options?.nameFilter,
       }),
+      { cacheTier: CACHE_TIERS.VOLATILE },
     )
   )
     .map(normalizeFlow)
@@ -150,6 +154,7 @@ export async function fetchFlowDetails(
       uniqueName: flow.uniquename || undefined,
       flowName: flow.uniquename ? undefined : flow.name,
     }),
+    { cacheTier: CACHE_TIERS.VOLATILE },
   );
   const record = records.find((item) => String(item.workflowid || "") === flow.workflowid);
 

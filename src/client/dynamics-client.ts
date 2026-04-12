@@ -5,6 +5,7 @@ import { DynamicsApiError, DynamicsRequestError } from "./errors.js";
 import { HttpTransport } from "./http-transport.js";
 import { ResponseCache } from "./response-cache.js";
 import { RetryPolicy } from "./retry-policy.js";
+import { resolveCachePolicy, type CacheRequestOptions, type CacheTier } from "./cache-policy.js";
 
 type CacheLayer = Pick<ResponseCache, "clear" | "getHealthSnapshot" | "load">;
 type RetryLayer = Pick<RetryPolicy, "send">;
@@ -18,6 +19,7 @@ interface ODataResponse<T> {
 
 export interface RequestOptions {
   bypassCache?: boolean;
+  cacheTier?: CacheTier;
   cacheTtlMs?: number;
   maxPages?: number;
   timeout?: number;
@@ -31,8 +33,6 @@ interface DynamicsClientDependencies {
 
 const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_MAX_PAGES = 10;
-const DEFAULT_CACHE_TTL = 15_000;
-
 export class DynamicsClient {
   private readonly responseCache: CacheLayer;
   private readonly retryPolicy: RetryLayer;
@@ -68,6 +68,7 @@ export class DynamicsClient {
     const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
     const maxPages = options?.maxPages ?? DEFAULT_MAX_PAGES;
     const cacheKey = this.buildCacheKey(env, resourcePath, queryParams, `pages=${maxPages}`);
+    const cachePolicy = this.getCachePolicy(resourcePath, options);
 
     return this.responseCache.load(
       cacheKey,
@@ -104,8 +105,8 @@ export class DynamicsClient {
         return allResults;
       },
       {
-        bypass: options?.bypassCache,
-        ttlMs: options?.cacheTtlMs ?? DEFAULT_CACHE_TTL,
+        bypass: cachePolicy.bypass,
+        ttlMs: cachePolicy.ttlMs,
       },
     );
   }
@@ -115,16 +116,19 @@ export class DynamicsClient {
     entitySet: string,
     id: string,
     queryParams?: string,
+    options?: RequestOptions,
   ): Promise<T | null> {
-    return this.getPath(env, `${entitySet}(${id})`, queryParams);
+    return this.getPath(env, `${entitySet}(${id})`, queryParams, options);
   }
 
   async getPath<T = Record<string, unknown>>(
     env: EnvironmentConfig,
     resourcePath: string,
     queryParams?: string,
+    options?: RequestOptions,
   ): Promise<T | null> {
     const cacheKey = this.buildCacheKey(env, resourcePath, queryParams, "single");
+    const cachePolicy = this.getCachePolicy(resourcePath, options);
 
     return this.responseCache.load(
       cacheKey,
@@ -151,7 +155,10 @@ export class DynamicsClient {
         });
         return data;
       },
-      { ttlMs: DEFAULT_CACHE_TTL },
+      {
+        bypass: cachePolicy.bypass,
+        ttlMs: cachePolicy.ttlMs,
+      },
     );
   }
 
@@ -171,6 +178,10 @@ export class DynamicsClient {
   private buildUrl(env: EnvironmentConfig, resourcePath: string, queryParams?: string): string {
     const baseUrl = `${env.url}/api/data/v9.2/${resourcePath}`;
     return queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
+  }
+
+  private getCachePolicy(resourcePath: string, options?: CacheRequestOptions) {
+    return resolveCachePolicy(resourcePath, options);
   }
 
   private async throwApiError(

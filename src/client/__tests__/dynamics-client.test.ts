@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TokenManager } from "../../auth/token-manager.js";
+import { CACHE_TIERS } from "../cache-policy.js";
 import { DynamicsClient, DynamicsRequestError } from "../dynamics-client.js";
 
 const originalFetch = global.fetch;
@@ -150,5 +151,117 @@ describe("DynamicsClient", () => {
       client.query(env, "accounts", "$select=name", { bypassCache: true }),
     ).rejects.toThrow("Dynamics request timeout [dev]");
     timeoutSpy.mockRestore();
+  });
+
+  it("uses the explicit cache tier when provided", async () => {
+    const responseCache = {
+      clear: vi.fn(),
+      getHealthSnapshot: vi.fn().mockReturnValue({
+        pendingRequestCount: 0,
+        responseCacheEntries: 0,
+      }),
+      load: vi.fn(async (_key: string, loader: () => Promise<unknown>, options: unknown) => {
+        await loader();
+        return options;
+      }),
+    };
+    const transport = {
+      send: vi.fn().mockResolvedValue({
+        response: createODataResponse([{ accountid: "1" }]),
+        callId: 1,
+      }),
+    };
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager, {
+      responseCache,
+      transport,
+    });
+
+    const cacheOptions = await client.query(env, "accounts", "$select=name", {
+      cacheTier: CACHE_TIERS.METADATA,
+    });
+
+    expect(cacheOptions).toEqual({
+      bypass: false,
+      ttlMs: 300_000,
+    });
+  });
+
+  it("infers a schema cache tier for EntityDefinitions queries", async () => {
+    const responseCache = {
+      clear: vi.fn(),
+      getHealthSnapshot: vi.fn().mockReturnValue({
+        pendingRequestCount: 0,
+        responseCacheEntries: 0,
+      }),
+      load: vi.fn(async (_key: string, loader: () => Promise<unknown>, options: unknown) => {
+        await loader();
+        return options;
+      }),
+    };
+    const transport = {
+      send: vi.fn().mockResolvedValue({
+        response: createODataResponse([{ MetadataId: "1" }]),
+        callId: 1,
+      }),
+    };
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager, {
+      responseCache,
+      transport,
+    });
+
+    const cacheOptions = await client.query(env, "EntityDefinitions", "$select=LogicalName");
+
+    expect(cacheOptions).toEqual({
+      bypass: false,
+      ttlMs: 1_800_000,
+    });
+  });
+
+  it("applies cache tier options to single-record reads", async () => {
+    const responseCache = {
+      clear: vi.fn(),
+      getHealthSnapshot: vi.fn().mockReturnValue({
+        pendingRequestCount: 0,
+        responseCacheEntries: 0,
+      }),
+      load: vi.fn(async (_key: string, loader: () => Promise<unknown>, options: unknown) => {
+        await loader();
+        return options;
+      }),
+    };
+    const transport = {
+      send: vi.fn().mockResolvedValue({
+        response: new Response(JSON.stringify({ roleid: "1", name: "Admin" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+        callId: 1,
+      }),
+    };
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager, {
+      responseCache,
+      transport,
+    });
+
+    const cacheOptions = await client.querySingle(env, "roles", "1", "$select=name", {
+      cacheTier: CACHE_TIERS.METADATA,
+    });
+
+    expect(cacheOptions).toEqual({
+      bypass: false,
+      ttlMs: 300_000,
+    });
   });
 });

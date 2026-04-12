@@ -1,5 +1,5 @@
 import type { EnvironmentConfig } from "../config/types.js";
-import type { DynamicsClient } from "../client/dynamics-client.js";
+import type { DynamicsClient, RequestOptions } from "../client/dynamics-client.js";
 
 const DEFAULT_QUERY_CHUNK_SIZE = 25;
 
@@ -25,6 +25,7 @@ export async function queryRecordsByFieldValuesInChunks<T extends Record<string,
   buildQuery: (chunkIds: string[]) => string,
   options?: {
     chunkSize?: number;
+    requestOptions?: RequestOptions;
     uniqueField?: string;
   },
 ): Promise<T[]> {
@@ -36,7 +37,7 @@ export async function queryRecordsByFieldValuesInChunks<T extends Record<string,
   const valueSet = new Set(uniqueValues);
   const results = await Promise.all(
     chunkValues(uniqueValues, options?.chunkSize).map((chunk) =>
-      client.query<T>(env, entitySet, buildQuery(chunk)),
+      client.query<T>(env, entitySet, buildQuery(chunk), options?.requestOptions),
     ),
   );
 
@@ -69,9 +70,11 @@ export async function queryRecordsByIdsInChunks<T extends Record<string, unknown
   idField: string,
   buildQuery: (chunkIds: string[]) => string,
   chunkSize = DEFAULT_QUERY_CHUNK_SIZE,
+  requestOptions?: RequestOptions,
 ): Promise<T[]> {
   return queryRecordsByFieldValuesInChunks(env, client, entitySet, ids, idField, buildQuery, {
     chunkSize,
+    requestOptions,
     uniqueField: idField,
   });
 }
