@@ -1,4 +1,4 @@
-import { buildQueryString, odataEq, odataStringLiteral } from "../utils/odata-helpers.js";
+import { eq, inList, isNull, query, odataStringLiteral } from "../utils/odata-helpers.js";
 
 const TABLE_SELECT = [
   "MetadataId",
@@ -112,14 +112,8 @@ export type ColumnDetailMetadataType =
   | "MoneyAttributeMetadata"
   | "DateTimeAttributeMetadata";
 
-function buildOrStringFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
-
 export function listTablesQuery(): string {
-  return buildQueryString({
-    select: TABLE_SELECT,
-  });
+  return query().select(TABLE_SELECT).toString();
 }
 
 export function tableDefinitionPath(logicalName: string): string {
@@ -161,60 +155,39 @@ export function tableDetailColumnsPath(
 }
 
 export function listTableColumnsQuery(): string {
-  return buildQueryString({
-    select: COLUMN_SELECT,
-    filter: "AttributeOf eq null",
-    orderby: "LogicalName asc",
-  });
+  return query()
+    .select(COLUMN_SELECT)
+    .filter(isNull("AttributeOf"))
+    .orderby("LogicalName asc")
+    .toString();
 }
 
 export function listTableChoiceColumnsQuery(): string {
-  return buildQueryString({
-    select: CHOICE_SELECT,
-    orderby: "LogicalName asc",
-  });
+  return query().select(CHOICE_SELECT).orderby("LogicalName asc").toString();
 }
 
 export function listTableLookupColumnsQuery(): string {
-  return buildQueryString({
-    select: LOOKUP_COLUMN_SELECT,
-    orderby: "LogicalName asc",
-  });
+  return query().select(LOOKUP_COLUMN_SELECT).orderby("LogicalName asc").toString();
 }
 
 export function listTableStringColumnsQuery(): string {
-  return buildQueryString({
-    select: STRING_COLUMN_SELECT,
-    orderby: "LogicalName asc",
-  });
+  return query().select(STRING_COLUMN_SELECT).orderby("LogicalName asc").toString();
 }
 
 export function listTableNumericColumnsQuery(): string {
-  return buildQueryString({
-    select: NUMERIC_COLUMN_SELECT,
-    orderby: "LogicalName asc",
-  });
+  return query().select(NUMERIC_COLUMN_SELECT).orderby("LogicalName asc").toString();
 }
 
 export function listTableDateTimeColumnsQuery(): string {
-  return buildQueryString({
-    select: DATETIME_COLUMN_SELECT,
-    orderby: "LogicalName asc",
-  });
+  return query().select(DATETIME_COLUMN_SELECT).orderby("LogicalName asc").toString();
 }
 
 export function listTableKeysQuery(): string {
-  return buildQueryString({
-    select: KEY_SELECT,
-    orderby: "LogicalName asc",
-  });
+  return query().select(KEY_SELECT).orderby("LogicalName asc").toString();
 }
 
 export function listTableManyToOneRelationshipsQuery(): string {
-  return buildQueryString({
-    select: MANY_TO_ONE_SELECT,
-    orderby: "SchemaName asc",
-  });
+  return query().select(MANY_TO_ONE_SELECT).orderby("SchemaName asc").toString();
 }
 
 export function listTableOneToManyRelationshipsQuery(): string {
@@ -222,22 +195,13 @@ export function listTableOneToManyRelationshipsQuery(): string {
 }
 
 export function listTableManyToManyRelationshipsQuery(): string {
-  return buildQueryString({
-    select: MANY_TO_MANY_SELECT,
-    orderby: "SchemaName asc",
-  });
+  return query().select(MANY_TO_MANY_SELECT).orderby("SchemaName asc").toString();
 }
 
 export function getTableByLogicalNameQuery(logicalName: string): string {
-  return buildQueryString({
-    select: TABLE_SELECT,
-    filter: odataEq("LogicalName", logicalName),
-  });
+  return query().select(TABLE_SELECT).filter(eq("LogicalName", logicalName)).toString();
 }
 
 export function listTablesByMetadataIdsQuery(metadataIds: string[]): string {
-  return buildQueryString({
-    select: TABLE_SELECT,
-    filter: buildOrStringFilter("MetadataId", metadataIds),
-  });
+  return query().select(TABLE_SELECT).filter(inList("MetadataId", metadataIds)).toString();
 }

@@ -1,8 +1,4 @@
-import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
-
-function buildOrFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
+import { and, eq, inList, query } from "../utils/odata-helpers.js";
 
 const WORKFLOW_CATEGORY = {
   workflow: 0,
@@ -27,17 +23,8 @@ export function listWorkflowsQuery(options?: {
   category?: WorkflowCategory;
   status?: WorkflowState;
 }): string {
-  const filters: string[] = ["type eq 1"]; // Definition only (exclude activations)
-
-  if (options?.category !== undefined) {
-    filters.push(`category eq ${WORKFLOW_CATEGORY[options.category]}`);
-  }
-  if (options?.status !== undefined) {
-    filters.push(`statecode eq ${WORKFLOW_STATE[options.status]}`);
-  }
-
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "workflowid",
       "name",
       "uniquename",
@@ -52,15 +39,23 @@ export function listWorkflowsQuery(options?: {
       "triggeronupdateattributelist",
       "createdon",
       "modifiedon",
-    ],
-    filter: filters.join(" and "),
-    orderby: "name asc",
-  });
+    ])
+    .filter(
+      and(
+        eq("type", 1), // Definition only (exclude activations)
+        options?.category !== undefined
+          ? eq("category", WORKFLOW_CATEGORY[options.category])
+          : undefined,
+        options?.status !== undefined ? eq("statecode", WORKFLOW_STATE[options.status]) : undefined,
+      ),
+    )
+    .orderby("name asc")
+    .toString();
 }
 
 export function listActionsQuery(): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "workflowid",
       "name",
       "uniquename",
@@ -74,15 +69,15 @@ export function listActionsQuery(): string {
       "triggeronupdateattributelist",
       "createdon",
       "modifiedon",
-    ],
-    filter: "type eq 1 and category eq 3",
-    orderby: "name asc",
-  });
+    ])
+    .filter(and(eq("type", 1), eq("category", 3)))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listWorkflowsByIdsQuery(workflowIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "workflowid",
       "name",
       "uniquename",
@@ -95,15 +90,15 @@ export function listWorkflowsByIdsQuery(workflowIds: string[]): string {
       "description",
       "createdon",
       "modifiedon",
-    ],
-    filter: buildOrFilter("workflowid", workflowIds),
-    orderby: "name asc",
-  });
+    ])
+    .filter(inList("workflowid", workflowIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function getWorkflowDetailsQuery(): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "workflowid",
       "name",
       "uniquename",
@@ -123,20 +118,16 @@ export function getWorkflowDetailsQuery(): string {
       "inputparameters",
       "createdon",
       "modifiedon",
-    ],
-  });
+    ])
+    .toString();
 }
 
 export function getWorkflowDetailsByIdentityQuery(options: {
   workflowName?: string;
   uniqueName?: string;
 }): string {
-  const filter = options.uniqueName
-    ? `${odataEq("uniquename", options.uniqueName)} and type eq 1`
-    : `${odataEq("name", options.workflowName as string)} and type eq 1`;
-
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "workflowid",
       "name",
       "uniquename",
@@ -156,9 +147,16 @@ export function getWorkflowDetailsByIdentityQuery(options: {
       "inputparameters",
       "createdon",
       "modifiedon",
-    ],
-    filter,
-  });
+    ])
+    .filter(
+      and(
+        options.uniqueName
+          ? eq("uniquename", options.uniqueName)
+          : eq("name", options.workflowName as string),
+        eq("type", 1),
+      ),
+    )
+    .toString();
 }
 
 export { WORKFLOW_CATEGORY, WORKFLOW_STATE };

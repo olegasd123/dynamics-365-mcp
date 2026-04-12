@@ -1,4 +1,4 @@
-import { buildQueryString } from "../utils/odata-helpers.js";
+import { query } from "../utils/odata-helpers.js";
 
 const DEFAULT_DEPENDENCY_SELECT = [
   "dependencyid",
@@ -26,9 +26,7 @@ export function retrieveRequiredComponentsPath(
 }
 
 export function dependencySelectQuery(): string {
-  return buildQueryString({
-    select: DEFAULT_DEPENDENCY_SELECT,
-  });
+  return query().select(DEFAULT_DEPENDENCY_SELECT).toString();
 }
 
 function toGuidParameter(value: string): string {

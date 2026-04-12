@@ -1,4 +1,4 @@
-import { buildQueryString, odataContains } from "../utils/odata-helpers.js";
+import { and, contains, eq, query } from "../utils/odata-helpers.js";
 
 const DASHBOARD_SELECT = [
   "formid",
@@ -12,15 +12,9 @@ const DASHBOARD_SELECT = [
 ];
 
 export function listDashboardsQuery(nameFilter?: string): string {
-  const filters = ["type eq 0"];
-
-  if (nameFilter) {
-    filters.push(odataContains("name", nameFilter));
-  }
-
-  return buildQueryString({
-    select: DASHBOARD_SELECT,
-    filter: filters.join(" and "),
-    orderby: "name asc",
-  });
+  return query()
+    .select(DASHBOARD_SELECT)
+    .filter(and(eq("type", 0), nameFilter ? contains("name", nameFilter) : undefined))
+    .orderby("name asc")
+    .toString();
 }

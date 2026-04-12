@@ -1,8 +1,4 @@
-import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
-
-function buildOrFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
+import { and, contains, eq, inList, query } from "../utils/odata-helpers.js";
 
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,
@@ -25,17 +21,8 @@ export function listWebResourcesQuery(options?: {
   type?: WebResourceType;
   nameFilter?: string;
 }): string {
-  const filters: string[] = [];
-
-  if (options?.type) {
-    filters.push(`webresourcetype eq ${WEB_RESOURCE_TYPE[options.type]}`);
-  }
-  if (options?.nameFilter) {
-    filters.push(odataContains("name", options.nameFilter));
-  }
-
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "webresourceid",
       "name",
       "displayname",
@@ -43,28 +30,33 @@ export function listWebResourcesQuery(options?: {
       "ismanaged",
       "description",
       "modifiedon",
-    ],
-    filter: filters.length > 0 ? filters.join(" and ") : undefined,
-    orderby: "name asc",
-  });
+    ])
+    .filter(
+      and(
+        options?.type ? eq("webresourcetype", WEB_RESOURCE_TYPE[options.type]) : undefined,
+        options?.nameFilter ? contains("name", options.nameFilter) : undefined,
+      ),
+    )
+    .orderby("name asc")
+    .toString();
 }
 
 export function getWebResourceContentQuery(): string {
-  return buildQueryString({
-    select: ["webresourceid", "name", "displayname", "webresourcetype", "content"],
-  });
+  return query()
+    .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
+    .toString();
 }
 
 export function getWebResourceContentByNameQuery(resourceName: string): string {
-  return buildQueryString({
-    select: ["webresourceid", "name", "displayname", "webresourcetype", "content"],
-    filter: odataEq("name", resourceName),
-  });
+  return query()
+    .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
+    .filter(eq("name", resourceName))
+    .toString();
 }
 
 export function listWebResourcesByIdsQuery(resourceIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "webresourceid",
       "name",
       "displayname",
@@ -72,27 +64,18 @@ export function listWebResourcesByIdsQuery(resourceIds: string[]): string {
       "ismanaged",
       "description",
       "modifiedon",
-    ],
-    filter: buildOrFilter("webresourceid", resourceIds),
-    orderby: "name asc",
-  });
+    ])
+    .filter(inList("webresourceid", resourceIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listWebResourcesWithContentQuery(options?: {
   type?: WebResourceType;
   nameFilter?: string;
 }): string {
-  const filters: string[] = [];
-
-  if (options?.type) {
-    filters.push(`webresourcetype eq ${WEB_RESOURCE_TYPE[options.type]}`);
-  }
-  if (options?.nameFilter) {
-    filters.push(odataContains("name", options.nameFilter));
-  }
-
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "webresourceid",
       "name",
       "displayname",
@@ -100,10 +83,15 @@ export function listWebResourcesWithContentQuery(options?: {
       "ismanaged",
       "modifiedon",
       "content",
-    ],
-    filter: filters.length > 0 ? filters.join(" and ") : undefined,
-    orderby: "name asc",
-  });
+    ])
+    .filter(
+      and(
+        options?.type ? eq("webresourcetype", WEB_RESOURCE_TYPE[options.type]) : undefined,
+        options?.nameFilter ? contains("name", options.nameFilter) : undefined,
+      ),
+    )
+    .orderby("name asc")
+    .toString();
 }
 
 export { WEB_RESOURCE_TYPE };
