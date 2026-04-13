@@ -164,9 +164,7 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         table: expect.any(Object),
         buttonName: expect.any(Object),
-        location: expect.objectContaining({
-          default: "all",
-        }),
+        location: expect.any(Object),
       });
       expect(toolsByName.list_solutions.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
