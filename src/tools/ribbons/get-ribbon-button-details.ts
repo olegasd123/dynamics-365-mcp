@@ -14,8 +14,8 @@ const getRibbonButtonDetailsSchema = {
   buttonName: z.string().describe("Ribbon button ID, label, or command"),
   location: z
     .enum(["form", "homepageGrid", "subgrid", "all"])
-    .optional()
-    .describe("Optional ribbon location filter"),
+    .default("all")
+    .describe("Ribbon location filter. Defaults to all."),
 };
 
 type GetRibbonButtonDetailsParams = ToolParams<typeof getRibbonButtonDetailsSchema>;
