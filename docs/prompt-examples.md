@@ -86,6 +86,7 @@ Replace these values before you run a prompt:
 - `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
 - `<FORM>`: form display name or unique name
 - `<VIEW>`: view name
+- `<BUTTON>`: ribbon button label, id, or command name
 - `<API>`: Custom API name or unique name
 - `<FLOW>`: cloud flow display name or unique name
 - `<ROLE>`: security role name
@@ -242,6 +243,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_form_details`
   `In <ENV>, show details for form <FORM> on table <TABLE> from solution <SOLUTION>.`
   `(Required: <FORM>)`
+
+## Ribbons
+
+- `list_table_ribbons`
+  `In <ENV>, list ribbons for table <TABLE>. Group the result by ribbon location and include the buttons on each ribbon. If needed, limit the result to location homepageGrid.`
+  `(Required: <TABLE>)`
+
+- `get_ribbon_button_details`
+  `In <ENV>, show ribbon button details for <BUTTON> on table <TABLE>. Include the command, enable rules, display rules, and image metadata. If needed, limit the search to location form.`
+  `(Required: <TABLE>, <BUTTON>)`
 
 ## Views
 
@@ -407,6 +418,7 @@ This prompt list covers these tools:
 - `get_form_details`
 - `get_plugin_details`
 - `get_plugin_assembly_details`
+- `get_ribbon_button_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
 - `get_solution_details`
@@ -424,6 +436,7 @@ This prompt list covers these tools:
 - `list_dashboards`
 - `list_environment_variables`
 - `list_forms`
+- `list_table_ribbons`
 - `list_plugin_steps`
 - `list_plugins`
 - `list_plugin_assembly_images`

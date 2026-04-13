@@ -155,6 +155,17 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.list_table_ribbons.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        location: expect.any(Object),
+      });
+      expect(toolsByName.get_ribbon_button_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        buttonName: expect.any(Object),
+        location: expect.any(Object),
+      });
       expect(toolsByName.list_solutions.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         nameFilter: expect.any(Object),

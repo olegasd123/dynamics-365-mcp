@@ -28,6 +28,8 @@ import { listTableColumnsTool } from "./tables/list-table-columns.js";
 import { listTableRelationshipsTool } from "./tables/list-table-relationships.js";
 import { listFormsTool } from "./forms/list-forms.js";
 import { getFormDetailsTool } from "./forms/get-form-details.js";
+import { listTableRibbonsTool } from "./ribbons/list-table-ribbons.js";
+import { getRibbonButtonDetailsTool } from "./ribbons/get-ribbon-button-details.js";
 import { listViewsTool } from "./views/list-views.js";
 import { getViewDetailsTool } from "./views/get-view-details.js";
 import { getViewFetchXmlTool } from "./views/get-view-fetchxml.js";
@@ -264,6 +266,16 @@ export const TOOL_MANIFEST = [
     ...getFormDetailsTool,
     group: "schema_ui",
     mainParams: ["environment", "formName", "table", "solution"],
+  },
+  {
+    ...listTableRibbonsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "location"],
+  },
+  {
+    ...getRibbonButtonDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "buttonName", "location"],
   },
   {
     ...listViewsTool,
