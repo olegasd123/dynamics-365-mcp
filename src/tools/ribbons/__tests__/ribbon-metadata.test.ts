@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { buildRetrieveEntityRibbonPath } from "../../../queries/ribbon-queries.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import { handleGetRibbonButtonDetails } from "../get-ribbon-button-details.js";
 import { fetchTableRibbonMetadata, resolveRibbonButton } from "../ribbon-metadata.js";
 
 const env: EnvironmentConfig = {
@@ -93,6 +94,46 @@ const ribbonXml = `
 </RibbonDiffXml>
 `.trim();
 
+const ribbonXmlWithoutLocLabels = `
+<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="sample.account.Form.AddToTalentPlug" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="78">
+      <CommandUIDefinition>
+        <Button
+          Id="sample.account.AddToTalentPlug.Button"
+          Command="sample.account.AddToTalentPlug.Command"
+          Alt="$LocLabels:sample.account.AddToTalentPlug.Button.Alt"
+          LabelText="$LocLabels:sample.account.AddToTalentPlug.Button.LabelText"
+          ToolTipTitle="$LocLabels:sample.account.AddToTalentPlug.Button.ToolTipTitle"
+          ToolTipDescription="$LocLabels:sample.account.AddToTalentPlug.Button.ToolTipDescription"
+          Sequence="78"
+          Image16by16="$webresource:publish.png"
+          TemplateAlias="o2"
+          ModernImage="$webresource:publish.svg"
+        />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+  <CommandDefinitions>
+    <CommandDefinition Id="sample.account.AddToTalentPlug.Command">
+      <EnableRules>
+        <EnableRule Id="sample.account.Enable.CanPublish" />
+      </EnableRules>
+      <Actions>
+        <JavaScriptFunction Library="$webresource:new_/account.js" FunctionName="publishToTalentPlug" />
+      </Actions>
+    </CommandDefinition>
+  </CommandDefinitions>
+  <RuleDefinitions>
+    <EnableRules>
+      <EnableRule Id="sample.account.Enable.CanPublish">
+        <CrmClientTypeRule Type="Web" />
+      </EnableRule>
+    </EnableRules>
+  </RuleDefinitions>
+</RibbonDiffXml>
+`.trim();
+
 describe("ribbon metadata", () => {
   it("loads table ribbons and resolves ribbon button details", async () => {
     const { client } = createRecordingClient({
@@ -178,6 +219,77 @@ describe("ribbon metadata", () => {
     expect(metadata.ribbons).toHaveLength(1);
     expect(metadata.buttons).toHaveLength(1);
     expect(metadata.buttons[0]?.ribbonType).toBe("homepageGrid");
+  });
+
+  it("falls back to a readable button label when loclabels are missing", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            ObjectTypeCode: 1,
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+        ],
+        [buildRetrieveEntityRibbonPath("account", "all")]: {
+          CompressedEntityXml: createStoredZip("RibbonXml.xml", ribbonXmlWithoutLocLabels).toString(
+            "base64",
+          ),
+        },
+      },
+    });
+
+    const metadata = await fetchTableRibbonMetadata(env, client, "account");
+    const button = resolveRibbonButton(metadata, "sample.account.AddToTalentPlug.Button");
+
+    expect(button.label).toBe("Add To Talent Plug");
+    expect(button.toolTipTitle).toBe("Add To Talent Plug");
+    expect(button.toolTipDescription).toBe("");
+  });
+
+  it("shows the friendly label in button details output", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            ObjectTypeCode: 1,
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+        ],
+        [buildRetrieveEntityRibbonPath("account", "all")]: {
+          CompressedEntityXml: createStoredZip("RibbonXml.xml", ribbonXmlWithoutLocLabels).toString(
+            "base64",
+          ),
+        },
+      },
+    });
+
+    const response = await handleGetRibbonButtonDetails(
+      {
+        environment: "dev",
+        table: "account",
+        buttonName: "sample.account.AddToTalentPlug.Button",
+        location: "all",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.content[0]?.text).toContain("## Ribbon Button: Add To Talent Plug");
+    expect(response.content[0]?.text).toContain("- Label: Add To Talent Plug");
+    expect(response.content[0]?.text).toContain("- Tooltip Title: Add To Talent Plug");
+    expect(response.content[0]?.text).toContain("- Tooltip Description: -");
   });
 });
 

@@ -87,6 +87,37 @@ export interface RibbonButtonDetails extends RibbonButtonRecord {
   enableRules: RibbonRuleSummary[];
 }
 
+type RibbonTextKind = "label" | "title" | "description" | "alt" | "generic";
+
+const GENERIC_RIBBON_NAME_PARTS = new Set([
+  "alt",
+  "button",
+  "children",
+  "command",
+  "controls",
+  "description",
+  "display",
+  "enable",
+  "form",
+  "group",
+  "groups",
+  "homepagegrid",
+  "label",
+  "labeltext",
+  "maintab",
+  "management",
+  "mscrm",
+  "other",
+  "ribbon",
+  "subgrid",
+  "tab",
+  "tabs",
+  "title",
+  "tooltip",
+  "tooltipdescription",
+  "tooltiptitle",
+]);
+
 export async function fetchTableRibbonMetadata(
   env: EnvironmentConfig,
   client: DynamicsClient,
@@ -201,6 +232,7 @@ function collectButtons(
     const id = readAttr(node, "Id");
     const command = readAttr(node, "Command");
     const buttonLabelText = readAttr(node, "LabelText");
+    const buttonAltText = readAttr(node, "Alt");
     const location = findNearestLocation(node) || extractRibbonId(id || command);
     const ribbonId = extractRibbonId(location || id || command);
     const ancestorIds = collectAncestorIds(node);
@@ -212,14 +244,30 @@ function collectButtons(
       ancestorIds.find((value) => /\.Group\b/i.test(value)) ||
       ancestorIds.find((value) => value.includes(".Groups.")) ||
       "";
+    const label =
+      resolveRibbonText(buttonLabelText, locLabels, "label", id) ||
+      resolveRibbonText(buttonAltText, locLabels, "alt", id) ||
+      inferFriendlyRibbonName(id);
+    const toolTipTitle =
+      resolveRibbonText(readAttr(node, "ToolTipTitle"), locLabels, "title", label || id) || label;
 
     buttons.push({
       id,
       labelText: buttonLabelText,
-      label: resolveRibbonText(buttonLabelText, locLabels),
-      toolTipTitle: resolveRibbonText(readAttr(node, "ToolTipTitle"), locLabels),
-      toolTipDescription: resolveRibbonText(readAttr(node, "ToolTipDescription"), locLabels),
-      description: resolveRibbonText(readAttr(node, "Description"), locLabels),
+      label,
+      toolTipTitle,
+      toolTipDescription: resolveRibbonText(
+        readAttr(node, "ToolTipDescription"),
+        locLabels,
+        "description",
+        label || id,
+      ),
+      description: resolveRibbonText(
+        readAttr(node, "Description"),
+        locLabels,
+        "description",
+        label,
+      ),
       command,
       sequence: parseNumeric(readAttr(node, "Sequence")),
       templateAlias: readAttr(node, "TemplateAlias"),
@@ -508,17 +556,72 @@ function normalizeButtonMatchValue(value: string | undefined): string {
     .toLowerCase();
 }
 
-function resolveRibbonText(value: string, locLabels: Record<string, string>): string {
+function resolveRibbonText(
+  value: string,
+  locLabels: Record<string, string>,
+  kind: RibbonTextKind = "generic",
+  fallbackSource = "",
+): string {
   if (!value) {
     return "";
   }
 
-  const labelMatch = value.match(/^\$LocLabels:([^/]+)$/i);
-  if (!labelMatch) {
-    return value;
+  const locLabelMatch = value.match(/^\$LocLabels:(.+)$/i);
+  if (locLabelMatch) {
+    const reference = (locLabelMatch[1] || "").trim();
+    return locLabels[reference] || inferRibbonReferenceText(reference, kind, fallbackSource);
   }
 
-  return locLabels[labelMatch[1] || ""] || value;
+  const resourceMatch = value.match(/^\$Resources:(.+)$/i);
+  if (resourceMatch) {
+    return inferRibbonReferenceText((resourceMatch[1] || "").trim(), kind, fallbackSource);
+  }
+
+  return value;
+}
+
+function inferRibbonReferenceText(
+  reference: string,
+  kind: RibbonTextKind,
+  fallbackSource: string,
+): string {
+  if (kind === "description") {
+    return "";
+  }
+
+  return inferFriendlyRibbonName(reference) || inferFriendlyRibbonName(fallbackSource);
+}
+
+function inferFriendlyRibbonName(value: string): string {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/^\$(LocLabels|Resources):/i, "");
+  if (!cleaned) {
+    return "";
+  }
+
+  const parts = cleaned
+    .split(/[./:_-]+/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const meaningfulPart = [...parts]
+    .reverse()
+    .find((part) => !GENERIC_RIBBON_NAME_PARTS.has(part.toLowerCase()) && !/^\d+$/u.test(part));
+
+  if (!meaningfulPart) {
+    return "";
+  }
+
+  return meaningfulPart
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((part) =>
+      /^[A-Z0-9]+$/u.test(part) ? part : `${part.charAt(0).toUpperCase()}${part.slice(1)}`,
+    )
+    .join(" ");
 }
 
 function detectRibbonType(value: string): RibbonButtonRecord["ribbonType"] {

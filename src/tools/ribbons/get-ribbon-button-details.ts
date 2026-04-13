@@ -37,6 +37,7 @@ export async function handleGetRibbonButtonDetails(
     lines.push(`- Ribbon: ${button.ribbonId}`);
     lines.push(`- Location: ${button.location || "-"}`);
     lines.push(`- Button Id: ${button.id}`);
+    lines.push(`- Label: ${button.label || "-"}`);
     lines.push(`- Command: ${button.command || "-"}`);
     lines.push(`- Sequence: ${button.sequence === null ? "-" : String(button.sequence)}`);
     lines.push(`- Template Alias: ${button.templateAlias || "-"}`);
