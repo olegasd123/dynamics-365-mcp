@@ -96,6 +96,19 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
       }
       return value as T;
     },
+    async invokeAction<T>(
+      env: EnvironmentConfig,
+      actionPath: string,
+      body?: Record<string, unknown>,
+    ): Promise<T> {
+      calls.push({
+        environment: env.name,
+        entitySet: actionPath,
+        queryParams: body ? JSON.stringify(body) : undefined,
+      });
+      const value = getDatasetValue(env.name, actionPath);
+      return (value || {}) as T;
+    },
   };
 
   return { client: client as never, calls };

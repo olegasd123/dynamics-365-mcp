@@ -6,11 +6,19 @@ import {
   buildRetrieveEntityRibbonPath,
   type RibbonLocationFilter,
 } from "../../queries/ribbon-queries.js";
+import {
+  listSolutionComponentsByObjectIdsQuery,
+  listSolutionsQuery,
+} from "../../queries/solution-queries.js";
 import { resolveTable, type TableRecord } from "../tables/table-metadata.js";
 import { normalizeXml } from "../../utils/xml-metadata.js";
 
 interface RetrieveEntityRibbonResponse {
   CompressedEntityXml?: string;
+}
+
+interface ExportTranslationResponse {
+  ExportTranslationFile?: string;
 }
 
 interface XmlNode {
@@ -39,11 +47,15 @@ export interface RibbonCommandSummary {
 }
 
 export interface RibbonButtonRecord {
+  altText: string;
   id: string;
   labelText: string;
   label: string;
+  toolTipTitleText: string;
   toolTipTitle: string;
+  toolTipDescriptionText: string;
   toolTipDescription: string;
+  descriptionText: string;
   description: string;
   command: string;
   sequence: number | null;
@@ -89,6 +101,13 @@ export interface RibbonButtonDetails extends RibbonButtonRecord {
 
 type RibbonTextKind = "label" | "title" | "description" | "alt" | "generic";
 
+interface CandidateSolution {
+  friendlyname: string;
+  solutionid: string;
+  uniquename: string;
+  ismanaged: boolean;
+}
+
 const GENERIC_RIBBON_NAME_PARTS = new Set([
   "alt",
   "button",
@@ -117,6 +136,9 @@ const GENERIC_RIBBON_NAME_PARTS = new Set([
   "tooltipdescription",
   "tooltiptitle",
 ]);
+const TABLE_SOLUTION_COMPONENT_TYPE = 1;
+const RIBBON_TRANSLATION_ACTION_PATH = "solutions/Microsoft.Dynamics.CRM.ExportTranslation";
+const ribbonTranslationCache = new Map<string, Promise<Record<string, string>>>();
 
 export async function fetchTableRibbonMetadata(
   env: EnvironmentConfig,
@@ -200,6 +222,64 @@ export function resolveRibbonButton(
   );
 }
 
+export async function localizeRibbonButtonDetails(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  table: TableRecord,
+  button: RibbonButtonDetails,
+): Promise<RibbonButtonDetails> {
+  const references = collectButtonLocLabelReferences(button);
+  if (references.length === 0) {
+    return button;
+  }
+
+  try {
+    const candidateSolutions = await listCandidateTranslationSolutions(
+      env,
+      client,
+      table.metadataId,
+      buildRibbonSolutionSearchTokens(button),
+    );
+    if (candidateSolutions.length === 0) {
+      return button;
+    }
+
+    const translations = await loadRibbonTranslationsForSolutions(
+      env,
+      client,
+      candidateSolutions,
+      references,
+    );
+    if (translations.size === 0) {
+      return button;
+    }
+
+    const localizedLabel =
+      resolveTranslatedLocLabel(button.labelText, translations) ||
+      resolveTranslatedLocLabel(button.altText, translations) ||
+      button.label;
+    const localizedTooltipTitle =
+      resolveTranslatedLocLabel(button.toolTipTitleText, translations) ||
+      localizedLabel ||
+      button.toolTipTitle;
+    const localizedTooltipDescription =
+      resolveTranslatedLocLabel(button.toolTipDescriptionText, translations) ||
+      button.toolTipDescription;
+    const localizedDescription =
+      resolveTranslatedLocLabel(button.descriptionText, translations) || button.description;
+
+    return {
+      ...button,
+      label: localizedLabel,
+      toolTipTitle: localizedTooltipTitle,
+      toolTipDescription: localizedTooltipDescription,
+      description: localizedDescription,
+    };
+  } catch {
+    return button;
+  }
+}
+
 function hydrateButtonDetails(
   metadata: TableRibbonMetadata,
   button: RibbonButtonRecord,
@@ -248,26 +328,28 @@ function collectButtons(
       resolveRibbonText(buttonLabelText, locLabels, "label", id) ||
       resolveRibbonText(buttonAltText, locLabels, "alt", id) ||
       inferFriendlyRibbonName(id);
+    const toolTipTitleText = readAttr(node, "ToolTipTitle");
+    const toolTipDescriptionText = readAttr(node, "ToolTipDescription");
+    const descriptionText = readAttr(node, "Description");
     const toolTipTitle =
-      resolveRibbonText(readAttr(node, "ToolTipTitle"), locLabels, "title", label || id) || label;
+      resolveRibbonText(toolTipTitleText, locLabels, "title", label || id) || label;
 
     buttons.push({
+      altText: buttonAltText,
       id,
       labelText: buttonLabelText,
       label,
+      toolTipTitleText,
       toolTipTitle,
+      toolTipDescriptionText,
       toolTipDescription: resolveRibbonText(
-        readAttr(node, "ToolTipDescription"),
+        toolTipDescriptionText,
         locLabels,
         "description",
         label || id,
       ),
-      description: resolveRibbonText(
-        readAttr(node, "Description"),
-        locLabels,
-        "description",
-        label,
-      ),
+      descriptionText,
+      description: resolveRibbonText(descriptionText, locLabels, "description", label),
       command,
       sequence: parseNumeric(readAttr(node, "Sequence")),
       templateAlias: readAttr(node, "TemplateAlias"),
@@ -544,6 +626,220 @@ function compareNullableNumbers(left: number | null, right: number | null): numb
   }
 
   return left - right;
+}
+
+function collectButtonLocLabelReferences(button: RibbonButtonRecord): string[] {
+  return [
+    extractLocLabelReference(button.altText),
+    extractLocLabelReference(button.labelText),
+    extractLocLabelReference(button.toolTipTitleText),
+    extractLocLabelReference(button.toolTipDescriptionText),
+    extractLocLabelReference(button.descriptionText),
+  ].filter(
+    (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+  );
+}
+
+function extractLocLabelReference(value: string): string {
+  const match = value.match(/^\$LocLabels:(.+)$/i);
+  return (match?.[1] || "").trim();
+}
+
+function resolveTranslatedLocLabel(
+  value: string,
+  translations: ReadonlyMap<string, string>,
+): string {
+  const reference = extractLocLabelReference(value);
+  if (!reference) {
+    return "";
+  }
+
+  return translations.get(reference) || "";
+}
+
+async function listCandidateTranslationSolutions(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  tableMetadataId: string,
+  searchTokens: string[],
+): Promise<CandidateSolution[]> {
+  const components = await client.query<Record<string, unknown>>(
+    env,
+    "solutioncomponents",
+    listSolutionComponentsByObjectIdsQuery(TABLE_SOLUTION_COMPONENT_TYPE, [tableMetadataId]),
+  );
+  const solutionIds = [
+    ...new Set(components.map((row) => String(row._solutionid_value || "")).filter(Boolean)),
+  ];
+  if (solutionIds.length === 0) {
+    return [];
+  }
+
+  const solutions = await client.query<Record<string, unknown>>(
+    env,
+    "solutions",
+    listSolutionsQuery(),
+  );
+  return solutions
+    .map((solution) => ({
+      solutionid: String(solution.solutionid || ""),
+      uniquename: String(solution.uniquename || ""),
+      friendlyname: String(solution.friendlyname || ""),
+      ismanaged: Boolean(solution.ismanaged),
+    }))
+    .filter((solution) => solutionIds.includes(solution.solutionid) && solution.uniquename)
+    .sort((left, right) => {
+      return (
+        rankRibbonTranslationSolution(right, searchTokens) -
+          rankRibbonTranslationSolution(left, searchTokens) ||
+        Number(left.ismanaged) - Number(right.ismanaged) ||
+        left.uniquename.localeCompare(right.uniquename)
+      );
+    });
+}
+
+async function loadRibbonTranslationsForSolutions(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  solutions: CandidateSolution[],
+  targetKeys: string[],
+): Promise<Map<string, string>> {
+  const translations = new Map<string, string>();
+  const pendingKeys = new Set(targetKeys);
+
+  for (const solution of solutions) {
+    if (pendingKeys.size === 0) {
+      break;
+    }
+
+    try {
+      const solutionTranslations = await loadRibbonTranslationsForSolution(
+        env,
+        client,
+        solution.uniquename,
+      );
+      for (const [key, value] of Object.entries(solutionTranslations)) {
+        if (pendingKeys.has(key) && value && !translations.has(key)) {
+          translations.set(key, value);
+          pendingKeys.delete(key);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return translations;
+}
+
+async function loadRibbonTranslationsForSolution(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  solutionUniqueName: string,
+): Promise<Record<string, string>> {
+  const cacheKey = `${env.name}|${solutionUniqueName}`;
+  const cached = ribbonTranslationCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const pending = (async () => {
+    const response = await client.invokeAction<ExportTranslationResponse>(
+      env,
+      RIBBON_TRANSLATION_ACTION_PATH,
+      {
+        SolutionName: solutionUniqueName,
+      },
+      { timeout: 120_000 },
+    );
+    const zipData = Buffer.from(String(response.ExportTranslationFile || ""), "base64");
+    const xml = readZipEntry(zipData, "CrmTranslations.xml");
+    return parseRibbonTranslationsWorkbook(xml);
+  })().catch((error) => {
+    ribbonTranslationCache.delete(cacheKey);
+    throw error;
+  });
+
+  ribbonTranslationCache.set(cacheKey, pending);
+  return pending;
+}
+
+function parseRibbonTranslationsWorkbook(xml: string): Record<string, string> {
+  const translations: Record<string, string> = {};
+
+  for (const row of xml.matchAll(/<Row\b[\s\S]*?<\/Row>/g)) {
+    const cells = [...String(row[0] || "").matchAll(/<Data\b[^>]*>([\s\S]*?)<\/Data>/g)].map(
+      (match) => decodeXmlText(match[1] || "").trim(),
+    );
+    if (cells.length < 4 || cells[0] !== "RibbonCustomization") {
+      continue;
+    }
+
+    const key = cells[2] || "";
+    const value = cells[3] || "";
+    if (key && value) {
+      translations[key] = value;
+    }
+  }
+
+  return translations;
+}
+
+function decodeXmlText(value: string): string {
+  return value
+    .replace(/&#x([0-9a-f]+);/giu, (_match, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#([0-9]+);/gu, (_match, digits) => String.fromCodePoint(Number.parseInt(digits, 10)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function buildRibbonSolutionSearchTokens(button: RibbonButtonRecord): string[] {
+  return [
+    button.id,
+    button.command,
+    button.altText,
+    button.labelText,
+    button.toolTipTitleText,
+    button.toolTipDescriptionText,
+  ]
+    .flatMap(extractSearchTokens)
+    .filter((value, index, values) => value.length >= 4 && values.indexOf(value) === index);
+}
+
+function extractSearchTokens(value: string): string[] {
+  return String(value || "")
+    .replace(/^\$(LocLabels|Resources):/i, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/u)
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function rankRibbonTranslationSolution(
+  solution: CandidateSolution,
+  searchTokens: string[],
+): number {
+  const haystack = `${solution.uniquename} ${solution.friendlyname}`.toLowerCase();
+  let score = 0;
+
+  for (const token of searchTokens) {
+    if (!token) {
+      continue;
+    }
+
+    if (haystack.includes(token)) {
+      score += token.length >= 8 ? 10 : 4;
+    }
+  }
+
+  if (/^(active|default|cr[0-9a-f]+)/i.test(solution.uniquename)) {
+    score -= 20;
+  }
+
+  return score;
 }
 
 function formatButtonMatch(button: RibbonButtonRecord): string {
@@ -855,6 +1151,10 @@ function findTagEnd(xml: string, startIndex: number): number {
 }
 
 function unzipRibbonXml(data: Buffer): string {
+  return readZipEntry(data, "RibbonXml.xml");
+}
+
+function readZipEntry(data: Buffer, fileNameSuffix: string): string {
   let offset = 0;
 
   while (offset + 30 <= data.length) {
@@ -882,7 +1182,7 @@ function unzipRibbonXml(data: Buffer): string {
       throw new Error("Ribbon ZIP entries with data descriptors are not supported.");
     }
 
-    if (fileName.endsWith("RibbonXml.xml")) {
+    if (fileName.endsWith(fileNameSuffix)) {
       const compressedData = data.subarray(fileDataStart, fileDataEnd);
       if (compressionMethod === 0) {
         return compressedData.toString("utf8");
@@ -898,7 +1198,7 @@ function unzipRibbonXml(data: Buffer): string {
     offset = fileDataEnd;
   }
 
-  throw new Error("RibbonXml.xml was not found in the retrieved ribbon package.");
+  throw new Error(`${fileNameSuffix} was not found in the retrieved package.`);
 }
 
 function createShortHash(value: string): string {

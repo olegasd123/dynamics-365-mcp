@@ -6,7 +6,11 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { formatTable } from "../../utils/formatters.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
-import { fetchTableRibbonMetadata, resolveRibbonButton } from "./ribbon-metadata.js";
+import {
+  fetchTableRibbonMetadata,
+  localizeRibbonButtonDetails,
+  resolveRibbonButton,
+} from "./ribbon-metadata.js";
 
 const getRibbonButtonDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
@@ -27,7 +31,8 @@ export async function handleGetRibbonButtonDetails(
   try {
     const env = getEnvironment(config, environment);
     const metadata = await fetchTableRibbonMetadata(env, client, table, { location });
-    const button = resolveRibbonButton(metadata, buttonName);
+    const resolvedButton = resolveRibbonButton(metadata, buttonName);
+    const button = await localizeRibbonButtonDetails(env, client, metadata.table, resolvedButton);
 
     const lines: string[] = [];
     lines.push(`## Ribbon Button: ${button.label || button.id}`);

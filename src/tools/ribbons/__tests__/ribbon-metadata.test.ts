@@ -1,9 +1,14 @@
+import { deflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { buildRetrieveEntityRibbonPath } from "../../../queries/ribbon-queries.js";
 import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
 import { handleGetRibbonButtonDetails } from "../get-ribbon-button-details.js";
-import { fetchTableRibbonMetadata, resolveRibbonButton } from "../ribbon-metadata.js";
+import {
+  fetchTableRibbonMetadata,
+  localizeRibbonButtonDetails,
+  resolveRibbonButton,
+} from "../ribbon-metadata.js";
 
 const env: EnvironmentConfig = {
   name: "dev",
@@ -134,6 +139,40 @@ const ribbonXmlWithoutLocLabels = `
 </RibbonDiffXml>
 `.trim();
 
+const translationWorkbookXml = `
+<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Localized Labels" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+    <Table>
+      <Row>
+        <Cell><Data ss:Type="String">RibbonCustomization</Data></Cell>
+        <Cell><Data ss:Type="String">table-1</Data></Cell>
+        <Cell><Data ss:Type="String">sample.account.AddToTalentPlug.Button.Alt</Data></Cell>
+        <Cell><Data ss:Type="String">Publier ou modifier</Data></Cell>
+      </Row>
+      <Row>
+        <Cell><Data ss:Type="String">RibbonCustomization</Data></Cell>
+        <Cell><Data ss:Type="String">table-1</Data></Cell>
+        <Cell><Data ss:Type="String">sample.account.AddToTalentPlug.Button.LabelText</Data></Cell>
+        <Cell><Data ss:Type="String">Publier ou modifier</Data></Cell>
+      </Row>
+      <Row>
+        <Cell><Data ss:Type="String">RibbonCustomization</Data></Cell>
+        <Cell><Data ss:Type="String">table-1</Data></Cell>
+        <Cell><Data ss:Type="String">sample.account.AddToTalentPlug.Button.ToolTipTitle</Data></Cell>
+        <Cell><Data ss:Type="String">Publier ou modifier</Data></Cell>
+      </Row>
+      <Row>
+        <Cell><Data ss:Type="String">RibbonCustomization</Data></Cell>
+        <Cell><Data ss:Type="String">table-1</Data></Cell>
+        <Cell><Data ss:Type="String">sample.account.AddToTalentPlug.Button.ToolTipDescription</Data></Cell>
+        <Cell><Data ss:Type="String">Publier ou modifier</Data></Cell>
+      </Row>
+    </Table>
+  </Worksheet>
+</Workbook>
+`.trim();
+
 describe("ribbon metadata", () => {
   it("loads table ribbons and resolves ribbon button details", async () => {
     const { client } = createRecordingClient({
@@ -251,6 +290,60 @@ describe("ribbon metadata", () => {
     expect(button.toolTipDescription).toBe("");
   });
 
+  it("loads localized ribbon text from solution translation exports", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            ObjectTypeCode: 1,
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+        ],
+        [buildRetrieveEntityRibbonPath("account", "all")]: {
+          CompressedEntityXml: createStoredZip("RibbonXml.xml", ribbonXmlWithoutLocLabels).toString(
+            "base64",
+          ),
+        },
+        solutioncomponents: [
+          {
+            solutioncomponentid: "sc-1",
+            _solutionid_value: "sol-1",
+            objectid: "table-1",
+            componenttype: 1,
+          },
+        ],
+        solutions: [
+          {
+            solutionid: "sol-1",
+            friendlyname: "SYNERGIE_TalentPlug",
+            uniquename: "SYNERGIE_TalentPlug",
+            ismanaged: false,
+          },
+        ],
+        "solutions/Microsoft.Dynamics.CRM.ExportTranslation": {
+          ExportTranslationFile: createStoredZip(
+            "CrmTranslations.xml",
+            translationWorkbookXml,
+            true,
+          ).toString("base64"),
+        },
+      },
+    });
+
+    const metadata = await fetchTableRibbonMetadata(env, client, "account");
+    const button = resolveRibbonButton(metadata, "sample.account.AddToTalentPlug.Button");
+    const localized = await localizeRibbonButtonDetails(env, client, metadata.table, button);
+
+    expect(localized.label).toBe("Publier ou modifier");
+    expect(localized.toolTipTitle).toBe("Publier ou modifier");
+    expect(localized.toolTipDescription).toBe("Publier ou modifier");
+  });
+
   it("shows the friendly label in button details output", async () => {
     const { client } = createRecordingClient({
       dev: {
@@ -270,6 +363,29 @@ describe("ribbon metadata", () => {
             "base64",
           ),
         },
+        solutioncomponents: [
+          {
+            solutioncomponentid: "sc-1",
+            _solutionid_value: "sol-1",
+            objectid: "table-1",
+            componenttype: 1,
+          },
+        ],
+        solutions: [
+          {
+            solutionid: "sol-1",
+            friendlyname: "SYNERGIE_TalentPlug",
+            uniquename: "SYNERGIE_TalentPlug",
+            ismanaged: false,
+          },
+        ],
+        "solutions/Microsoft.Dynamics.CRM.ExportTranslation": {
+          ExportTranslationFile: createStoredZip(
+            "CrmTranslations.xml",
+            translationWorkbookXml,
+            true,
+          ).toString("base64"),
+        },
       },
     });
 
@@ -286,29 +402,30 @@ describe("ribbon metadata", () => {
       },
     );
 
-    expect(response.content[0]?.text).toContain("## Ribbon Button: Add To Talent Plug");
-    expect(response.content[0]?.text).toContain("- Label: Add To Talent Plug");
-    expect(response.content[0]?.text).toContain("- Tooltip Title: Add To Talent Plug");
-    expect(response.content[0]?.text).toContain("- Tooltip Description: -");
+    expect(response.content[0]?.text).toContain("## Ribbon Button: Publier ou modifier");
+    expect(response.content[0]?.text).toContain("- Label: Publier ou modifier");
+    expect(response.content[0]?.text).toContain("- Tooltip Title: Publier ou modifier");
+    expect(response.content[0]?.text).toContain("- Tooltip Description: Publier ou modifier");
   });
 });
 
-function createStoredZip(fileName: string, contents: string): Buffer {
+function createStoredZip(fileName: string, contents: string, deflate = false): Buffer {
   const fileNameBuffer = Buffer.from(fileName, "utf8");
   const contentsBuffer = Buffer.from(contents, "utf8");
+  const payloadBuffer = deflate ? deflateRawSync(contentsBuffer) : contentsBuffer;
   const header = Buffer.alloc(30);
 
   header.writeUInt32LE(0x04034b50, 0);
   header.writeUInt16LE(20, 4);
   header.writeUInt16LE(0, 6);
-  header.writeUInt16LE(0, 8);
+  header.writeUInt16LE(deflate ? 8 : 0, 8);
   header.writeUInt16LE(0, 10);
   header.writeUInt16LE(0, 12);
   header.writeUInt32LE(0, 14);
-  header.writeUInt32LE(contentsBuffer.length, 18);
+  header.writeUInt32LE(payloadBuffer.length, 18);
   header.writeUInt32LE(contentsBuffer.length, 22);
   header.writeUInt16LE(fileNameBuffer.length, 26);
   header.writeUInt16LE(0, 28);
 
-  return Buffer.concat([header, fileNameBuffer, contentsBuffer]);
+  return Buffer.concat([header, fileNameBuffer, payloadBuffer]);
 }

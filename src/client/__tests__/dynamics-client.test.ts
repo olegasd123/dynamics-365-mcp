@@ -286,4 +286,42 @@ describe("DynamicsClient", () => {
       ttlMs: 300_000,
     });
   });
+
+  it("invokes bound actions with a POST body", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ ExportTranslationFile: "UEsDBA==" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    global.fetch = fetchMock;
+
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
+
+    const response = await client.invokeAction(
+      env,
+      "solutions/Microsoft.Dynamics.CRM.ExportTranslation",
+      {
+        SolutionName: "SYNERGIE_TalentPlug",
+      },
+      { timeout: 45000 },
+    );
+
+    expect(response).toEqual({ ExportTranslationFile: "UEsDBA==" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://dev.crm.dynamics.com/api/data/v9.2/solutions/Microsoft.Dynamics.CRM.ExportTranslation",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ SolutionName: "SYNERGIE_TalentPlug" }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-1",
+          "Content-Type": "application/json",
+        }),
+      }),
+    );
+  });
 });

@@ -7,7 +7,10 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_TRANSIENT_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 
 export interface RetryPolicyRequest {
+  body?: string;
   env: EnvironmentConfig;
+  headers?: Record<string, string>;
+  method?: string;
   timeoutMs: number;
   url: string;
 }
@@ -43,8 +46,11 @@ export class RetryPolicy {
     while (attempt < this.maxRetries) {
       try {
         const result = await this.transport.send({
+          body: request.body,
           env: request.env,
           forceRefreshToken,
+          headers: request.headers,
+          method: request.method,
           timeoutMs: request.timeoutMs,
           url: request.url,
         });

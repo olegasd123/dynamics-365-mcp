@@ -162,6 +162,38 @@ export class DynamicsClient {
     );
   }
 
+  async invokeAction<T = Record<string, unknown>>(
+    env: EnvironmentConfig,
+    actionPath: string,
+    body?: Record<string, unknown>,
+    options?: RequestOptions,
+  ): Promise<T> {
+    const url = this.buildUrl(env, actionPath);
+    const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
+    const { response, callId } = await this.retryPolicy.send({
+      body: body ? JSON.stringify(body) : undefined,
+      env,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      timeoutMs: timeout,
+      url,
+    });
+
+    if (!response.ok) {
+      await this.throwApiError(env, response, callId);
+    }
+
+    const rawBody = await response.text();
+    const data = rawBody ? (JSON.parse(rawBody) as T) : ({} as T);
+    requestLogger.logHttpResponse(callId, {
+      status: response.status,
+      body: data,
+    });
+    return data;
+  }
+
   clearCache(environmentName?: string): void {
     this.responseCache.clear(environmentName ? `${environmentName}|` : undefined);
   }
