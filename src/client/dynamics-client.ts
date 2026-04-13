@@ -1,5 +1,5 @@
 import type { TokenManager } from "../auth/token-manager.js";
-import type { EnvironmentConfig } from "../config/types.js";
+import { DEFAULT_DYNAMICS_API_VERSION, type EnvironmentConfig } from "../config/types.js";
 import { requestLogger } from "../logging/request-logger.js";
 import { DynamicsApiError, DynamicsRequestError } from "./errors.js";
 import { HttpTransport } from "./http-transport.js";
@@ -176,7 +176,8 @@ export class DynamicsClient {
   }
 
   private buildUrl(env: EnvironmentConfig, resourcePath: string, queryParams?: string): string {
-    const baseUrl = `${env.url}/api/data/v9.2/${resourcePath}`;
+    const apiVersion = env.apiVersion ?? DEFAULT_DYNAMICS_API_VERSION;
+    const baseUrl = `${env.url}/api/data/${apiVersion}/${resourcePath}`;
     return queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
   }
 

@@ -57,6 +57,28 @@ describe("DynamicsClient", () => {
     expect(first).not.toBe(second);
   });
 
+  it("uses the configured api version when building request URLs", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(createODataResponse([{ accountid: "1", name: "Account" }]));
+    global.fetch = fetchMock;
+
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
+
+    await client.query({ ...env, apiVersion: "v9.1" }, "accounts", "$select=name", {
+      bypassCache: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://dev.crm.dynamics.com/api/data/v9.1/accounts?$select=name",
+      expect.any(Object),
+    );
+  });
+
   it("deduplicates concurrent query calls for the same cache key", async () => {
     let resolveResponse: ((value: Response) => void) | undefined;
     const responsePromise = new Promise<Response>((resolve) => {

@@ -1,11 +1,21 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
-import type { AppConfig, EnvironmentConfig } from "./types.js";
+import { DEFAULT_DYNAMICS_API_VERSION, type AppConfig, type EnvironmentConfig } from "./types.js";
 
 interface ConnectionStringEnvironmentEntry {
   name?: string;
   connectionString?: string;
+}
+
+interface EnvironmentJsonEntry {
+  name?: string;
+  url?: string;
+  apiVersion?: string;
+  tenantId?: string;
+  authType?: string;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 interface ConnectionStringsEnvPayload {
@@ -49,6 +59,7 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
     return {
       name: "default",
       url: url.replace(/\/$/, ""),
+      apiVersion: DEFAULT_DYNAMICS_API_VERSION,
       tenantId,
       authType: "deviceCode",
       clientId,
@@ -62,6 +73,7 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
   return {
     name: "default",
     url: url.replace(/\/$/, ""),
+    apiVersion: DEFAULT_DYNAMICS_API_VERSION,
     tenantId,
     authType: "clientSecret",
     clientId,
@@ -115,7 +127,7 @@ function loadFromJsonFile(filePath: string): AppConfig {
     throw new Error("Config file must contain an 'environments' array");
   }
 
-  const environments: EnvironmentConfig[] = json.environments.map((env: Record<string, string>) => {
+  const environments: EnvironmentConfig[] = json.environments.map((env: EnvironmentJsonEntry) => {
     if (!env.name || !env.url || !env.tenantId) {
       throw new Error(
         `Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId)`,
@@ -132,6 +144,7 @@ function loadFromJsonFile(filePath: string): AppConfig {
     return {
       name: env.name,
       url: env.url.replace(/\/$/, ""),
+      apiVersion: env.apiVersion || DEFAULT_DYNAMICS_API_VERSION,
       tenantId: env.tenantId,
       authType,
       clientId: env.clientId,
