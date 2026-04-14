@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, query } from "../utils/odata-builder.js";
+import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
 
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,
@@ -50,7 +50,7 @@ export function getWebResourceContentQuery(): string {
 export function getWebResourceContentByNameQuery(resourceName: string): string {
   return query()
     .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
-    .filter(eq("name", resourceName))
+    .filter(or(eq("name", resourceName), eq("webresourceid", resourceName)))
     .toString();
 }
 

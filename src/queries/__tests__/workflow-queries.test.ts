@@ -37,7 +37,9 @@ describe("workflow queries", () => {
   it("builds the workflow details query by unique name", () => {
     const query = getWorkflowDetailsByIdentityQuery({ uniqueName: "contoso_O'Hara" });
 
-    expect(query).toContain("$filter=uniquename eq 'contoso_O''Hara' and type eq 1");
+    expect(query).toContain(
+      "$filter=(uniquename eq 'contoso_O''Hara' or workflowid eq 'contoso_O''Hara') and type eq 1",
+    );
     expect(query).toContain("triggeronupdateattributelist");
   });
 });

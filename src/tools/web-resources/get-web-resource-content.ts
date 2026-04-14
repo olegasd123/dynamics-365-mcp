@@ -6,12 +6,13 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const TEXT_TYPES = new Set([1, 2, 3, 4, 9, 12]); // HTML, CSS, JS, XML, XSL, RESX
 
 const getWebResourceContentSchema = {
   environment: z.string().optional().describe("Environment name"),
-  name: z.string().describe("Web resource name (e.g. 'new_/scripts/main.js')"),
+  name: z.string().describe("Web resource name or web resource id"),
 };
 
 type GetWebResourceContentParams = ToolParams<typeof getWebResourceContentSchema>;
@@ -36,6 +37,10 @@ export async function handleGetWebResourceContent(
         found: false,
         name: resourceName,
       });
+    }
+
+    if (resources.length > 1) {
+      throw createAmbiguousWebResourceError(env.name, resourceName, resources);
     }
 
     const resource = resources[0];
@@ -105,4 +110,37 @@ export function registerGetWebResourceContent(
   client: DynamicsClient,
 ) {
   registerTool(server, getWebResourceContentTool, { config, client });
+}
+
+function createAmbiguousWebResourceError(
+  environmentName: string,
+  resourceRef: string,
+  matches: Record<string, unknown>[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Web resource '${resourceRef}' is ambiguous in '${environmentName}'. Choose a web resource and try again. Matches: ${matches.map(formatWebResourceMatch).join(", ")}.`,
+    {
+      parameter: "name",
+      options: matches.map((resource) => createWebResourceOption(resource)),
+    },
+  );
+}
+
+function createWebResourceOption(resource: Record<string, unknown>): AmbiguousMatchOption {
+  return {
+    value: String(resource.webresourceid || ""),
+    label: formatWebResourceMatch(resource),
+  };
+}
+
+function formatWebResourceMatch(resource: Record<string, unknown>): string {
+  const name = String(resource.name || "");
+  const displayName = String(resource.displayname || "");
+  const identity = String(resource.webresourceid || "");
+
+  if (displayName) {
+    return `${name} - ${displayName} (${identity})`;
+  }
+
+  return `${name} (${identity})`;
 }

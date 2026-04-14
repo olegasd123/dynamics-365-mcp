@@ -93,11 +93,7 @@ export async function fetchDefaultGlobalBusinessUnitName(
   }
 
   if (rootBusinessUnits.length > 1) {
-    throw new Error(
-      `Default global business unit is ambiguous in '${env.name}'. Matches: ${rootBusinessUnits
-        .map((unit) => unit.name)
-        .join(", ")}.`,
-    );
+    throw createAmbiguousDefaultGlobalBusinessUnitError(env.name, rootBusinessUnits);
   }
 
   throw new Error(`Default global business unit not found in '${env.name}'.`);
@@ -205,6 +201,26 @@ function normalizeRootBusinessUnit(record: Record<string, unknown>): RootBusines
     ...record,
     businessunitid: String(record.businessunitid || ""),
     name: String(record.name || ""),
+  };
+}
+
+function createAmbiguousDefaultGlobalBusinessUnitError(
+  environmentName: string,
+  matches: RootBusinessUnitRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Default global business unit is ambiguous in '${environmentName}'. Choose a business unit and try again. Matches: ${matches.map((unit) => unit.name).join(", ")}.`,
+    {
+      parameter: "businessUnitName",
+      options: matches.map((unit) => createRootBusinessUnitOption(unit)),
+    },
+  );
+}
+
+function createRootBusinessUnitOption(unit: RootBusinessUnitRecord): AmbiguousMatchOption {
+  return {
+    value: unit.businessunitid,
+    label: unit.name || unit.businessunitid,
   };
 }
 

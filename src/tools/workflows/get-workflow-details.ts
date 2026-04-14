@@ -7,6 +7,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { getWorkflowDetailsByIdentityQuery } from "../../queries/workflow-queries.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
   0: "Workflow",
@@ -28,7 +29,7 @@ const SCOPE_LABELS: Record<number, string> = {
 const getWorkflowDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
   workflowName: z.string().optional().describe("Workflow name (display name)"),
-  uniqueName: z.string().optional().describe("Workflow unique name"),
+  uniqueName: z.string().optional().describe("Workflow unique name or workflow id"),
 };
 
 type GetWorkflowDetailsParams = ToolParams<typeof getWorkflowDetailsSchema>;
@@ -62,6 +63,10 @@ export async function handleGetWorkflowDetails(
         workflowName: workflowName || null,
         uniqueName: uniqueName || null,
       });
+    }
+
+    if (workflows.length > 1) {
+      throw createAmbiguousWorkflowError(env.name, workflowName || uniqueName || "", workflows);
     }
 
     const w = workflows[0];
@@ -161,6 +166,35 @@ export function registerGetWorkflowDetails(
   client: DynamicsClient,
 ) {
   registerTool(server, getWorkflowDetailsTool, { config, client });
+}
+
+function createAmbiguousWorkflowError(
+  environmentName: string,
+  workflowRef: string,
+  matches: Record<string, unknown>[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Workflow '${workflowRef}' is ambiguous in '${environmentName}'. Choose a workflow and try again. Matches: ${matches.map(formatWorkflowMatch).join(", ")}.`,
+    {
+      parameter: "uniqueName",
+      options: matches.map((workflow) => createWorkflowOption(workflow)),
+    },
+  );
+}
+
+function createWorkflowOption(workflow: Record<string, unknown>): AmbiguousMatchOption {
+  const identity = String(workflow.uniquename || workflow.workflowid || "");
+
+  return {
+    value: identity,
+    label: formatWorkflowMatch(workflow),
+  };
+}
+
+function formatWorkflowMatch(workflow: Record<string, unknown>): string {
+  const name = String(workflow.name || "");
+  const identity = String(workflow.uniquename || workflow.workflowid || "");
+  return `${name} (${identity})`;
 }
 
 function parseJsonValue(value: unknown): unknown {

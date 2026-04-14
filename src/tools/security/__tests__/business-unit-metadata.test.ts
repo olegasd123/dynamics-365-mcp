@@ -84,4 +84,30 @@ describe("business unit metadata", () => {
 
     await expect(fetchDefaultGlobalBusinessUnitName(env, client)).resolves.toBe("Root");
   });
+
+  it("returns structured options when the default global business unit is ambiguous", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root-1",
+            name: "Root One",
+          },
+          {
+            businessunitid: "bu-root-2",
+            name: "Root Two",
+          },
+        ],
+      },
+    });
+
+    await expect(fetchDefaultGlobalBusinessUnitName(env, client)).rejects.toMatchObject({
+      name: "AmbiguousMatchError",
+      parameter: "businessUnitName",
+      options: [
+        { value: "bu-root-1", label: "Root One" },
+        { value: "bu-root-2", label: "Root Two" },
+      ],
+    });
+  });
 });
