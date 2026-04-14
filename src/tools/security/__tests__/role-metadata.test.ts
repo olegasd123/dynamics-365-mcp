@@ -173,6 +173,79 @@ describe("role metadata", () => {
     );
   });
 
+  it("loads Managers from the root business unit when no business unit is provided", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-root",
+            name: "Managers",
+            _businessunitid_value: "bu-root",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+          {
+            roleid: "role-child",
+            name: "Managers",
+            _businessunitid_value: "bu-child",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Child",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: [
+          {
+            roleprivilegeid: "rp-1",
+            roleid: "role-root",
+            privilegeid: "priv-1",
+            privilegedepthmask: 8,
+            ismanaged: false,
+          },
+        ],
+        privileges: [
+          {
+            privilegeid: "priv-1",
+            name: "prvReadAccount",
+            accessright: 2,
+            canbeglobal: true,
+          },
+        ],
+      },
+    });
+
+    const response = await handleGetRolePrivileges(
+      {
+        environment: "dev",
+        roleName: "Managers",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0]?.text).toContain("## Security Role: Managers");
+    expect(response.content[0]?.text).toContain("- Business Unit: Root");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_role_privileges",
+      ok: true,
+      data: {
+        businessUnit: "Root",
+        role: {
+          roleid: "role-root",
+          name: "Managers",
+          businessUnitName: "Root",
+        },
+      },
+    });
+  });
+
   it("accepts a business unit id when resolving role privileges", async () => {
     const { client } = createRecordingClient({
       dev: {
