@@ -208,10 +208,7 @@ export class RequestLogger {
 
   private stringifyPayload(payload: unknown): string {
     const sanitized = sanitizeValue(payload);
-    const text =
-      typeof sanitized === "string"
-        ? sanitized
-        : JSON.stringify(sanitized, null, 2) || JSON.stringify(String(sanitized));
+    const text = formatPayloadForLog(sanitized);
 
     if (this.config.maxBodyChars > 0 && text.length > this.config.maxBodyChars) {
       return `${text.slice(0, this.config.maxBodyChars)}\n... [truncated ${text.length - this.config.maxBodyChars} chars]`;
@@ -393,6 +390,81 @@ function normalizeError(error: unknown): Record<string, unknown> {
     name: "Error",
     message: typeof error === "string" ? error : String(error),
   };
+}
+
+function formatPayloadForLog(payload: unknown): string {
+  if (typeof payload === "string") {
+    return payload;
+  }
+
+  if (isRecord(payload)) {
+    const formattedToolResponse = formatToolResponsePayload(payload);
+    if (formattedToolResponse) {
+      return formattedToolResponse;
+    }
+  }
+
+  return JSON.stringify(payload, null, 2) || JSON.stringify(String(payload));
+}
+
+function formatToolResponsePayload(payload: Record<string, unknown>): string | null {
+  if (!Array.isArray(payload.content)) {
+    return null;
+  }
+
+  const extractedSections: string[] = [];
+  const extractedTextRefs = new Map<string, string>();
+  const normalizedPayload: Record<string, unknown> = {
+    ...payload,
+    content: payload.content.map((entry, index) => {
+      if (!isTextContent(entry)) {
+        return entry;
+      }
+
+      const label = `content[${index}].text`;
+      extractedSections.push(`${label}:\n${entry.text}`);
+      extractedTextRefs.set(entry.text, label);
+      return {
+        ...entry,
+        text: `[see ${label} above]`,
+      };
+    }),
+  };
+
+  if (
+    isRecord(payload.structuredContent) &&
+    typeof payload.structuredContent.summary === "string"
+  ) {
+    const summary = payload.structuredContent.summary;
+    const existingRef = extractedTextRefs.get(summary);
+
+    normalizedPayload.structuredContent = {
+      ...payload.structuredContent,
+      summary: existingRef
+        ? `[same as ${existingRef}]`
+        : summary.includes("\n")
+          ? "[see structuredContent.summary above]"
+          : summary,
+    };
+
+    if (!existingRef && summary.includes("\n")) {
+      extractedSections.push(`structuredContent.summary:\n${summary}`);
+    }
+  }
+
+  if (extractedSections.length === 0) {
+    return null;
+  }
+
+  return `${extractedSections.join("\n\n")}\n\npayload:\n${JSON.stringify(normalizedPayload, null, 2)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isTextContent(value: unknown): value is { type: "text"; text: string } {
+  return isRecord(value) && value.type === "text" && typeof value.text === "string";
 }
 
 function isSimpleValue(value: unknown): boolean {

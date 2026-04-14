@@ -95,6 +95,41 @@ describe("request logger", () => {
     expect(text).toContain("Something failed");
   });
 
+  it("writes multiline tool text with real line breaks", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "d365-mcp-logs-"));
+    requestLogger.configureFromEnv({
+      D365_MCP_LOG_ENABLED: "true",
+      D365_MCP_LOG_DIR: tempDir,
+    });
+
+    const server = new FakeServer();
+    instrumentServerToolLogging(server as never);
+
+    server.tool("demo_markdown", "Demo Markdown", {}, async () =>
+      createToolSuccessResponse(
+        "demo_markdown",
+        "## Table Ribbons: Entreprise\n- Environment: synergie-dev\n- Table: account",
+        "## Table Ribbons: Entreprise\n- Environment: synergie-dev\n- Table: account",
+        { ok: true },
+      ),
+    );
+
+    const handler = server.getHandler("demo_markdown");
+    await handler({}, { requestId: "req-100" });
+
+    const [dateFolder] = readdirSync(tempDir);
+    const [fileName] = readdirSync(join(tempDir, dateFolder));
+    const text = readFileSync(join(tempDir, dateFolder, fileName), "utf8");
+
+    expect(text).toContain(
+      "content[0].text:\n## Table Ribbons: Entreprise\n- Environment: synergie-dev\n- Table: account",
+    );
+    expect(text).toContain('"summary": "[same as content[0].text]"');
+    expect(text).not.toContain(
+      '"text": "## Table Ribbons: Entreprise\\n- Environment: synergie-dev\\n- Table: account"',
+    );
+  });
+
   it("expands ~ in the log directory path", () => {
     requestLogger.configureFromEnv(
       {
