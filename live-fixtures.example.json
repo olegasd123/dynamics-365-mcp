@@ -9,7 +9,6 @@
       {
         "name": "account name",
         "enabled": false,
-        "skipReason": "This test is currently disabled.",
         "arguments": {
           "environment": "dev",
           "table": "account",
@@ -288,6 +287,18 @@
         }
       }
     ],
+    "get_ribbon_button_details": [
+      {
+        "name": "account ribbon button",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "buttonName": "Replace With Real Ribbon Button Name",
+          "location": "form"
+        }
+      }
+    ],
     "get_business_units_details": [
       {
         "name": "sales unit",
@@ -557,6 +568,15 @@
           "environment": "dev",
           "nameFilter": "account",
           "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_table_ribbons": [
+      {
+        "name": "account ribbons",
+        "arguments": {
+          "environment": "dev",
+          "table": "account"
         }
       }
     ],

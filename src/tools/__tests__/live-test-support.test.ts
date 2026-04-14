@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   countConfiguredLiveCases,
@@ -6,6 +7,7 @@ import {
   DEFAULT_MAX_LOGGED_REQUEST_CHARS,
   DEFAULT_MAX_LOGGED_REQUESTS,
   getLiveMaxParallel,
+  loadLiveFixtures,
   getMaxLoggedRequestChars,
   getMaxLoggedRequests,
   getSelectedLiveCases,
@@ -13,6 +15,7 @@ import {
   type LiveFixtures,
 } from "./live-test-support.js";
 import { formatFailuresAssertionMessage } from "./live-test-reporting.js";
+import { EXPECTED_TOOL_NAMES } from "./tool-test-helpers.js";
 
 describe("live test support", () => {
   it("defaults live parallelism to one", () => {
@@ -137,6 +140,16 @@ describe("live test support", () => {
 
     expect(results).toEqual([0, 2, 4, 6, 8]);
     expect(peak).toBe(2);
+  });
+
+  it("loads the tracked example fixtures for every tool, including ribbons", () => {
+    const fixtures = loadLiveFixtures(
+      fileURLToPath(new URL("../../../live-fixtures.example.json", import.meta.url)),
+    );
+
+    expect(() => getSelectedLiveCases(fixtures, EXPECTED_TOOL_NAMES, () => 0)).not.toThrow();
+    expect(fixtures.tools.list_table_ribbons).toHaveLength(1);
+    expect(fixtures.tools.get_ribbon_button_details).toHaveLength(1);
   });
 
   it("limits request details in live failure messages", () => {
