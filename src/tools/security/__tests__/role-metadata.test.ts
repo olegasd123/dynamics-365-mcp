@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import { handleGetRolePrivileges } from "../get-role-privileges.js";
 import { fetchRolePrivileges, listSecurityRoles } from "../role-metadata.js";
 
 describe("role metadata", () => {
@@ -170,5 +171,63 @@ describe("role metadata", () => {
         entitySet: "businessunits",
       }),
     );
+  });
+
+  it("returns structured retry options when the role name is ambiguous", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-1",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+          {
+            roleid: "role-2",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+        ],
+      },
+    });
+
+    const response = await handleGetRolePrivileges(
+      {
+        environment: "dev",
+        roleName: "Salesperson",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a role and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_role_privileges",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "roleName",
+        options: [
+          { value: "role-1", label: "Salesperson [Root] (role-1)" },
+          { value: "role-2", label: "Salesperson [Root] (role-2)" },
+        ],
+        retryable: false,
+      },
+    });
   });
 });

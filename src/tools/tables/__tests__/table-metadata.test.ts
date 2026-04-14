@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import { handleGetTableSchema } from "../get-table-schema.js";
 import {
   fetchTableSchema,
   listTables,
@@ -336,5 +337,59 @@ describe("table metadata", () => {
           "$select=MetadataId,LogicalName,SchemaName,DisplayName,Description,AttributeType,AttributeTypeName,RequiredLevel,IsPrimaryId,IsPrimaryName,IsAuditEnabled,IsValidForAdvancedFind,IsValidForCreate,IsValidForRead,IsValidForUpdate,IsCustomAttribute,IsSecured&$filter=AttributeOf eq null&$orderby=LogicalName asc",
       },
     ]);
+  });
+
+  it("returns structured retry options when the table name is ambiguous", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+          {
+            MetadataId: "table-2",
+            LogicalName: "new_account",
+            SchemaName: "New_Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "new_accounts",
+          },
+        ],
+      },
+    });
+
+    const response = await handleGetTableSchema(
+      {
+        environment: "dev",
+        table: "count",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a table and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_table_schema",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "table",
+        options: [
+          { value: "account", label: "Account, logical=account, schema=Account" },
+          { value: "new_account", label: "Account, logical=new_account, schema=New_Account" },
+        ],
+        retryable: false,
+      },
+    });
   });
 });

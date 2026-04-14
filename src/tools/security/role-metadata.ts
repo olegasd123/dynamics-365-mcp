@@ -11,6 +11,7 @@ import {
   queryRecordsByIdsInChunks,
 } from "../../utils/query-batching.js";
 import { fetchDefaultGlobalBusinessUnitName as fetchDefaultGlobalBusinessUnitNameMetadata } from "./business-unit-metadata.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const DEPTH_MASK_LABELS: Array<{ mask: number; label: string }> = [
   { mask: 1, label: "Basic" },
@@ -115,11 +116,7 @@ export async function resolveSecurityRole(
   }
 
   if (resolvedMatches.ambiguous.length > 1) {
-    throw new Error(
-      `Security role '${roleRef}' is ambiguous in '${env.name}'. Matches: ${resolvedMatches.ambiguous
-        .map((role) => `${role.name} [${role.businessUnitName}]`)
-        .join(", ")}.`,
-    );
+    throw createAmbiguousSecurityRoleError(roleRef, env.name, resolvedMatches.ambiguous);
   }
 
   throw new Error(`Security role '${roleRef}' not found in '${env.name}'.`);
@@ -412,4 +409,25 @@ function uniqueRoles(roles: SecurityRoleRecord[]): SecurityRoleRecord[] {
     seen.add(role.roleid);
     return true;
   });
+}
+
+function createAmbiguousSecurityRoleError(
+  roleRef: string,
+  environmentName: string,
+  matches: SecurityRoleRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Security role '${roleRef}' is ambiguous in '${environmentName}'. Choose a role and try again. Matches: ${matches.map((role) => `${role.name} [${role.businessUnitName}]`).join(", ")}.`,
+    {
+      parameter: "roleName",
+      options: matches.map((role) => createSecurityRoleOption(role)),
+    },
+  );
+}
+
+function createSecurityRoleOption(role: SecurityRoleRecord): AmbiguousMatchOption {
+  return {
+    value: role.roleid,
+    label: `${role.name} [${role.businessUnitName || "-"}] (${role.roleid})`,
+  };
 }
