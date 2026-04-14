@@ -451,13 +451,13 @@ function resolveByName<T>(
   displayName: (item: T) => string,
   itemLabel: string,
   environmentName: string,
-  ambiguity?: {
+  ambiguity: {
     parameter: string;
     option: (item: T) => AmbiguousMatchOption;
     uniqueKey: (item: T) => string;
   },
 ): T {
-  const uniqueKey = ambiguity?.uniqueKey || displayName;
+  const uniqueKey = ambiguity.uniqueKey;
 
   const exactMatches = uniqueByKey(
     items.filter((item) => candidateNames(item).some((name) => name === itemRef)),
@@ -492,22 +492,14 @@ function resolveByName<T>(
   );
 
   if (matches.length > 1) {
-    if (ambiguity) {
-      throw new AmbiguousMatchError(
-        `${itemLabel} '${itemRef}' is ambiguous in '${environmentName}'. Choose a matching ${itemLabel.toLowerCase()} and try again. Matches: ${matches
-          .map((item) => displayName(item))
-          .join(", ")}.`,
-        {
-          parameter: ambiguity.parameter,
-          options: matches.map((item) => ambiguity.option(item)),
-        },
-      );
-    }
-
-    throw new Error(
-      `${itemLabel} '${itemRef}' is ambiguous in '${environmentName}'. Matches: ${matches
+    throw new AmbiguousMatchError(
+      `${itemLabel} '${itemRef}' is ambiguous in '${environmentName}'. Choose a matching ${itemLabel.toLowerCase()} and try again. Matches: ${matches
         .map((item) => displayName(item))
         .join(", ")}.`,
+      {
+        parameter: ambiguity.parameter,
+        options: matches.map((item) => ambiguity.option(item)),
+      },
     );
   }
 
