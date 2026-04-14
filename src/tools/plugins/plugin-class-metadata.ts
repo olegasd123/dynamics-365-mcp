@@ -161,7 +161,11 @@ function resolveSinglePluginClass(
     return matches[0];
   }
   if (matches.length > 1) {
-    throw createAmbiguousPluginClassError("match", matches, "Plugin match is ambiguous.");
+    throw createAmbiguousPluginClassError(
+      matches[0]?.friendlyName || matches[0]?.fullName || "plugin",
+      matches,
+      "Plugin match is ambiguous.",
+    );
   }
   return null;
 }

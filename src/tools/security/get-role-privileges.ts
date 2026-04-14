@@ -7,6 +7,7 @@ import { defineTool, registerTool, type ToolContext, type ToolParams } from "../
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { fetchRolePrivileges } from "./role-metadata.js";
+import { AmbiguousMatchError } from "../tool-errors.js";
 
 const getRolePrivilegesSchema = {
   environment: z.string().optional().describe("Environment name"),
@@ -63,7 +64,7 @@ export async function handleGetRolePrivileges(
       },
     );
   } catch (error) {
-    return createToolErrorResponse("get_role_privileges", error);
+    return createToolErrorResponse("get_role_privileges", remapRolePrivilegesError(error));
   }
 }
 
@@ -80,4 +81,15 @@ export function registerGetRolePrivileges(
   client: DynamicsClient,
 ) {
   registerTool(server, getRolePrivilegesTool, { config, client });
+}
+
+function remapRolePrivilegesError(error: unknown): unknown {
+  if (!(error instanceof AmbiguousMatchError) || error.parameter !== "businessUnitName") {
+    return error;
+  }
+
+  return new AmbiguousMatchError(error.message, {
+    parameter: "businessUnit",
+    options: error.options,
+  });
 }

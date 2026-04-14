@@ -325,7 +325,7 @@ describe("role metadata", () => {
       error: {
         name: "AmbiguousMatchError",
         code: "ambiguous_match",
-        parameter: "businessUnitName",
+        parameter: "businessUnit",
         options: [
           { value: "bu-root-1", label: "Root One" },
           { value: "bu-root-2", label: "Root Two" },

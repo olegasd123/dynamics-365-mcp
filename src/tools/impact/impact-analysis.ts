@@ -608,6 +608,7 @@ async function resolveColumnTarget(
   }
 
   if (matches.length > 1) {
+    const optionValuePrefix = tableRef ? "" : `${table.logicalName}.`;
     throw new AmbiguousMatchError(
       `Column '${columnName}' is ambiguous on table '${table.logicalName}' in '${env.name}'. Choose a matching column and try again. Matches: ${matches
         .map((column) => column.logicalName)
@@ -615,8 +616,8 @@ async function resolveColumnTarget(
       {
         parameter: "name",
         options: matches.map((column) => ({
-          value: column.logicalName,
-          label: column.logicalName,
+          value: `${optionValuePrefix}${column.logicalName}`,
+          label: `${table.logicalName}.${column.logicalName}`,
         })),
       },
     );

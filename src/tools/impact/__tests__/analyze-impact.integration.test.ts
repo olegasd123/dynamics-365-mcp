@@ -471,8 +471,8 @@ describe("analyze_impact tool", () => {
         code: "ambiguous_match",
         parameter: "name",
         options: [
-          { value: "faxextension", label: "faxextension" },
-          { value: "faxnumber", label: "faxnumber" },
+          { value: "faxextension", label: "account.faxextension" },
+          { value: "faxnumber", label: "account.faxnumber" },
         ],
         retryable: false,
       },
@@ -533,6 +533,66 @@ describe("analyze_impact tool", () => {
             value: "wr-2",
             label: "contoso_/scripts/shared.js (wr-2)",
           },
+        ],
+        retryable: false,
+      },
+    });
+  });
+
+  it("returns fully qualified retry values for ambiguous column names without a table parameter", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "col-1",
+            LogicalName: "faxnumber",
+            DisplayName: { UserLocalizedLabel: { Label: "Fax Number" } },
+            AttributeType: "String",
+          },
+          {
+            MetadataId: "col-2",
+            LogicalName: "faxextension",
+            DisplayName: { UserLocalizedLabel: { Label: "Fax Extension" } },
+            AttributeType: "String",
+          },
+        ],
+        pluginassemblies: [],
+        workflows: [],
+        webresourceset: [],
+        solutions: [],
+      },
+    });
+
+    registerAnalyzeImpact(server as never, config, client);
+
+    const response = await server.getHandler("analyze_impact")({
+      componentType: "column",
+      name: "account.fax",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.structuredContent).toMatchObject({
+      tool: "analyze_impact",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "name",
+        options: [
+          { value: "account.faxextension", label: "account.faxextension" },
+          { value: "account.faxnumber", label: "account.faxnumber" },
         ],
         retryable: false,
       },

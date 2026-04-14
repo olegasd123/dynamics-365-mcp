@@ -108,4 +108,47 @@ describe("list_security_roles", () => {
       }),
     ]);
   });
+
+  it("returns structured retry options when the default business unit is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root-1",
+            name: "Root One",
+          },
+          {
+            businessunitid: "bu-root-2",
+            name: "Root Two",
+          },
+        ],
+        roles: [],
+      },
+    });
+
+    registerListSecurityRoles(server as never, config, client);
+    const response = await server.getHandler("list_security_roles")({
+      environment: "dev",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Default global business unit is ambiguous");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "list_security_roles",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "businessUnit",
+        options: [
+          { value: "bu-root-1", label: "Root One" },
+          { value: "bu-root-2", label: "Root Two" },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });
