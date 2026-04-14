@@ -65,4 +65,51 @@ describe("get_business_units_details", () => {
       }),
     ]);
   });
+
+  it("returns structured retry options when the business unit name is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-sales-root",
+            name: "Sales",
+            _parentbusinessunitid_value: "bu-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+          {
+            businessunitid: "bu-sales-emea",
+            name: "Sales",
+            _parentbusinessunitid_value: "bu-emea",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "EMEA",
+          },
+        ],
+      },
+    });
+
+    registerGetBusinessUnitsDetails(server as never, config, client);
+    const response = await server.getHandler("get_business_units_details")({
+      environment: "dev",
+      businessUnitName: "Sales",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a business unit and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_business_units_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "businessUnitName",
+        options: [
+          { value: "bu-sales-root", label: "Sales [Root]" },
+          { value: "bu-sales-emea", label: "Sales [EMEA]" },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });

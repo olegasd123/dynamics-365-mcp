@@ -35,7 +35,7 @@ interface PluginStepDetails extends Record<string, unknown> {
 
 const getPluginAssemblyDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
-  assemblyName: z.string().describe("Name of the plugin assembly"),
+  assemblyName: z.string().describe("Name or id of the plugin assembly"),
 };
 
 type GetPluginAssemblyDetailsParams = ToolParams<typeof getPluginAssemblyDetailsSchema>;

@@ -172,6 +172,49 @@ describe("get_plugin_assembly_details tool", () => {
     });
   });
 
+  it("returns structured retry options when the assembly name is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        pluginassemblies: [
+          {
+            pluginassemblyid: "asm-1",
+            name: "Core.Plugins",
+          },
+          {
+            pluginassemblyid: "asm-2",
+            name: "core.plugins",
+          },
+        ],
+      },
+    });
+
+    registerGetPluginAssemblyDetails(server as never, config, client);
+
+    const response = await server.getHandler("get_plugin_assembly_details")({
+      assemblyName: "CORE.PLUGINS",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose an assembly and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_plugin_assembly_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "assemblyName",
+        options: [
+          { value: "asm-1", label: "Core.Plugins (asm-1)" },
+          { value: "asm-2", label: "core.plugins (asm-2)" },
+        ],
+        retryable: false,
+      },
+    });
+  });
+
   it("returns an error when the client query fails", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);

@@ -118,7 +118,7 @@ export const listPluginAssemblyImagesTool = defineTool({
     "List pre/post entity images registered on steps for a plugin assembly in Dynamics 365.",
   schema: {
     environment: z.string().optional().describe("Environment name"),
-    assemblyName: z.string().describe("Name of the plugin assembly"),
+    assemblyName: z.string().describe("Name or id of the plugin assembly"),
     stepName: z.string().optional().describe("Filter by specific step name"),
     message: z.string().optional().describe("Filter by message name (e.g. 'Create', 'Update')"),
   },

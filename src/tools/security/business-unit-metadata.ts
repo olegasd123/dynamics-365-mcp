@@ -4,6 +4,7 @@ import {
   listBusinessUnitsQuery,
   listRootBusinessUnitsQuery,
 } from "../../queries/security-queries.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 export interface BusinessUnitRecord extends Record<string, unknown> {
   businessunitid: string;
@@ -125,13 +126,7 @@ function resolveBusinessUnitFromRecords(
 
   if (matches.length > 1 || exactName.length > 1) {
     const ambiguous = uniqueBusinessUnits([...matches, ...exactName]);
-    throw new Error(
-      `Business unit '${businessUnitRef}' is ambiguous in '${environmentName}'. Matches: ${ambiguous
-        .map((unit) =>
-          unit.parentBusinessUnitName ? `${unit.name} [${unit.parentBusinessUnitName}]` : unit.name,
-        )
-        .join(", ")}.`,
-    );
+    throw createAmbiguousBusinessUnitError(businessUnitRef, environmentName, ambiguous);
   }
 
   throw new Error(`Business unit '${businessUnitRef}' not found in '${environmentName}'.`);
@@ -178,6 +173,31 @@ function normalizeBusinessUnit(record: Record<string, unknown>): BusinessUnitRec
     modifiedon: String(record.modifiedon || ""),
     isRoot: !parentBusinessUnitId,
   };
+}
+
+function createAmbiguousBusinessUnitError(
+  businessUnitRef: string,
+  environmentName: string,
+  matches: BusinessUnitRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Business unit '${businessUnitRef}' is ambiguous in '${environmentName}'. Choose a business unit and try again. Matches: ${matches.map(formatBusinessUnitMatch).join(", ")}.`,
+    {
+      parameter: "businessUnitName",
+      options: matches.map((unit) => createBusinessUnitOption(unit)),
+    },
+  );
+}
+
+function createBusinessUnitOption(unit: BusinessUnitRecord): AmbiguousMatchOption {
+  return {
+    value: unit.businessunitid,
+    label: formatBusinessUnitMatch(unit),
+  };
+}
+
+function formatBusinessUnitMatch(unit: BusinessUnitRecord): string {
+  return unit.parentBusinessUnitName ? `${unit.name} [${unit.parentBusinessUnitName}]` : unit.name;
 }
 
 function normalizeRootBusinessUnit(record: Record<string, unknown>): RootBusinessUnitRecord {
