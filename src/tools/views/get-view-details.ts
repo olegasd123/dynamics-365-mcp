@@ -16,7 +16,7 @@ const STATE_LABELS: Record<number, string> = {
 
 const getViewDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
-  viewName: z.string().describe("View name"),
+  viewName: z.string().describe("View name or view id"),
   table: z.string().optional().describe("Optional table logical name"),
   scope: z.enum(["system", "personal", "all"]).optional().describe("View scope"),
   solution: z

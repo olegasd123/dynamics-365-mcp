@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import { handleGetFormDetails } from "../get-form-details.js";
 import { fetchFormDetails, listForms, resolveForm } from "../form-metadata.js";
 
 describe("form metadata", () => {
@@ -225,5 +226,71 @@ describe("form metadata", () => {
 
     expect(form.formid).toBe("form-current");
     expect(form.name).toBe("Candidat");
+  });
+
+  it("returns structured retry options when the form name is ambiguous", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        systemforms: [
+          {
+            formid: "form-1",
+            name: "Informations",
+            objecttypecode: "account",
+            type: 2,
+            uniquename: "account_information_main",
+            formactivationstate: 1,
+            isdefault: false,
+            ismanaged: false,
+            formxml: "<form />",
+          },
+          {
+            formid: "form-2",
+            name: "Informations",
+            objecttypecode: "contact",
+            type: 2,
+            uniquename: "contact_information_main",
+            formactivationstate: 1,
+            isdefault: false,
+            ismanaged: false,
+            formxml: "<form />",
+          },
+        ],
+      },
+    });
+
+    const response = await handleGetFormDetails(
+      {
+        environment: "dev",
+        formName: "Informations",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a matching form and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_form_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "formName",
+        options: [
+          {
+            value: "account_information_main",
+            label: "account/Main/Informations (account_information_main)",
+          },
+          {
+            value: "contact_information_main",
+            label: "contact/Main/Informations (contact_information_main)",
+          },
+        ],
+        retryable: false,
+      },
+    });
   });
 });

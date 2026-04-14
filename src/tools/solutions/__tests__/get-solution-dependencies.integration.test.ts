@@ -219,7 +219,29 @@ describe("get_solution_dependencies tool", () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content[0].text).toContain("Component 'Account' is ambiguous.");
+    expect(response.content[0].text).toContain("Choose a matching component and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_solution_dependencies",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "componentName",
+        options: [
+          {
+            value: "sc-step-1",
+            label: "Core.Plugins :: Account Create [Create/account] [Core.Plugins] (Plugin Step)",
+          },
+          {
+            value: "sc-step-2",
+            label:
+              "Core.Plugins :: Account Create Audit [Create/account] [Core.Plugins] (Plugin Step)",
+          },
+        ],
+        retryable: false,
+      },
+    });
   });
 
   it("supports milestone 2 component groups in dependency lookups", async () => {

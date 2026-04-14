@@ -32,6 +32,7 @@ import {
   retrieveRequiredComponentsPath,
 } from "../../queries/dependency-queries.js";
 import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const TOOL_COMPONENT_TYPES = {
   table: SOLUTION_COMPONENT_TYPE.table,
@@ -193,7 +194,10 @@ const getSolutionDependenciesSchema = {
     ])
     .optional()
     .describe("Optional component type filter"),
-  componentName: z.string().optional().describe("Optional component name or display name filter"),
+  componentName: z
+    .string()
+    .optional()
+    .describe("Optional component name, display name, object id, or solution component id filter"),
   maxRows: z
     .number()
     .int()
@@ -620,7 +624,10 @@ function selectComponents(
   const needle = componentName.trim().toLowerCase();
   const exactMatches = filtered.filter(
     (component) =>
-      component.name.toLowerCase() === needle || component.displayName.toLowerCase() === needle,
+      component.solutioncomponentid.toLowerCase() === needle ||
+      component.objectid.toLowerCase() === needle ||
+      component.name.toLowerCase() === needle ||
+      component.displayName.toLowerCase() === needle,
   );
 
   if (exactMatches.length === 1) {
@@ -628,24 +635,45 @@ function selectComponents(
   }
 
   if (exactMatches.length > 1) {
-    throw new Error(
-      `Component '${componentName}' is ambiguous. Matches: ${exactMatches.map((component) => component.displayName).join(", ")}.`,
-    );
+    throw createAmbiguousComponentError(componentName, exactMatches);
   }
 
   filtered = filtered.filter(
     (component) =>
+      component.solutioncomponentid.toLowerCase().includes(needle) ||
+      component.objectid.toLowerCase().includes(needle) ||
       component.name.toLowerCase().includes(needle) ||
       component.displayName.toLowerCase().includes(needle),
   );
 
   if (filtered.length > 1) {
-    throw new Error(
-      `Component '${componentName}' is ambiguous. Matches: ${filtered.map((component) => component.displayName).join(", ")}.`,
-    );
+    throw createAmbiguousComponentError(componentName, filtered);
   }
 
   return filtered;
+}
+
+function createAmbiguousComponentError(
+  componentName: string,
+  matches: NamedSolutionComponent[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Component '${componentName}' is ambiguous. Choose a matching component and try again. Matches: ${matches.map((component) => component.displayName).join(", ")}.`,
+    {
+      parameter: "componentName",
+      options: matches.map((component) => createComponentOption(component)),
+    },
+  );
+}
+
+function createComponentOption(component: NamedSolutionComponent): AmbiguousMatchOption {
+  const parentSuffix = component.parentDisplayName ? ` [${component.parentDisplayName}]` : "";
+  const typeLabel = getSolutionComponentTypeLabel(component.componenttype);
+
+  return {
+    value: component.solutioncomponentid,
+    label: `${component.displayName}${parentSuffix} (${typeLabel})`,
+  };
 }
 
 async function fetchDependenciesForComponent(

@@ -16,7 +16,7 @@ const STATE_LABELS: Record<number, string> = {
 
 const getFormDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
-  formName: z.string().describe("Form display name or unique name"),
+  formName: z.string().describe("Form display name, unique name, or form id"),
   table: z.string().optional().describe("Optional table logical name"),
   type: z.enum(["main", "quickCreate", "card"]).optional().describe("Optional form type"),
   solution: z.string().optional().describe("Optional solution display name or unique name"),
