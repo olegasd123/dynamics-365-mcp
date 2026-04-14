@@ -83,7 +83,8 @@ Replace these values before you run a prompt:
 - `<PLUGIN_CLASS>`: plugin class name or full type name
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
-- `<WORKFLOW_UNIQUE_NAME>`: workflow unique name or workflow id
+- `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
+- `<WORKFLOW_ID>`: workflow id
 - `<FORM>`: form display name, unique name, or form id
 - `<VIEW>`: view name or view id
 - `<BUTTON>`: ribbon button label, id, or command name
@@ -154,7 +155,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: none)`
 
 - `get_workflow_details`
-  `In <ENV>, show full details for workflow <WORKFLOW>. If needed, use the unique name or workflow id <WORKFLOW_UNIQUE_NAME>.`
+  `In <ENV>, show full details for workflow <WORKFLOW_NAME>. If needed, use <WORKFLOW_UNIQUE_NAME> / <WORKFLOW_ID>.`
   `(Required: none)`
 
 ## Web Resources
@@ -164,7 +165,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: none)`
 
 - `get_web_resource_content`
-  `In <ENV>, get the content of web resource <WEB_RESOURCE>. You can use either the web resource name or the web resource id.`
+  `In <ENV>, get the content of web resource <WEB_RESOURCE>.`
   `(Required: <WEB_RESOURCE>)`
 
 ## ALM Objects
@@ -303,11 +304,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: <BUSINESS_UNIT>)`
 
 - `list_security_roles`
-  `In <ENV>, list security roles with names that contain 'Sales'. If needed, use business unit <BUSINESS_UNIT> by name or id. Otherwise use the default global business unit.`
+  `In <ENV>, list security roles with names that contain 'Sales'. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`
   `(Required: none)`
 
 - `get_role_privileges`
-  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT> by name or id. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
+  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
 
 ## Usage And Impact
@@ -321,7 +322,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: <COLUMN>)`
 
 - `find_web_resource_usage`
-  `In <ENV>, find where web resource <WEB_RESOURCE> is used in forms and other text web resources. You can use either the web resource name or the web resource id.`
+  `In <ENV>, find where web resource <WEB_RESOURCE> is used in forms and other text web resources.`
   `(Required: <WEB_RESOURCE>)`
 
 - `analyze_create_triggers`
