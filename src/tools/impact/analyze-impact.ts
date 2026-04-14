@@ -13,7 +13,7 @@ const analyzeImpactSchema = {
   componentType: z
     .enum(["table", "column", "plugin", "workflow", "flow", "web_resource", "solution"])
     .describe("Component type to analyze. Use 'plugin' for plugin assembly impact."),
-  name: z.string().describe("Component name, unique name, or other main identifier"),
+  name: z.string().describe("Component name, unique name, or stable id when available"),
   table: z
     .string()
     .optional()

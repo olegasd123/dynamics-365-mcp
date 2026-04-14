@@ -350,4 +350,192 @@ describe("analyze_impact tool", () => {
       },
     });
   });
+
+  it("returns structured retry options for ambiguous impact targets", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+            OwnershipType: { Value: "UserOwned" },
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "col-1",
+            LogicalName: "faxnumber",
+            SchemaName: "FaxNumber",
+            DisplayName: { UserLocalizedLabel: { Label: "Fax Number" } },
+            AttributeType: "String",
+            AttributeTypeName: { Value: "StringType" },
+            RequiredLevel: { Value: "None" },
+            IsPrimaryId: false,
+            IsPrimaryName: false,
+            IsAuditEnabled: { Value: false },
+            IsValidForAdvancedFind: true,
+            IsValidForCreate: true,
+            IsValidForRead: true,
+            IsValidForUpdate: true,
+            IsCustomAttribute: false,
+            IsSecured: false,
+          },
+          {
+            MetadataId: "col-2",
+            LogicalName: "faxextension",
+            SchemaName: "FaxExtension",
+            DisplayName: { UserLocalizedLabel: { Label: "Fax Extension" } },
+            AttributeType: "String",
+            AttributeTypeName: { Value: "StringType" },
+            RequiredLevel: { Value: "None" },
+            IsPrimaryId: false,
+            IsPrimaryName: false,
+            IsAuditEnabled: { Value: false },
+            IsValidForAdvancedFind: true,
+            IsValidForCreate: true,
+            IsValidForRead: true,
+            IsValidForUpdate: true,
+            IsCustomAttribute: false,
+            IsSecured: false,
+          },
+        ],
+        pluginassemblies: [
+          { pluginassemblyid: "asm-1", name: "Core.Plugins" },
+          { pluginassemblyid: "asm-2", name: "core.plugins" },
+        ],
+        workflows: [
+          {
+            workflowid: "wf-1",
+            name: "Shared Workflow",
+            uniquename: "contoso_SharedWorkflow_A",
+            category: 0,
+            statecode: 1,
+          },
+          {
+            workflowid: "wf-2",
+            name: "Shared Workflow",
+            uniquename: "contoso_SharedWorkflow_B",
+            category: 0,
+            statecode: 1,
+          },
+        ],
+        webresourceset: [
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/shared.js",
+            webresourcetype: 3,
+          },
+          {
+            webresourceid: "wr-2",
+            name: "contoso_/scripts/shared.js",
+            webresourcetype: 3,
+          },
+        ],
+      },
+    });
+
+    registerAnalyzeImpact(server as never, config, client);
+
+    const columnResponse = await server.getHandler("analyze_impact")({
+      componentType: "column",
+      name: "fax",
+      table: "account",
+    });
+    const pluginResponse = await server.getHandler("analyze_impact")({
+      componentType: "plugin",
+      name: "CORE.PLUGINS",
+    });
+    const workflowResponse = await server.getHandler("analyze_impact")({
+      componentType: "workflow",
+      name: "Shared Workflow",
+    });
+    const resourceResponse = await server.getHandler("analyze_impact")({
+      componentType: "web_resource",
+      name: "contoso_/scripts/shared.js",
+    });
+
+    expect(columnResponse.isError).toBe(true);
+    expect(columnResponse.structuredContent).toMatchObject({
+      tool: "analyze_impact",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "name",
+        options: [
+          { value: "faxextension", label: "faxextension" },
+          { value: "faxnumber", label: "faxnumber" },
+        ],
+        retryable: false,
+      },
+    });
+
+    expect(pluginResponse.isError).toBe(true);
+    expect(pluginResponse.structuredContent).toMatchObject({
+      tool: "analyze_impact",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "name",
+        options: [
+          { value: "asm-1", label: "Core.Plugins (asm-1)" },
+          { value: "asm-2", label: "core.plugins (asm-2)" },
+        ],
+        retryable: false,
+      },
+    });
+
+    expect(workflowResponse.isError).toBe(true);
+    expect(workflowResponse.structuredContent).toMatchObject({
+      tool: "analyze_impact",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "name",
+        options: [
+          {
+            value: "contoso_SharedWorkflow_A",
+            label: "Shared Workflow (contoso_SharedWorkflow_A)",
+          },
+          {
+            value: "contoso_SharedWorkflow_B",
+            label: "Shared Workflow (contoso_SharedWorkflow_B)",
+          },
+        ],
+        retryable: false,
+      },
+    });
+
+    expect(resourceResponse.isError).toBe(true);
+    expect(resourceResponse.structuredContent).toMatchObject({
+      tool: "analyze_impact",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "name",
+        options: [
+          {
+            value: "wr-1",
+            label: "contoso_/scripts/shared.js (wr-1)",
+          },
+          {
+            value: "wr-2",
+            label: "contoso_/scripts/shared.js (wr-2)",
+          },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });
