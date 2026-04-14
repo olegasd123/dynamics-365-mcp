@@ -29,8 +29,13 @@ export async function handleGetWebResourceContent(
       "webresourceset",
       getWebResourceContentByNameQuery(resourceName),
     );
+    const matchingResources = resources.filter(
+      (resource) =>
+        String(resource.name || "") === resourceName ||
+        String(resource.webresourceid || "") === resourceName,
+    );
 
-    if (resources.length === 0) {
+    if (matchingResources.length === 0) {
       const text = `Web resource '${resourceName}' not found in '${env.name}'.`;
       return createToolSuccessResponse("get_web_resource_content", text, text, {
         environment: env.name,
@@ -39,11 +44,11 @@ export async function handleGetWebResourceContent(
       });
     }
 
-    if (resources.length > 1) {
-      throw createAmbiguousWebResourceError(env.name, resourceName, resources);
+    if (matchingResources.length > 1) {
+      throw createAmbiguousWebResourceError(env.name, resourceName, matchingResources);
     }
 
-    const resource = resources[0];
+    const resource = matchingResources[0];
     const base64Content = resource.content as string;
     const resourceType = resource.webresourcetype as number;
 

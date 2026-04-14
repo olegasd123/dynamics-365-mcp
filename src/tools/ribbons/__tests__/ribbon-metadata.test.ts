@@ -166,6 +166,33 @@ const ribbonXmlWithAmbiguousAddFax = `
 </RibbonDiffXml>
 `.trim();
 
+const ribbonXmlWithAmbiguousFormButtons = `
+<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="sample.account.Form.AddFaxPrimary" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="10">
+      <CommandUIDefinition>
+        <Button
+          Id="sample.account.Form.AddFax.Primary.Button"
+          Command="sample.account.Form.AddFax.Primary.Command"
+          LabelText="Add Fax"
+          Sequence="10"
+        />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="sample.account.Form.AddFaxSecondary" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="20">
+      <CommandUIDefinition>
+        <Button
+          Id="sample.account.Form.AddFax.Secondary.Button"
+          Command="sample.account.Form.AddFax.Secondary.Command"
+          LabelText="Add Fax"
+          Sequence="20"
+        />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>
+`.trim();
+
 const translationWorkbookXml = `
 <?xml version="1.0"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet">
@@ -335,6 +362,66 @@ describe("ribbon metadata", () => {
         options: [
           { value: "form", label: "form: form/Add Fax" },
           { value: "homepageGrid", label: "homepageGrid: homepageGrid/Add Fax" },
+        ],
+        retryable: false,
+      },
+    });
+  });
+
+  it("returns structured button choices when ambiguity remains within one location", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            ObjectTypeCode: 1,
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+        ],
+        [buildRetrieveEntityRibbonPath("account", "all")]: {
+          CompressedEntityXml: createStoredZip(
+            "RibbonXml.xml",
+            ribbonXmlWithAmbiguousFormButtons,
+          ).toString("base64"),
+        },
+      },
+    });
+
+    const response = await handleGetRibbonButtonDetails(
+      {
+        environment: "dev",
+        table: "account",
+        buttonName: "add fax",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a matching button and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_ribbon_button_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "buttonName",
+        options: [
+          {
+            value: "sample.account.Form.AddFax.Primary.Button",
+            label: "form/Add Fax (sample.account.Form.AddFax.Primary.Button)",
+          },
+          {
+            value: "sample.account.Form.AddFax.Secondary.Button",
+            label: "form/Add Fax (sample.account.Form.AddFax.Secondary.Button)",
+          },
         ],
         retryable: false,
       },

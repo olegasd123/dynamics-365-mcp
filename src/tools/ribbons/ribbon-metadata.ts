@@ -847,7 +847,7 @@ function createAmbiguousRibbonButtonError(
   metadata: TableRibbonMetadata,
   buttonRef: string,
   matches: RibbonButtonRecord[],
-): Error {
+): AmbiguousMatchError {
   const locationOptions = createRibbonLocationOptions(matches);
   const matchSummary = matches.map(formatButtonMatch).join(", ");
 
@@ -861,7 +861,13 @@ function createAmbiguousRibbonButtonError(
     );
   }
 
-  return new Error(`Ribbon button '${buttonRef}' is ambiguous. Matches: ${matchSummary}.`);
+  return new AmbiguousMatchError(
+    `Ribbon button '${buttonRef}' is ambiguous. Choose a matching button and try again. Matches: ${matchSummary}.`,
+    {
+      parameter: "buttonName",
+      options: matches.map((button) => createRibbonButtonOption(button)),
+    },
+  );
 }
 
 function createRibbonLocationOptions(matches: RibbonButtonRecord[]): AmbiguousMatchOption[] {
@@ -884,6 +890,15 @@ function createRibbonLocationOptions(matches: RibbonButtonRecord[]): AmbiguousMa
       value,
       label: `${value}: ${labels.join(", ")}`,
     }));
+}
+
+function createRibbonButtonOption(button: RibbonButtonRecord): AmbiguousMatchOption {
+  const value = button.id || button.command;
+
+  return {
+    value,
+    label: `${formatButtonMatch(button)} (${value})`,
+  };
 }
 
 function toRibbonLocationOption(

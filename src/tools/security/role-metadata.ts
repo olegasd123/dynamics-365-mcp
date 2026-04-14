@@ -10,7 +10,10 @@ import {
   queryRecordsByFieldValuesInChunks,
   queryRecordsByIdsInChunks,
 } from "../../utils/query-batching.js";
-import { fetchDefaultGlobalBusinessUnitName as fetchDefaultGlobalBusinessUnitNameMetadata } from "./business-unit-metadata.js";
+import {
+  fetchDefaultGlobalBusinessUnitName as fetchDefaultGlobalBusinessUnitNameMetadata,
+  resolveBusinessUnit,
+} from "./business-unit-metadata.js";
 import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const DEPTH_MASK_LABELS: Array<{ mask: number; label: string }> = [
@@ -128,30 +131,8 @@ export async function resolveSecurityRoleForComparison(
   roleRef: string,
   businessUnit?: string,
 ): Promise<RoleResolutionResult> {
-  const resolvedMatches = await collectResolvedRoleMatches(env, client, roleRef, businessUnit);
-  if (resolvedMatches.exactId.length === 1) {
-    return { role: resolvedMatches.exactId[0], warnings: [] };
-  }
-
-  if (resolvedMatches.narrowedExact.length === 1) {
-    return { role: resolvedMatches.narrowedExact[0], warnings: [] };
-  }
-
-  if (resolvedMatches.matches.length === 1) {
-    return { role: resolvedMatches.matches[0], warnings: [] };
-  }
-
-  if (resolvedMatches.ambiguous.length > 1) {
-    const selectedRole = pickMostRecentlyModifiedRole(resolvedMatches.ambiguous);
-    return {
-      role: selectedRole,
-      warnings: [
-        `Found ${resolvedMatches.ambiguous.length} matching security roles for '${roleRef}' in '${env.name}'. Using the most recently modified role '${selectedRole.name}' [${selectedRole.businessUnitName}]${formatModifiedOnSuffix(selectedRole.modifiedon)}.`,
-      ],
-    };
-  }
-
-  throw new Error(`Security role '${roleRef}' not found in '${env.name}'.`);
+  const role = await resolveSecurityRole(env, client, roleRef, businessUnit);
+  return { role, warnings: [] };
 }
 
 export async function fetchRolePrivileges(
@@ -214,7 +195,8 @@ export async function resolveRoleBusinessUnitName(
 ): Promise<string> {
   const trimmedBusinessUnit = businessUnit?.trim();
   if (trimmedBusinessUnit) {
-    return trimmedBusinessUnit;
+    const resolvedBusinessUnit = await resolveBusinessUnit(env, client, trimmedBusinessUnit);
+    return resolvedBusinessUnit.name;
   }
 
   return fetchDefaultGlobalBusinessUnitName(env, client);
@@ -274,32 +256,6 @@ function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
     ismanaged: Boolean(record.ismanaged),
     modifiedon: String(record.modifiedon || ""),
   };
-}
-
-function pickMostRecentlyModifiedRole(roles: SecurityRoleRecord[]): SecurityRoleRecord {
-  return [...roles].sort(compareRolesByModifiedOnDesc)[0];
-}
-
-function compareRolesByModifiedOnDesc(left: SecurityRoleRecord, right: SecurityRoleRecord): number {
-  const timeDiff = parseModifiedOn(right.modifiedon) - parseModifiedOn(left.modifiedon);
-  if (timeDiff !== 0) {
-    return timeDiff;
-  }
-
-  return right.roleid.localeCompare(left.roleid);
-}
-
-function parseModifiedOn(value: string): number {
-  if (!value) {
-    return 0;
-  }
-
-  const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-function formatModifiedOnSuffix(modifiedOn: string): string {
-  return modifiedOn ? `, modified on ${modifiedOn}` : "";
 }
 
 async function fetchPrivilegesForRoleIds(

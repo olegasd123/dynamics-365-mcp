@@ -54,8 +54,14 @@ export async function handleGetWorkflowDetails(
       getWorkflowDetailsByIdentityQuery({ workflowName, uniqueName }),
       { cacheTier: CACHE_TIERS.VOLATILE },
     );
+    const matchingWorkflows = workflows.filter((workflow) =>
+      uniqueName
+        ? String(workflow.uniquename || "") === uniqueName ||
+          String(workflow.workflowid || "") === uniqueName
+        : String(workflow.name || "") === workflowName,
+    );
 
-    if (workflows.length === 0) {
+    if (matchingWorkflows.length === 0) {
       const text = `Workflow '${workflowName || uniqueName}' not found in '${env.name}'.`;
       return createToolSuccessResponse("get_workflow_details", text, text, {
         environment: env.name,
@@ -65,11 +71,15 @@ export async function handleGetWorkflowDetails(
       });
     }
 
-    if (workflows.length > 1) {
-      throw createAmbiguousWorkflowError(env.name, workflowName || uniqueName || "", workflows);
+    if (matchingWorkflows.length > 1) {
+      throw createAmbiguousWorkflowError(
+        env.name,
+        workflowName || uniqueName || "",
+        matchingWorkflows,
+      );
     }
 
-    const w = workflows[0];
+    const w = matchingWorkflows[0];
     const lines: string[] = [];
     const triggers: string[] = [];
     if (w.triggeroncreate) triggers.push("Create");

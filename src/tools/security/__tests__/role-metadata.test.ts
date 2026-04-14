@@ -173,6 +173,63 @@ describe("role metadata", () => {
     );
   });
 
+  it("accepts a business unit id when resolving role privileges", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root",
+            name: "Root",
+          },
+          {
+            businessunitid: "bu-child",
+            name: "Child",
+            _parentbusinessunitid_value: "bu-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-root",
+            name: "Salesperson",
+            _businessunitid_value: "bu-root",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+          {
+            roleid: "role-child",
+            name: "Salesperson",
+            _businessunitid_value: "bu-child",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Child",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: [
+          {
+            roleprivilegeid: "rp-1",
+            roleid: "role-child",
+            privilegeid: "priv-1",
+            privilegedepthmask: 8,
+            ismanaged: false,
+          },
+        ],
+        privileges: [
+          {
+            privilegeid: "priv-1",
+            name: "prvReadAccount",
+            accessright: 2,
+            canbeglobal: true,
+          },
+        ],
+      },
+    });
+
+    const details = await fetchRolePrivileges(env, client, "Salesperson", "bu-child");
+
+    expect(details.role.roleid).toBe("role-child");
+    expect(details.role.businessUnitName).toBe("Child");
+  });
+
   it("returns structured retry options when the role name is ambiguous", async () => {
     const { client } = createRecordingClient({
       dev: {

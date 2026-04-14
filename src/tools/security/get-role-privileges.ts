@@ -14,7 +14,9 @@ const getRolePrivilegesSchema = {
   businessUnit: z
     .string()
     .optional()
-    .describe("Optional business unit name. If missing, use the default global business unit."),
+    .describe(
+      "Optional business unit name or id. If missing, use the default global business unit.",
+    ),
 };
 
 type GetRolePrivilegesParams = ToolParams<typeof getRolePrivilegesSchema>;

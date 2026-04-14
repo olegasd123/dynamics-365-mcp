@@ -8,22 +8,31 @@ import { createToolErrorResponse, createToolSuccessResponse } from "../response.
 import { diffCollections } from "../../utils/diff.js";
 import { formatNamedDiffSection } from "./diff-section.js";
 import { fetchRolePrivilegesForComparison } from "../security/role-metadata.js";
+import { AmbiguousMatchError } from "../tool-errors.js";
 
 const compareSecurityRolesSchema = {
   sourceEnvironment: z.string().describe("Source environment name"),
   targetEnvironment: z.string().describe("Target environment name"),
   roleName: z.string().describe("Security role name or role id"),
+  sourceRoleName: z
+    .string()
+    .optional()
+    .describe("Optional source role name or role id override. Defaults to roleName."),
+  targetRoleName: z
+    .string()
+    .optional()
+    .describe("Optional target role name or role id override. Defaults to roleName."),
   sourceBusinessUnit: z
     .string()
     .optional()
     .describe(
-      "Optional source business unit name. If missing, use the default global business unit.",
+      "Optional source business unit name or id. If missing, use the default global business unit.",
     ),
   targetBusinessUnit: z
     .string()
     .optional()
     .describe(
-      "Optional target business unit name. If missing, use the default global business unit.",
+      "Optional target business unit name or id. If missing, use the default global business unit.",
     ),
 };
 
@@ -34,6 +43,8 @@ export async function handleCompareSecurityRoles(
     sourceEnvironment,
     targetEnvironment,
     roleName,
+    sourceRoleName,
+    targetRoleName,
     sourceBusinessUnit,
     targetBusinessUnit,
   }: CompareSecurityRolesParams,
@@ -42,10 +53,24 @@ export async function handleCompareSecurityRoles(
   try {
     const sourceEnv = getEnvironment(config, sourceEnvironment);
     const targetEnv = getEnvironment(config, targetEnvironment);
-    const [sourceRole, targetRole] = await Promise.all([
-      fetchRolePrivilegesForComparison(sourceEnv, client, roleName, sourceBusinessUnit),
-      fetchRolePrivilegesForComparison(targetEnv, client, roleName, targetBusinessUnit),
-    ]);
+    const sourceRoleRef = sourceRoleName || roleName;
+    const targetRoleRef = targetRoleName || roleName;
+    const sourceRole = await fetchComparisonRolePrivileges({
+      env: sourceEnv,
+      client,
+      roleRef: sourceRoleRef,
+      businessUnit: sourceBusinessUnit,
+      roleParameter: "sourceRoleName",
+      businessUnitParameter: "sourceBusinessUnit",
+    });
+    const targetRole = await fetchComparisonRolePrivileges({
+      env: targetEnv,
+      client,
+      roleRef: targetRoleRef,
+      businessUnit: targetBusinessUnit,
+      roleParameter: "targetRoleName",
+      businessUnitParameter: "targetBusinessUnit",
+    });
 
     const roleDiff = diffCollections([sourceRole.role], [targetRole.role], (role) => role.name, [
       "businessUnitName",
@@ -99,6 +124,8 @@ export async function handleCompareSecurityRoles(
         sourceEnvironment,
         targetEnvironment,
         roleName,
+        sourceRoleName: sourceRoleRef,
+        targetRoleName: targetRoleRef,
         warnings,
         sourceBusinessUnit: sourceRole.role.businessUnitName || null,
         targetBusinessUnit: targetRole.role.businessUnitName || null,
@@ -124,4 +151,45 @@ export function registerCompareSecurityRoles(
   client: DynamicsClient,
 ) {
   registerTool(server, compareSecurityRolesTool, { config, client });
+}
+
+async function fetchComparisonRolePrivileges(params: {
+  env: AppConfig["environments"][number];
+  client: DynamicsClient;
+  roleRef: string;
+  businessUnit?: string;
+  roleParameter: "sourceRoleName" | "targetRoleName";
+  businessUnitParameter: "sourceBusinessUnit" | "targetBusinessUnit";
+}) {
+  const { env, client, roleRef, businessUnit, roleParameter, businessUnitParameter } = params;
+
+  try {
+    return await fetchRolePrivilegesForComparison(env, client, roleRef, businessUnit);
+  } catch (error) {
+    throw remapComparisonError(error, { roleParameter, businessUnitParameter });
+  }
+}
+
+function remapComparisonError(
+  error: unknown,
+  parameters: {
+    roleParameter: "sourceRoleName" | "targetRoleName";
+    businessUnitParameter: "sourceBusinessUnit" | "targetBusinessUnit";
+  },
+): unknown {
+  if (!(error instanceof AmbiguousMatchError)) {
+    return error;
+  }
+
+  const parameter =
+    error.parameter === "businessUnitName"
+      ? parameters.businessUnitParameter
+      : error.parameter === "roleName"
+        ? parameters.roleParameter
+        : error.parameter;
+
+  return new AmbiguousMatchError(error.message, {
+    parameter,
+    options: error.options,
+  });
 }

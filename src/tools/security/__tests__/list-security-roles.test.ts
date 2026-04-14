@@ -60,6 +60,18 @@ describe("list_security_roles", () => {
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
       dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root",
+            name: "Root",
+          },
+          {
+            businessunitid: "bu-child",
+            name: "Child",
+            _parentbusinessunitid_value: "bu-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+        ],
         roles: [
           {
             roleid: "role-root",

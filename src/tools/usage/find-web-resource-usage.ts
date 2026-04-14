@@ -10,7 +10,7 @@ import { findWebResourceUsageData } from "./usage-analysis.js";
 
 const findWebResourceUsageSchema = {
   environment: z.string().optional().describe("Environment name"),
-  name: z.string().describe("Web resource name"),
+  name: z.string().describe("Web resource name or web resource id"),
 };
 
 type FindWebResourceUsageParams = ToolParams<typeof findWebResourceUsageSchema>;
