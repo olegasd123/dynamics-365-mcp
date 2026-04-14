@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AuthenticationError } from "../../auth/token-manager.js";
 import { DynamicsApiError, DynamicsRequestError } from "../../client/errors.js";
 import { EnvironmentNotFoundError } from "../../config/environments.js";
+import { AmbiguousMatchError } from "../tool-errors.js";
 import {
   buildPaginatedListData,
   buildPaginatedListSummary,
@@ -132,6 +133,32 @@ describe("createToolErrorResponse", () => {
         code: "environment_not_found",
         environment: "missing",
         availableEnvironments: ["dev", "prod"],
+        retryable: false,
+      },
+    });
+  });
+
+  it("adds machine-readable fields for ambiguous choices", () => {
+    const response = createToolErrorResponse(
+      "get_ribbon_button_details",
+      new AmbiguousMatchError("Ribbon button 'add fax' is ambiguous.", {
+        parameter: "location",
+        options: [
+          { value: "form", label: "form: form/Add Fax" },
+          { value: "homepageGrid", label: "homepageGrid: homepageGrid/Add Fax" },
+        ],
+      }),
+    );
+
+    expect(response.structuredContent).toMatchObject({
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "location",
+        options: [
+          { value: "form", label: "form: form/Add Fax" },
+          { value: "homepageGrid", label: "homepageGrid: homepageGrid/Add Fax" },
+        ],
         retryable: false,
       },
     });

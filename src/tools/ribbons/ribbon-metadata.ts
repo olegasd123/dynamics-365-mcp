@@ -11,6 +11,7 @@ import {
   listSolutionsQuery,
 } from "../../queries/solution-queries.js";
 import { resolveTable, type TableRecord } from "../tables/table-metadata.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 import { normalizeXml } from "../../utils/xml-metadata.js";
 
 interface RetrieveEntityRibbonResponse {
@@ -201,9 +202,7 @@ export function resolveRibbonButton(
   }
 
   if (exactMatches.length > 1) {
-    throw new Error(
-      `Ribbon button '${buttonRef}' is ambiguous. Matches: ${exactMatches.map(formatButtonMatch).join(", ")}.`,
-    );
+    throw createAmbiguousRibbonButtonError(metadata, buttonRef, exactMatches);
   }
 
   const partialMatches = findPartialButtonMatches(metadata.buttons, buttonRef);
@@ -212,9 +211,7 @@ export function resolveRibbonButton(
   }
 
   if (partialMatches.length > 1) {
-    throw new Error(
-      `Ribbon button '${buttonRef}' is ambiguous. Matches: ${partialMatches.map(formatButtonMatch).join(", ")}.`,
-    );
+    throw createAmbiguousRibbonButtonError(metadata, buttonRef, partialMatches);
   }
 
   throw new Error(
@@ -844,6 +841,62 @@ function rankRibbonTranslationSolution(
 
 function formatButtonMatch(button: RibbonButtonRecord): string {
   return `${button.ribbonType}/${button.label || button.id}`;
+}
+
+function createAmbiguousRibbonButtonError(
+  metadata: TableRibbonMetadata,
+  buttonRef: string,
+  matches: RibbonButtonRecord[],
+): Error {
+  const locationOptions = createRibbonLocationOptions(matches);
+  const matchSummary = matches.map(formatButtonMatch).join(", ");
+
+  if (metadata.locationFilter === "all" && locationOptions.length > 1) {
+    return new AmbiguousMatchError(
+      `Ribbon button '${buttonRef}' is ambiguous across multiple locations. Choose a location and try again. Options: ${locationOptions.map((option) => option.value).join(", ")}. Matches: ${matchSummary}.`,
+      {
+        parameter: "location",
+        options: locationOptions,
+      },
+    );
+  }
+
+  return new Error(`Ribbon button '${buttonRef}' is ambiguous. Matches: ${matchSummary}.`);
+}
+
+function createRibbonLocationOptions(matches: RibbonButtonRecord[]): AmbiguousMatchOption[] {
+  const groupedMatches = new Map<Exclude<RibbonLocationFilter, "all">, string[]>();
+
+  for (const match of matches) {
+    const location = toRibbonLocationOption(match.ribbonType);
+    if (!location) {
+      continue;
+    }
+
+    const labels = groupedMatches.get(location) || [];
+    labels.push(formatButtonMatch(match));
+    groupedMatches.set(location, labels);
+  }
+
+  return [...groupedMatches.entries()]
+    .sort(([left], [right]) => compareRibbonType(left, right))
+    .map(([value, labels]) => ({
+      value,
+      label: `${value}: ${labels.join(", ")}`,
+    }));
+}
+
+function toRibbonLocationOption(
+  value: RibbonButtonRecord["ribbonType"],
+): Exclude<RibbonLocationFilter, "all"> | null {
+  switch (value) {
+    case "form":
+    case "homepageGrid":
+    case "subgrid":
+      return value;
+    default:
+      return null;
+  }
 }
 
 function normalizeButtonMatchValue(value: string | undefined): string {

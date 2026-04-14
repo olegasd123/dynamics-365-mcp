@@ -139,6 +139,33 @@ const ribbonXmlWithoutLocLabels = `
 </RibbonDiffXml>
 `.trim();
 
+const ribbonXmlWithAmbiguousAddFax = `
+<RibbonDiffXml>
+  <CustomActions>
+    <CustomAction Id="sample.account.Form.AddFax" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="10">
+      <CommandUIDefinition>
+        <Button
+          Id="sample.account.Form.AddFax.Button"
+          Command="sample.account.Form.AddFax.Command"
+          LabelText="Add Fax"
+          Sequence="10"
+        />
+      </CommandUIDefinition>
+    </CustomAction>
+    <CustomAction Id="sample.account.Homepage.AddFax" Location="Mscrm.HomepageGrid.account.MainTab.Actions.Controls._children" Sequence="20">
+      <CommandUIDefinition>
+        <Button
+          Id="sample.account.Homepage.AddFax.Button"
+          Command="sample.account.Homepage.AddFax.Command"
+          LabelText="Add Fax"
+          Sequence="20"
+        />
+      </CommandUIDefinition>
+    </CustomAction>
+  </CustomActions>
+</RibbonDiffXml>
+`.trim();
+
 const translationWorkbookXml = `
 <?xml version="1.0"?>
 <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet">
@@ -258,6 +285,60 @@ describe("ribbon metadata", () => {
     expect(metadata.ribbons).toHaveLength(1);
     expect(metadata.buttons).toHaveLength(1);
     expect(metadata.buttons[0]?.ribbonType).toBe("homepageGrid");
+  });
+
+  it("returns structured location choices for ambiguous button names", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            ObjectTypeCode: 1,
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+          },
+        ],
+        [buildRetrieveEntityRibbonPath("account", "all")]: {
+          CompressedEntityXml: createStoredZip(
+            "RibbonXml.xml",
+            ribbonXmlWithAmbiguousAddFax,
+          ).toString("base64"),
+        },
+      },
+    });
+
+    const response = await handleGetRibbonButtonDetails(
+      {
+        environment: "dev",
+        table: "account",
+        buttonName: "add fax",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a location and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_ribbon_button_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "location",
+        options: [
+          { value: "form", label: "form: form/Add Fax" },
+          { value: "homepageGrid", label: "homepageGrid: homepageGrid/Add Fax" },
+        ],
+        retryable: false,
+      },
+    });
   });
 
   it("falls back to a readable button label when loclabels are missing", async () => {

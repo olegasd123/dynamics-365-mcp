@@ -3,6 +3,7 @@ import { AuthenticationError } from "../auth/token-manager.js";
 import { DynamicsApiError, DynamicsRequestError } from "../client/errors.js";
 import { EnvironmentNotFoundError } from "../config/environments.js";
 import { requestLogger } from "../logging/request-logger.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "./tool-errors.js";
 
 interface ToolTextContent {
   type: "text";
@@ -49,6 +50,8 @@ export interface ToolErrorPayload {
     kind?: "timeout" | "network";
     errorCode?: string;
     availableEnvironments?: string[];
+    parameter?: string;
+    options?: AmbiguousMatchOption[];
     retryable?: boolean;
   };
 }
@@ -192,6 +195,16 @@ function normalizeToolError(error: Error): ToolErrorPayload["error"] {
     name: error.name,
     message: error.message,
   };
+
+  if (error instanceof AmbiguousMatchError) {
+    return {
+      ...baseError,
+      code: "ambiguous_match",
+      parameter: error.parameter,
+      options: error.options,
+      retryable: false,
+    };
+  }
 
   if (error instanceof EnvironmentNotFoundError) {
     return {
