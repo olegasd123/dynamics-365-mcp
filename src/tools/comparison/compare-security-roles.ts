@@ -140,7 +140,8 @@ export async function handleCompareSecurityRoles(
 
 export const compareSecurityRolesTool = defineTool({
   name: "compare_security_roles",
-  description: "Compare one security role between two environments.",
+  description:
+    "Compare one security role between two environments. Supports per-environment role and business unit overrides when one side needs disambiguation.",
   schema: compareSecurityRolesSchema,
   handler: handleCompareSecurityRoles,
 });

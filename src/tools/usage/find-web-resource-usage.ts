@@ -72,7 +72,8 @@ export async function handleFindWebResourceUsage(
 
 export const findWebResourceUsageTool = defineTool({
   name: "find_web_resource_usage",
-  description: "Find where one web resource is used in forms and other text web resources.",
+  description:
+    "Find where one web resource is used in forms and other text web resources. `name` can be a web resource name or id.",
   schema: findWebResourceUsageSchema,
   handler: handleFindWebResourceUsage,
 });

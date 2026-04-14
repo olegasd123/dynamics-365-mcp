@@ -104,7 +104,8 @@ export async function handleGetWebResourceContent(
 
 export const getWebResourceContentTool = defineTool({
   name: "get_web_resource_content",
-  description: "Fetch the content of a specific web resource from Dynamics 365.",
+  description:
+    "Fetch the content of a specific web resource from Dynamics 365 by name or web resource id.",
   schema: getWebResourceContentSchema,
   handler: handleGetWebResourceContent,
 });

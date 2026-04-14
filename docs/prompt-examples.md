@@ -83,15 +83,19 @@ Replace these values before you run a prompt:
 - `<PLUGIN_CLASS>`: plugin class name or full type name
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
-- `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
-- `<FORM>`: form display name or unique name
-- `<VIEW>`: view name
+- `<WORKFLOW_UNIQUE_NAME>`: workflow unique name or workflow id
+- `<FORM>`: form display name, unique name, or form id
+- `<VIEW>`: view name or view id
 - `<BUTTON>`: ribbon button label, id, or command name
 - `<API>`: Custom API name or unique name
 - `<FLOW>`: cloud flow display name or unique name
-- `<ROLE>`: security role name
-- `<BUSINESS_UNIT>`: business unit name
-- `<WEB_RESOURCE>`: web resource name like `new_/scripts/main.js`
+- `<ROLE>`: security role name or role id
+- `<SOURCE_ROLE>`: source security role name or role id override
+- `<TARGET_ROLE>`: target security role name or role id override
+- `<BUSINESS_UNIT>`: business unit name or id
+- `<SOURCE_BUSINESS_UNIT>`: source business unit name or id
+- `<TARGET_BUSINESS_UNIT>`: target business unit name or id
+- `<WEB_RESOURCE>`: web resource name or id like `new_/scripts/main.js` or `wr-123`
 - `<ENV_VAR>`: environment variable schema name or display name
 - `<CONNECTION_REFERENCE>`: connection reference display name or logical name
 - `<APP_MODULE>`: app module name or unique name
@@ -150,7 +154,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: none)`
 
 - `get_workflow_details`
-  `In <ENV>, show full details for workflow <WORKFLOW>. If needed, use the unique name <WORKFLOW_UNIQUE_NAME>.`
+  `In <ENV>, show full details for workflow <WORKFLOW>. If needed, use the unique name or workflow id <WORKFLOW_UNIQUE_NAME>.`
   `(Required: none)`
 
 ## Web Resources
@@ -160,7 +164,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: none)`
 
 - `get_web_resource_content`
-  `In <ENV>, get the content of web resource <WEB_RESOURCE>.`
+  `In <ENV>, get the content of web resource <WEB_RESOURCE>. You can use either the web resource name or the web resource id.`
   `(Required: <WEB_RESOURCE>)`
 
 ## ALM Objects
@@ -299,11 +303,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: <BUSINESS_UNIT>)`
 
 - `list_security_roles`
-  `In <ENV>, list security roles with names that contain 'Sales'. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`
+  `In <ENV>, list security roles with names that contain 'Sales'. If needed, use business unit <BUSINESS_UNIT> by name or id. Otherwise use the default global business unit.`
   `(Required: none)`
 
 - `get_role_privileges`
-  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`
+  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT> by name or id. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
 
 ## Usage And Impact
@@ -317,7 +321,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: <COLUMN>)`
 
 - `find_web_resource_usage`
-  `In <ENV>, find where web resource <WEB_RESOURCE> is used in forms and other text web resources.`
+  `In <ENV>, find where web resource <WEB_RESOURCE> is used in forms and other text web resources. You can use either the web resource name or the web resource id.`
   `(Required: <WEB_RESOURCE>)`
 
 - `analyze_create_triggers`
@@ -383,7 +387,7 @@ This group needs at least two configured environments.
   `(Required: none)`
 
 - `compare_security_roles`
-  `Compare security role <ROLE> between <SOURCE_ENV> and <TARGET_ENV>. Use business unit <BUSINESS_UNIT> in both environments if needed. Otherwise use each environment's default global business unit.`
+  `Compare security role <ROLE> between <SOURCE_ENV> and <TARGET_ENV>. Use source business unit <SOURCE_BUSINESS_UNIT> and target business unit <TARGET_BUSINESS_UNIT> if needed. If only one side is ambiguous, retry with source role override <SOURCE_ROLE> or target role override <TARGET_ROLE>. Otherwise use each environment's default global business unit.`
   `(Required: <ROLE>)`
 
 ## Full Coverage Checklist

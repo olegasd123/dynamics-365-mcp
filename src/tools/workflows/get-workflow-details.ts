@@ -165,7 +165,7 @@ export async function handleGetWorkflowDetails(
 export const getWorkflowDetailsTool = defineTool({
   name: "get_workflow_details",
   description:
-    "Get detailed information about a specific workflow including triggers, scope, and definition.",
+    "Get detailed information about a specific workflow including triggers, scope, and definition. `uniqueName` also accepts a workflow id.",
   schema: getWorkflowDetailsSchema,
   handler: handleGetWorkflowDetails,
 });

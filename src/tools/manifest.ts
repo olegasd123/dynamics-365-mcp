@@ -420,7 +420,15 @@ export const TOOL_MANIFEST = [
   {
     ...compareSecurityRolesTool,
     group: "comparison",
-    mainParams: ["sourceEnvironment", "targetEnvironment", "roleName"],
+    mainParams: [
+      "sourceEnvironment",
+      "targetEnvironment",
+      "roleName",
+      "sourceRoleName",
+      "targetRoleName",
+      "sourceBusinessUnit",
+      "targetBusinessUnit",
+    ],
   },
 ] as const;
 
