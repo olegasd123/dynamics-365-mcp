@@ -308,6 +308,7 @@ Priority order:
 | `find_table_usage`                 | Find where one Dataverse table is used across metadata assets.                                                                                                                                                                       | `environment`, `table`                                   |
 | `find_column_usage`                | Find where one Dataverse column is used across metadata assets.                                                                                                                                                                      | `environment`, `column`, `table`                         |
 | `find_web_resource_usage`          | Find where one web resource is used in forms and other text web resources. `name` can be a web resource name or id.                                                                                                                  | `environment`, `name`                                    |
+| `find_workflow_activity_usage`     | Find workflow processes (category Workflow) whose XAML or clientdata references a custom workflow activity (`CodeActivity`) class.                                                                                                   | `environment`, `className`, `solution`, `status`         |
 | `analyze_create_triggers`          | Analyze what direct create triggers can run for a Dataverse table create.                                                                                                                                                            | `environment`, `table`, `providedAttributes`             |
 | `analyze_update_triggers`          | Analyze what direct update triggers can run for a Dataverse table change.                                                                                                                                                            | `environment`, `table`, `changedAttributes`              |
 | `analyze_impact`                   | Analyze likely impact for a table, column, plugin assembly, workflow, cloud flow, web resource, or solution.                                                                                                                         | `environment`, `componentType`, `name`                   |
@@ -347,6 +348,7 @@ Users can now work with a solution by display name or unique name.
 - `list_plugin_assemblies` supports `solution`
 - `list_workflows` supports `solution`
 - `list_actions` supports `solution`
+- `find_workflow_activity_usage` supports `solution`
 - `list_web_resources` supports `solution`
 - `list_tables` supports `solution`
 - `get_table_schema` supports `solution`

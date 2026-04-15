@@ -206,6 +206,16 @@
         }
       }
     ],
+    "find_workflow_activity_usage": [
+      {
+        "name": "set integration key workflow usage",
+        "arguments": {
+          "environment": "dev",
+          "className": "Masao.Workflows.CommonSteps.SetIntegrationKey",
+          "status": "activated"
+        }
+      }
+    ],
     "get_app_module_details": [
       {
         "name": "sales hub",

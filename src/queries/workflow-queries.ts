@@ -53,6 +53,38 @@ export function listWorkflowsQuery(options?: {
     .toString();
 }
 
+export function listWorkflowDefinitionSearchQuery(options?: {
+  category?: WorkflowCategory;
+  status?: WorkflowState;
+}): string {
+  return query()
+    .select([
+      "workflowid",
+      "name",
+      "uniquename",
+      "category",
+      "statecode",
+      "statuscode",
+      "mode",
+      "primaryentity",
+      "ismanaged",
+      "modifiedon",
+      "xaml",
+      "clientdata",
+    ])
+    .filter(
+      and(
+        eq("type", 1), // Definition only (exclude activations)
+        options?.category !== undefined
+          ? eq("category", WORKFLOW_CATEGORY[options.category])
+          : undefined,
+        options?.status !== undefined ? eq("statecode", WORKFLOW_STATE[options.status]) : undefined,
+      ),
+    )
+    .orderby("name asc")
+    .toString();
+}
+
 export function listActionsQuery(): string {
   return query()
     .select([

@@ -142,6 +142,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 ## Workflows And Actions
 
+- `find_workflow_activity_usage`
+  `In <ENV>, list workflows that use workflow activity class <CLASS_NAME>. Keep the search to category workflow only and show the matching workflows.`
+  `(Required: <CLASS_NAME>)`
+
 - `list_workflows`
   `In <ENV>, list activated business rules from solution <SOLUTION>.`
   `In <ENV>, list activated workflows from solution <SOLUTION>.`

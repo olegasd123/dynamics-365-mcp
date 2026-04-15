@@ -3,6 +3,7 @@ import {
   getWorkflowDetailsQuery,
   getWorkflowDetailsByIdentityQuery,
   listActionsQuery,
+  listWorkflowDefinitionSearchQuery,
   listWorkflowsQuery,
 } from "../workflow-queries.js";
 
@@ -24,6 +25,18 @@ describe("workflow queries", () => {
     expect(query).toContain("$filter=type eq 1 and category eq 3");
     expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
     expect(query).toContain("triggeroncreate");
+  });
+
+  it("builds the workflow definition search query", () => {
+    const query = listWorkflowDefinitionSearchQuery({
+      category: "workflow",
+      status: "activated",
+    });
+
+    expect(query).toContain("$filter=type eq 1 and category eq 0 and statecode eq 1");
+    expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
+    expect(query).toContain("xaml");
+    expect(query).toContain("clientdata");
   });
 
   it("builds the workflow details query", () => {

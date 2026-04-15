@@ -44,6 +44,7 @@ import { getRolePrivilegesTool } from "./security/get-role-privileges.js";
 import { findTableUsageTool } from "./usage/find-table-usage.js";
 import { findColumnUsageTool } from "./usage/find-column-usage.js";
 import { findWebResourceUsageTool } from "./usage/find-web-resource-usage.js";
+import { findWorkflowActivityUsageTool } from "./usage/find-workflow-activity-usage.js";
 import { analyzeCreateTriggersTool } from "./usage/analyze-create-triggers.js";
 import { analyzeUpdateTriggersTool } from "./usage/analyze-update-triggers.js";
 import { analyzeImpactTool } from "./impact/analyze-impact.js";
@@ -346,6 +347,11 @@ export const TOOL_MANIFEST = [
     ...findWebResourceUsageTool,
     group: "usage_analysis",
     mainParams: ["environment", "name"],
+  },
+  {
+    ...findWorkflowActivityUsageTool,
+    group: "usage_analysis",
+    mainParams: ["environment", "className", "solution", "status"],
   },
   {
     ...analyzeCreateTriggersTool,
