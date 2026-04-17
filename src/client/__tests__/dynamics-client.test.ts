@@ -79,6 +79,39 @@ describe("DynamicsClient", () => {
     );
   });
 
+  it("returns one Dataverse page without following next links", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          "@odata.count": 3,
+          "@odata.nextLink": "https://dev.crm.dynamics.com/api/data/v9.2/accounts?$skiptoken=abc",
+          value: [{ accountid: "1", name: "Account A" }],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+    global.fetch = fetchMock;
+
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager);
+
+    await expect(
+      client.queryPage(env, "accounts", "$select=name&$top=1&$count=true", { bypassCache: true }),
+    ).resolves.toEqual({
+      items: [{ accountid: "1", name: "Account A" }],
+      totalCount: 3,
+      nextLink: "https://dev.crm.dynamics.com/api/data/v9.2/accounts?$skiptoken=abc",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("deduplicates concurrent query calls for the same cache key", async () => {
     let resolveResponse: ((value: Response) => void) | undefined;
     const responsePromise = new Promise<Response>((resolve) => {

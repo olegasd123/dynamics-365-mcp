@@ -65,6 +65,23 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.list_table_records.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        nameFilter: expect.any(Object),
+        state: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_table_record_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        recordId: expect.any(Object),
+        name: expect.any(Object),
+        firstName: expect.any(Object),
+        lastName: expect.any(Object),
+        state: expect.any(Object),
+      });
       expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         query: expect.any(Object),

@@ -17,11 +17,18 @@ interface ODataResponse<T> {
   "@odata.nextLink"?: string;
 }
 
+export interface ODataPageResult<T> {
+  items: T[];
+  totalCount: number | null;
+  nextLink: string | null;
+}
+
 export interface RequestOptions {
   bypassCache?: boolean;
   cacheTier?: CacheTier;
   cacheTtlMs?: number;
   maxPages?: number;
+  pageLink?: string;
   timeout?: number;
 }
 
@@ -103,6 +110,67 @@ export class DynamicsClient {
         }
 
         return allResults;
+      },
+      {
+        bypass: cachePolicy.bypass,
+        ttlMs: cachePolicy.ttlMs,
+      },
+    );
+  }
+
+  async queryPage<T = Record<string, unknown>>(
+    env: EnvironmentConfig,
+    entitySet: string,
+    queryParams?: string,
+    options?: RequestOptions,
+  ): Promise<ODataPageResult<T>> {
+    return this.queryPagePath(env, entitySet, queryParams, options);
+  }
+
+  async queryPagePath<T = Record<string, unknown>>(
+    env: EnvironmentConfig,
+    resourcePath: string,
+    queryParams?: string,
+    options?: RequestOptions,
+  ): Promise<ODataPageResult<T>> {
+    const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
+    const url = options?.pageLink || this.buildUrl(env, resourcePath, queryParams);
+    const cacheKey = this.buildCacheKey(
+      env,
+      options?.pageLink || resourcePath,
+      queryParams,
+      "page",
+    );
+    const cachePolicy = this.getCachePolicy(resourcePath, options);
+
+    return this.responseCache.load(
+      cacheKey,
+      async () => {
+        const { response, callId } = await this.retryPolicy.send({
+          env,
+          timeoutMs: timeout,
+          url,
+        });
+
+        if (!response.ok) {
+          await this.throwApiError(env, response, callId);
+        }
+
+        const data = (await response.json()) as ODataResponse<T>;
+        requestLogger.logHttpResponse(callId, {
+          status: response.status,
+          body: {
+            "@odata.count": data["@odata.count"] ?? null,
+            "@odata.nextLink": data["@odata.nextLink"] ?? null,
+            value: data.value,
+          },
+        });
+
+        return {
+          items: [...data.value],
+          totalCount: typeof data["@odata.count"] === "number" ? data["@odata.count"] : null,
+          nextLink: data["@odata.nextLink"] ?? null,
+        };
       },
       {
         bypass: cachePolicy.bypass,

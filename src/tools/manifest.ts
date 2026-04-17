@@ -26,6 +26,8 @@ import { listTablesTool } from "./tables/list-tables.js";
 import { getTableSchemaTool } from "./tables/get-table-schema.js";
 import { listTableColumnsTool } from "./tables/list-table-columns.js";
 import { listTableRelationshipsTool } from "./tables/list-table-relationships.js";
+import { listTableRecordsTool } from "./data/list-table-records.js";
+import { getTableRecordDetailsTool } from "./data/get-table-record-details.js";
 import { listFormsTool } from "./forms/list-forms.js";
 import { getFormDetailsTool } from "./forms/get-form-details.js";
 import { listTableRibbonsTool } from "./ribbons/list-table-ribbons.js";
@@ -257,6 +259,16 @@ export const TOOL_MANIFEST = [
     ...listTableRelationshipsTool,
     group: "schema_ui",
     mainParams: ["environment", "table", "solution"],
+  },
+  {
+    ...listTableRecordsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "nameFilter", "state"],
+  },
+  {
+    ...getTableRecordDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "recordId", "name", "firstName", "lastName", "state"],
   },
   {
     ...listFormsTool,

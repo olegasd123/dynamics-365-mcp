@@ -79,6 +79,10 @@ Replace these values before you run a prompt:
 - `<TARGET_TABLE>`: target table name if it is different
 - `<COLUMN>`: column logical name like `name`
 - `<COLUMNS>`: comma-separated column logical names like `name, accountnumber`
+- `<RECORD_ID>`: Dataverse row id
+- `<NAME>`: one full name, primary name, or last name
+- `<FIRST_NAME>`: first name like `Anna`
+- `<LAST_NAME>`: last name like `Smith`
 - `<PLUGIN>`: plugin assembly name
 - `<PLUGIN_CLASS>`: plugin class name or full type name
 - `<STEP>`: plugin step name
@@ -242,6 +246,18 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `list_table_relationships`
   `In <ENV>, list relationships for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
+
+- `list_table_records`
+  `In <ENV>, list records from table <TABLE>.`
+  `In <ENV>, list contacts from table contact where the name matches '<NAME>'.`
+  `In <ENV>, list inactive products from table product.`
+  `(Required: <TABLE>)`
+
+- `get_table_record_details`
+  `In <ENV>, show details for the record <RECORD_ID> from table <TABLE>.`
+  `In <ENV>, show details for the contact with last name <LAST_NAME>.`
+  `In <ENV>, show details for the contact with first name <FIRST_NAME> and last name <LAST_NAME>.`
+  `(Required: <TABLE> and one lookup value)`
 
 ## Forms
 
