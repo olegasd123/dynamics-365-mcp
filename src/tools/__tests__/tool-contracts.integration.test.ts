@@ -69,6 +69,8 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         table: expect.any(Object),
         nameFilter: expect.any(Object),
+        createdWithinDays: expect.any(Object),
+        modifiedWithinDays: expect.any(Object),
         state: expect.any(Object),
         limit: expect.any(Object),
         cursor: expect.any(Object),

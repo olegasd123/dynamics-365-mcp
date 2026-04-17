@@ -250,6 +250,8 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `list_table_records`
   `In <ENV>, list records from table <TABLE>.`
   `In <ENV>, list contacts from table contact where the name matches '<NAME>'.`
+  `In <ENV>, list contacts from table contact that were created in the last 5 days.`
+  `In <ENV>, list contacts from table contact that were modified in the last 10 days.`
   `In <ENV>, list inactive products from table product.`
   `(Required: <TABLE>)`
 

@@ -263,7 +263,14 @@ export const TOOL_MANIFEST = [
   {
     ...listTableRecordsTool,
     group: "schema_ui",
-    mainParams: ["environment", "table", "nameFilter", "state"],
+    mainParams: [
+      "environment",
+      "table",
+      "nameFilter",
+      "createdWithinDays",
+      "modifiedWithinDays",
+      "state",
+    ],
   },
   {
     ...getTableRecordDetailsTool,

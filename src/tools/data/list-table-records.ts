@@ -13,6 +13,7 @@ import {
   createToolSuccessResponse,
 } from "../response.js";
 import {
+  DAYS_WINDOW_SCHEMA,
   TABLE_RECORD_STATE_SCHEMA,
   describeRequestedState,
   listTableDataRecords,
@@ -26,6 +27,12 @@ const listTableRecordsSchema = {
     .string()
     .optional()
     .describe("Optional text filter for the primary name or common person name fields"),
+  createdWithinDays: DAYS_WINDOW_SCHEMA.describe(
+    "Optional created date filter. Use 5 for records created in the last 5 days.",
+  ),
+  modifiedWithinDays: DAYS_WINDOW_SCHEMA.describe(
+    "Optional modified date filter. Use 10 for records modified in the last 10 days.",
+  ),
   state: TABLE_RECORD_STATE_SCHEMA,
   limit: LIST_LIMIT_SCHEMA,
   cursor: LIST_CURSOR_SCHEMA,
@@ -34,7 +41,16 @@ const listTableRecordsSchema = {
 type ListTableRecordsParams = ToolParams<typeof listTableRecordsSchema>;
 
 export async function handleListTableRecords(
-  { environment, table, nameFilter, state, limit, cursor }: ListTableRecordsParams,
+  {
+    environment,
+    table,
+    nameFilter,
+    createdWithinDays,
+    modifiedWithinDays,
+    state,
+    limit,
+    cursor,
+  }: ListTableRecordsParams,
   { config, client }: ToolContext,
 ) {
   try {
@@ -42,12 +58,16 @@ export async function handleListTableRecords(
     const profile = await loadTableDataProfile(env, client, table);
     const page = await listTableDataRecords(env, client, profile, {
       cursor,
+      createdWithinDays,
       limit,
+      modifiedWithinDays,
       nameFilter,
       state,
     });
     const requestedState = describeRequestedState(state, profile.supportsStateFilter);
     const filters = {
+      createdWithinDays: createdWithinDays ?? null,
+      modifiedWithinDays: modifiedWithinDays ?? null,
       nameFilter: nameFilter || null,
       state: state || "active",
       appliedState: requestedState,
@@ -79,6 +99,7 @@ export async function handleListTableRecords(
       item.label,
       item.secondaryText || "-",
       item.stateLabel || (profile.supportsStateFilter ? "-" : "N/A"),
+      formatDate(item.createdon),
       formatDate(item.modifiedon),
       item.recordId,
     ]);
@@ -86,12 +107,21 @@ export async function handleListTableRecords(
     const filterParts = [
       `state='${requestedState}'`,
       nameFilter ? `nameFilter='${nameFilter}'` : "",
+      createdWithinDays ? `createdWithinDays=${createdWithinDays}` : "",
+      modifiedWithinDays ? `modifiedWithinDays=${modifiedWithinDays}` : "",
     ]
       .filter(Boolean)
       .join(", ");
 
-    const text = `## Records from '${profile.table.logicalName}' in '${env.name}'\n\n${pageSummary}\n\n- State Filter: ${requestedState}\n- Entity Set: ${profile.table.entitySetName}\n\n${formatTable(
-      ["Label", "Details", "State", "Modified", "Record ID"],
+    const dateFilterLines = [
+      createdWithinDays ? `- Created In Last Days: ${createdWithinDays}` : "",
+      modifiedWithinDays ? `- Modified In Last Days: ${modifiedWithinDays}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const text = `## Records from '${profile.table.logicalName}' in '${env.name}'\n\n${pageSummary}\n\n- State Filter: ${requestedState}\n- Entity Set: ${profile.table.entitySetName}${dateFilterLines ? `\n${dateFilterLines}` : ""}\n\n${formatTable(
+      ["Label", "Details", "State", "Created", "Modified", "Record ID"],
       rows,
     )}`;
 

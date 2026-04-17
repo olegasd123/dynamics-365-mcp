@@ -2,7 +2,15 @@ import { Buffer } from "node:buffer";
 import { z } from "zod";
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { and, contains, eq, or, query, type ODataFilter } from "../../utils/odata-builder.js";
+import {
+  and,
+  contains,
+  eq,
+  or,
+  query,
+  rawFilter,
+  type ODataFilter,
+} from "../../utils/odata-builder.js";
 import {
   fetchTableColumns,
   type TableColumnRecord,
@@ -78,6 +86,14 @@ export const TABLE_RECORD_STATE_SCHEMA = z
   .describe("Optional state filter. Defaults to 'active'. Use 'inactive' for deactivated rows.");
 
 export type TableRecordState = z.infer<typeof TABLE_RECORD_STATE_SCHEMA>;
+
+export const DAYS_WINDOW_SCHEMA = z
+  .number()
+  .int()
+  .min(1)
+  .max(3650)
+  .optional()
+  .describe("Optional number of days back from now. Use 5 for 'last 5 days'.");
 
 interface DataColumnDescriptor {
   logicalName: string;
@@ -210,7 +226,9 @@ export async function listTableDataRecords(
   profile: TableDataProfile,
   options?: {
     cursor?: string;
+    createdWithinDays?: number;
     limit?: number;
+    modifiedWithinDays?: number;
     nameFilter?: string;
     state?: TableRecordState;
   },
@@ -228,7 +246,12 @@ export async function listTableDataRecords(
   const page = await client.queryPage<Record<string, unknown>>(
     env,
     profile.table.entitySetName,
-    buildListQuery(profile, limit, options?.nameFilter, options?.state),
+    buildListQuery(profile, limit, {
+      createdWithinDays: options?.createdWithinDays,
+      modifiedWithinDays: options?.modifiedWithinDays,
+      nameFilter: options?.nameFilter,
+      state: options?.state,
+    }),
     {
       pageLink: cursorPayload?.nextLink,
     },
@@ -352,10 +375,19 @@ export function describeRequestedState(
 function buildListQuery(
   profile: TableDataProfile,
   limit: number,
-  nameFilter?: string,
-  state?: TableRecordState,
+  options?: {
+    createdWithinDays?: number;
+    modifiedWithinDays?: number;
+    nameFilter?: string;
+    state?: TableRecordState;
+  },
 ): string {
-  const filter = and(buildStateFilter(profile, state), buildNameFilter(profile, nameFilter));
+  const filter = and(
+    buildStateFilter(profile, options?.state),
+    buildNameFilter(profile, options?.nameFilter),
+    buildDateWindowFilter(profile, "createdon", options?.createdWithinDays),
+    buildDateWindowFilter(profile, "modifiedon", options?.modifiedWithinDays),
+  );
 
   return query()
     .select(buildSelectFieldNames(profile, profile.listFieldNames))
@@ -364,6 +396,25 @@ function buildListQuery(
     .top(limit)
     .count(true)
     .toString();
+}
+
+function buildDateWindowFilter(
+  profile: TableDataProfile,
+  fieldName: "createdon" | "modifiedon",
+  withinDays?: number,
+): ODataFilter | undefined {
+  if (withinDays === undefined) {
+    return undefined;
+  }
+
+  if (!profile.columnsByLogicalName.has(fieldName)) {
+    throw new Error(
+      `Table '${profile.table.logicalName}' does not support the '${fieldName}' filter.`,
+    );
+  }
+
+  const threshold = new Date(Date.now() - withinDays * 24 * 60 * 60 * 1000).toISOString();
+  return rawFilter(`${fieldName} ge ${threshold}`);
 }
 
 function buildLookupByIdQuery(

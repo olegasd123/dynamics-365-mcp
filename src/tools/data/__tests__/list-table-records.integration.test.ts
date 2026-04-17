@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { handleListTableRecords, registerListTableRecords } from "../list-table-records.js";
 import {
   FakeServer,
@@ -38,6 +38,10 @@ const CONTACT_COLUMNS = [
 ];
 
 describe("list_table_records tool", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("uses active state by default and keeps pagination on the Dataverse side", async () => {
     const config = createTestConfig(["dev"]);
     const { client, calls } = createRecordingClient({
@@ -136,6 +140,76 @@ describe("list_table_records tool", () => {
         hasMore: false,
       },
     });
+  });
+
+  it("adds a createdon filter for the last N days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-17T12:00:00Z"));
+
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [CONTACT_TABLE],
+        "EntityDefinitions(LogicalName='contact')/Attributes": CONTACT_COLUMNS,
+        contacts: {
+          "@odata.count": 1,
+          value: [contactRecord("contact-1", "Anna Smith", "anna@example.com")],
+        },
+      },
+    });
+
+    const response = await handleListTableRecords(
+      {
+        createdWithinDays: 5,
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Created In Last Days: 5");
+    expect(
+      calls.some(
+        (call) =>
+          call.entitySet === "contacts" &&
+          call.queryParams?.includes("createdon ge 2026-04-12T12:00:00.000Z"),
+      ),
+    ).toBe(true);
+  });
+
+  it("adds a modifiedon filter for the last N days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-17T12:00:00Z"));
+
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [CONTACT_TABLE],
+        "EntityDefinitions(LogicalName='contact')/Attributes": CONTACT_COLUMNS,
+        contacts: {
+          "@odata.count": 1,
+          value: [contactRecord("contact-1", "Anna Smith", "anna@example.com")],
+        },
+      },
+    });
+
+    const response = await handleListTableRecords(
+      {
+        modifiedWithinDays: 10,
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Modified In Last Days: 10");
+    expect(
+      calls.some(
+        (call) =>
+          call.entitySet === "contacts" &&
+          call.queryParams?.includes("modifiedon ge 2026-04-07T12:00:00.000Z"),
+      ),
+    ).toBe(true);
   });
 });
 
