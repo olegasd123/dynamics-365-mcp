@@ -34,6 +34,8 @@ const CONTACT_COLUMNS = [
   createColumn("firstname", "First Name", "String"),
   createColumn("lastname", "Last Name", "String"),
   createColumn("emailaddress1", "Email", "String"),
+  createColumn("new_customfield", "Custom Field", "String"),
+  createColumn("jobtitle", "Job Title", "String"),
   createColumn("statecode", "State", "State"),
   createColumn("statuscode", "Status", "Status"),
   createColumn("createdon", "Created On", "DateTime"),
@@ -62,16 +64,32 @@ describe("get_table_record_details tool", () => {
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("## Record: Anna Smith");
     expect(response.content[0].text).toContain("anna@example.com");
+    expect(response.content[0].text).toContain("Custom Field");
     expect(response.structuredContent).toMatchObject({
       tool: "get_table_record_details",
       ok: true,
       data: {
+        fieldPage: {
+          totalCount: CONTACT_COLUMNS.length,
+        },
         record: {
           recordId: "contact-1",
           label: "Anna Smith",
         },
       },
     });
+
+    const payload = response.structuredContent as {
+      data: {
+        record: {
+          fields: Array<{ logicalName: string; value: string }>;
+        };
+      };
+    };
+    expect(
+      payload.data.record.fields.some((field) => field.logicalName === "new_customfield"),
+    ).toBe(true);
+    expect(payload.data.record.fields.some((field) => field.logicalName === "jobtitle")).toBe(true);
   });
 
   it("returns structured retry options when a last name is ambiguous", async () => {
@@ -115,6 +133,67 @@ describe("get_table_record_details tool", () => {
       ),
     ).toBe(true);
   });
+
+  it("supports client-side paging across all readable metadata fields", async () => {
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [CONTACT_TABLE],
+        "EntityDefinitions(LogicalName='contact')/Attributes": CONTACT_COLUMNS,
+        contacts: [contactRecord("contact-1", "Anna Smith", "anna@example.com")],
+      },
+    });
+
+    const firstPage = await handleGetTableRecordDetails(
+      {
+        limit: 2,
+        recordId: "contact-1",
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(firstPage.isError).toBeUndefined();
+    expect(firstPage.content[0].text).toContain("Showing 2 of");
+
+    const firstPayload = firstPage.structuredContent as {
+      data: {
+        fieldPage: {
+          nextCursor: string | null;
+          returnedCount: number;
+          totalCount: number;
+          hasMore: boolean;
+        };
+        record: {
+          fields: Array<{ logicalName: string }>;
+        };
+      };
+    };
+    expect(firstPayload.data.fieldPage.returnedCount).toBe(2);
+    expect(firstPayload.data.fieldPage.totalCount).toBe(CONTACT_COLUMNS.length);
+    expect(firstPayload.data.fieldPage.hasMore).toBe(true);
+    expect(firstPayload.data.record.fields).toHaveLength(2);
+
+    const secondPage = await handleGetTableRecordDetails(
+      {
+        cursor: firstPayload.data.fieldPage.nextCursor || undefined,
+        limit: 2,
+        recordId: "contact-1",
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(secondPage.isError).toBeUndefined();
+    const secondPayload = secondPage.structuredContent as {
+      data: {
+        record: {
+          fields: Array<{ logicalName: string }>;
+        };
+      };
+    };
+    expect(secondPayload.data.record.fields).toHaveLength(2);
+  });
 });
 
 function createColumn(
@@ -154,6 +233,7 @@ function contactRecord(contactid: string, fullname: string, emailaddress1: strin
     firstname: fullname.split(" ")[0],
     lastname: fullname.split(" ")[1] || "",
     emailaddress1,
+    new_customfield: "Custom Value",
     statecode: 0,
     [`statecode@OData.Community.Display.V1.FormattedValue`]: "Active",
     statuscode: 1,

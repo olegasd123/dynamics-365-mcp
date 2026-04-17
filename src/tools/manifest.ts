@@ -275,7 +275,17 @@ export const TOOL_MANIFEST = [
   {
     ...getTableRecordDetailsTool,
     group: "schema_ui",
-    mainParams: ["environment", "table", "recordId", "name", "firstName", "lastName", "state"],
+    mainParams: [
+      "environment",
+      "table",
+      "recordId",
+      "name",
+      "firstName",
+      "lastName",
+      "state",
+      "limit",
+      "cursor",
+    ],
   },
   {
     ...listFormsTool,

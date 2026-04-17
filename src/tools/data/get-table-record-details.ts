@@ -5,7 +5,14 @@ import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { formatTable } from "../../utils/formatters.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
-import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
+import {
+  LIST_CURSOR_SCHEMA,
+  LIST_LIMIT_SCHEMA,
+  buildPaginatedListData,
+  buildPaginatedListSummary,
+  createToolErrorResponse,
+  createToolSuccessResponse,
+} from "../response.js";
 import {
   TABLE_RECORD_STATE_SCHEMA,
   describeRequestedState,
@@ -24,12 +31,24 @@ const getTableRecordDetailsSchema = {
   firstName: z.string().optional().describe("Optional first name for person tables like contact"),
   lastName: z.string().optional().describe("Optional last name for person tables like contact"),
   state: TABLE_RECORD_STATE_SCHEMA,
+  limit: LIST_LIMIT_SCHEMA,
+  cursor: LIST_CURSOR_SCHEMA,
 };
 
 type GetTableRecordDetailsParams = ToolParams<typeof getTableRecordDetailsSchema>;
 
 export async function handleGetTableRecordDetails(
-  { environment, table, recordId, name, firstName, lastName, state }: GetTableRecordDetailsParams,
+  {
+    environment,
+    table,
+    recordId,
+    name,
+    firstName,
+    lastName,
+    state,
+    limit,
+    cursor,
+  }: GetTableRecordDetailsParams,
   { config, client }: ToolContext,
 ) {
   try {
@@ -44,7 +63,27 @@ export async function handleGetTableRecordDetails(
       recordId,
       state,
     });
+    const fieldPage = buildPaginatedListData(
+      details.fields,
+      {
+        environment: env.name,
+        table: profile.table.logicalName,
+      },
+      {
+        limit,
+        cursor,
+      },
+    );
     const requestedState = describeRequestedState(state, profile.supportsStateFilter);
+    const fieldSummary = buildPaginatedListSummary({
+      cursor: fieldPage.cursor,
+      returnedCount: fieldPage.returnedCount,
+      totalCount: fieldPage.totalCount,
+      hasMore: fieldPage.hasMore,
+      nextCursor: fieldPage.nextCursor,
+      itemLabelSingular: "field",
+      itemLabelPlural: "fields",
+    });
 
     const lines: string[] = [];
     lines.push(`## Record: ${details.label}`);
@@ -62,10 +101,12 @@ export async function handleGetTableRecordDetails(
     }
     lines.push("");
     lines.push("### Fields");
+    lines.push(fieldSummary);
+    lines.push("");
     lines.push(
       formatTable(
         ["Field", "Value"],
-        details.fields.map((field) => [field.displayName, field.value || "-"]),
+        fieldPage.items.map((field) => [field.displayName, field.value || "-"]),
       ),
     );
 
@@ -84,8 +125,25 @@ export async function handleGetTableRecordDetails(
           lastName: lastName || null,
           state: state || "active",
           appliedState: requestedState,
+          limit: fieldPage.limit,
+          cursor: fieldPage.cursor,
         },
-        record: details,
+        fieldPage: {
+          limit: fieldPage.limit,
+          cursor: fieldPage.cursor,
+          returnedCount: fieldPage.returnedCount,
+          totalCount: fieldPage.totalCount,
+          hasMore: fieldPage.hasMore,
+          nextCursor: fieldPage.nextCursor,
+          items: fieldPage.items,
+        },
+        record: {
+          ...details,
+          fields: fieldPage.items,
+          raw: Object.fromEntries(
+            fieldPage.items.map((field) => [field.logicalName, details.raw[field.logicalName]]),
+          ),
+        },
       },
     );
   } catch (error) {

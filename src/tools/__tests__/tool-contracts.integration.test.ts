@@ -83,6 +83,8 @@ describe("tool contracts", () => {
         firstName: expect.any(Object),
         lastName: expect.any(Object),
         state: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
       });
       expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),

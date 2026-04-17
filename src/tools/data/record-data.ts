@@ -111,6 +111,7 @@ interface TableDataProfile {
   supportsStateFilter: boolean;
   listFieldNames: string[];
   detailFieldNames: string[];
+  detailSearchFieldNames: string[];
   nameSearchFieldNames: string[];
 }
 
@@ -202,7 +203,12 @@ export async function loadTableDataProfile(
     listFieldNames: buildFieldSelection(columnsByLogicalName, primaryIdColumn, primaryNameColumn, [
       ...LIST_FIELD_CANDIDATES,
     ]),
-    detailFieldNames: buildFieldSelection(
+    detailFieldNames: buildAllReadableFieldSelection(
+      columnsByLogicalName,
+      primaryIdColumn,
+      primaryNameColumn,
+    ),
+    detailSearchFieldNames: buildFieldSelection(
       columnsByLogicalName,
       primaryIdColumn,
       primaryNameColumn,
@@ -291,20 +297,7 @@ export async function getTableDataRecordDetails(
   const stateFilter = buildStateFilter(profile, options.state);
 
   if (options.recordId) {
-    const records = await client.query<Record<string, unknown>>(
-      env,
-      profile.table.entitySetName,
-      buildLookupByIdQuery(profile, options.recordId, stateFilter),
-      {
-        maxPages: 1,
-      },
-    );
-
-    if (records.length > 0) {
-      return normalizeDetailsRecord(profile, records[0]);
-    }
-
-    throw new Error(buildNotFoundMessage(profile, env.name, options, stateFilter));
+    return fetchFullRecordDetailsById(env, client, profile, options.recordId, stateFilter, options);
   }
 
   const selector = normalizeLookupSelector(options);
@@ -317,7 +310,14 @@ export async function getTableDataRecordDetails(
 
   const exactResolved = resolveCandidates(profile, selector, exactMatches);
   if (exactResolved.length === 1) {
-    return normalizeDetailsRecord(profile, exactResolved[0]);
+    return fetchFullRecordDetailsById(
+      env,
+      client,
+      profile,
+      String(readRecordRawValue(exactResolved[0], profile.primaryIdColumn) || ""),
+      stateFilter,
+      options,
+    );
   }
   if (exactResolved.length > 1) {
     throw createAmbiguousRecordError(
@@ -338,7 +338,14 @@ export async function getTableDataRecordDetails(
   const partialResolved = resolveCandidates(profile, selector, containsMatches);
 
   if (partialResolved.length === 1) {
-    return normalizeDetailsRecord(profile, partialResolved[0]);
+    return fetchFullRecordDetailsById(
+      env,
+      client,
+      profile,
+      String(readRecordRawValue(partialResolved[0], profile.primaryIdColumn) || ""),
+      stateFilter,
+      options,
+    );
   }
 
   if (partialResolved.length > 1) {
@@ -461,7 +468,7 @@ function buildExactLookupQuery(
   }
 
   return query()
-    .select(buildSelectFieldNames(profile, profile.detailFieldNames))
+    .select(buildSelectFieldNames(profile, profile.detailSearchFieldNames))
     .filter(and(stateFilter, lookupFilter))
     .orderby(profile.orderByField)
     .top(MAX_MATCH_RESULTS)
@@ -502,7 +509,7 @@ function buildContainsLookupQuery(
   }
 
   return query()
-    .select(buildSelectFieldNames(profile, profile.detailFieldNames))
+    .select(buildSelectFieldNames(profile, profile.detailSearchFieldNames))
     .filter(and(stateFilter, lookupFilter))
     .orderby(profile.orderByField)
     .top(MAX_MATCH_RESULTS)
@@ -552,6 +559,24 @@ function buildFieldSelection(
     if (columnsByLogicalName.has(fieldName)) {
       fields.push(fieldName);
     }
+  }
+
+  return uniqueFieldNames(fields);
+}
+
+function buildAllReadableFieldSelection(
+  columnsByLogicalName: Map<string, DataColumnDescriptor>,
+  primaryIdColumn: DataColumnDescriptor,
+  primaryNameColumn: DataColumnDescriptor | null,
+): string[] {
+  const fields = [primaryIdColumn.logicalName];
+
+  if (primaryNameColumn?.logicalName) {
+    fields.push(primaryNameColumn.logicalName);
+  }
+
+  for (const logicalName of columnsByLogicalName.keys()) {
+    fields.push(logicalName);
   }
 
   return uniqueFieldNames(fields);
@@ -623,9 +648,9 @@ function normalizeDetailsRecord(
   record: Record<string, unknown>,
 ): TableRecordDetails {
   const listItem = normalizeListItem(profile, record);
-  const fields = profile.detailFieldNames
-    .map((fieldName) => buildFieldValue(profile, record, fieldName))
-    .filter((field): field is TableRecordFieldValue => Boolean(field));
+  const fields = profile.detailFieldNames.map((fieldName) =>
+    buildFieldValue(profile, record, fieldName),
+  );
 
   return {
     ...listItem,
@@ -638,7 +663,7 @@ function buildFieldValue(
   profile: TableDataProfile,
   record: Record<string, unknown>,
   logicalName: string,
-): TableRecordFieldValue | null {
+): TableRecordFieldValue {
   const descriptor = profile.columnsByLogicalName.get(logicalName) || {
     logicalName,
     selectName: logicalName,
@@ -648,14 +673,10 @@ function buildFieldValue(
   const rawValue = readRecordRawValue(record, descriptor);
   const formattedValue = readRecordFormattedValue(record, descriptor);
 
-  if (isBlankValue(rawValue) && !formattedValue) {
-    return null;
-  }
-
   return {
     logicalName: descriptor.logicalName,
     displayName: descriptor.displayName || descriptor.logicalName,
-    value: formattedValue || formatUnknownValue(rawValue),
+    value: formattedValue || formatUnknownValue(rawValue) || "-",
     rawValue,
     formattedValue: formattedValue || null,
   };
@@ -1004,10 +1025,6 @@ function uniqueFieldNames(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-function isBlankValue(value: unknown): boolean {
-  return value === undefined || value === null || value === "";
-}
-
 function formatUnknownValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
@@ -1022,4 +1039,34 @@ function formatUnknownValue(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+async function fetchFullRecordDetailsById(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  profile: TableDataProfile,
+  recordId: string,
+  stateFilter: ODataFilter | undefined,
+  options: {
+    firstName?: string;
+    lastName?: string;
+    name?: string;
+    recordId?: string;
+    state?: TableRecordState;
+  },
+): Promise<TableRecordDetails> {
+  const records = await client.query<Record<string, unknown>>(
+    env,
+    profile.table.entitySetName,
+    buildLookupByIdQuery(profile, recordId, stateFilter),
+    {
+      maxPages: 1,
+    },
+  );
+
+  if (records.length === 0) {
+    throw new Error(buildNotFoundMessage(profile, env.name, options, stateFilter));
+  }
+
+  return normalizeDetailsRecord(profile, records[0]);
 }
