@@ -110,14 +110,24 @@ interface TableDataProfile {
   orderByField: string;
   supportsStateFilter: boolean;
   listFieldNames: string[];
-  detailFieldNames: string[];
+  defaultDetailFieldNames: string[];
+  allDetailFieldNames: string[];
   detailSearchFieldNames: string[];
   nameSearchFieldNames: string[];
 }
 
-interface CursorPayload {
+interface ListCursorPayload {
   nextLink: string;
   totalCount: number;
+  environment: string;
+  tableLogicalName: string;
+  limit: number;
+  filters: {
+    createdWithinDays: number | null;
+    modifiedWithinDays: number | null;
+    nameFilter: string | null;
+    state: TableRecordState | "active";
+  };
 }
 
 export interface TableRecordListItem extends Record<string, unknown> {
@@ -203,7 +213,13 @@ export async function loadTableDataProfile(
     listFieldNames: buildFieldSelection(columnsByLogicalName, primaryIdColumn, primaryNameColumn, [
       ...LIST_FIELD_CANDIDATES,
     ]),
-    detailFieldNames: buildAllReadableFieldSelection(
+    defaultDetailFieldNames: buildFieldSelection(
+      columnsByLogicalName,
+      primaryIdColumn,
+      primaryNameColumn,
+      [...DETAIL_FIELD_CANDIDATES],
+    ),
+    allDetailFieldNames: buildAllReadableFieldSelection(
       columnsByLogicalName,
       primaryIdColumn,
       primaryNameColumn,
@@ -247,15 +263,26 @@ export async function listTableDataRecords(
   nextCursor: string | null;
   items: TableRecordListItem[];
 }> {
-  const limit = options?.limit ?? 50;
-  const cursorPayload = decodeCursor(options?.cursor);
+  const normalizedNameFilter = normalizeTextInput(options?.nameFilter);
+  assertListNameFilterSupported(profile, normalizedNameFilter);
+
+  const cursorPayload = decodeListCursor(options?.cursor);
+  const limit = resolveListPageLimit(options?.limit, cursorPayload);
+  const cursorContext = buildListCursorContext(env.name, profile, {
+    createdWithinDays: options?.createdWithinDays,
+    limit,
+    modifiedWithinDays: options?.modifiedWithinDays,
+    nameFilter: normalizedNameFilter,
+    state: options?.state,
+  });
+  validateListCursorContext(cursorPayload, cursorContext);
   const page = await client.queryPage<Record<string, unknown>>(
     env,
     profile.table.entitySetName,
     buildListQuery(profile, limit, {
       createdWithinDays: options?.createdWithinDays,
       modifiedWithinDays: options?.modifiedWithinDays,
-      nameFilter: options?.nameFilter,
+      nameFilter: normalizedNameFilter,
       state: options?.state,
     }),
     {
@@ -265,7 +292,8 @@ export async function listTableDataRecords(
   const totalCount = page.totalCount ?? cursorPayload?.totalCount ?? page.items.length;
   const nextCursor =
     page.nextLink && totalCount >= 0
-      ? encodeCursor({
+      ? encodeListCursor({
+          ...cursorContext,
           nextLink: page.nextLink,
           totalCount,
         })
@@ -292,15 +320,27 @@ export async function getTableDataRecordDetails(
     name?: string;
     recordId?: string;
     state?: TableRecordState;
+    includeAllFields?: boolean;
   },
 ): Promise<TableRecordDetails> {
   const stateFilter = buildStateFilter(profile, options.state);
+  const detailFieldNames = resolveDetailFieldNames(profile, options.includeAllFields);
+  const recordId = normalizeTextInput(options.recordId);
 
-  if (options.recordId) {
-    return fetchFullRecordDetailsById(env, client, profile, options.recordId, stateFilter, options);
+  if (recordId) {
+    return fetchFullRecordDetailsById(
+      env,
+      client,
+      profile,
+      recordId,
+      detailFieldNames,
+      stateFilter,
+      options,
+    );
   }
 
   const selector = normalizeLookupSelector(options);
+  validateLookupSelectorSupport(profile, selector);
   const exactQuery = buildExactLookupQuery(profile, selector, stateFilter);
   const exactMatches = exactQuery
     ? await client.query<Record<string, unknown>>(env, profile.table.entitySetName, exactQuery, {
@@ -315,6 +355,7 @@ export async function getTableDataRecordDetails(
       client,
       profile,
       String(readRecordRawValue(exactResolved[0], profile.primaryIdColumn) || ""),
+      detailFieldNames,
       stateFilter,
       options,
     );
@@ -343,6 +384,7 @@ export async function getTableDataRecordDetails(
       client,
       profile,
       String(readRecordRawValue(partialResolved[0], profile.primaryIdColumn) || ""),
+      detailFieldNames,
       stateFilter,
       options,
     );
@@ -405,6 +447,16 @@ function buildListQuery(
     .toString();
 }
 
+function assertListNameFilterSupported(profile: TableDataProfile, nameFilter?: string): void {
+  if (!nameFilter || profile.nameSearchFieldNames.length > 0) {
+    return;
+  }
+
+  throw new Error(
+    `Table '${profile.table.logicalName}' does not support nameFilter. Use another filter or get the record by id.`,
+  );
+}
+
 function buildDateWindowFilter(
   profile: TableDataProfile,
   fieldName: "createdon" | "modifiedon",
@@ -427,10 +479,11 @@ function buildDateWindowFilter(
 function buildLookupByIdQuery(
   profile: TableDataProfile,
   recordId: string,
+  detailFieldNames: string[],
   stateFilter?: ODataFilter,
 ): string {
   return query()
-    .select(buildSelectFieldNames(profile, profile.detailFieldNames))
+    .select(buildSelectFieldNames(profile, detailFieldNames))
     .filter(and(eq(profile.primaryIdColumn.logicalName, recordId), stateFilter))
     .top(2)
     .toString();
@@ -517,12 +570,11 @@ function buildContainsLookupQuery(
 }
 
 function buildNameFilter(profile: TableDataProfile, nameFilter?: string): ODataFilter | undefined {
-  const trimmed = nameFilter?.trim();
-  if (!trimmed || profile.nameSearchFieldNames.length === 0) {
+  if (!nameFilter || profile.nameSearchFieldNames.length === 0) {
     return undefined;
   }
 
-  return or(...profile.nameSearchFieldNames.map((fieldName) => contains(fieldName, trimmed)));
+  return or(...profile.nameSearchFieldNames.map((fieldName) => contains(fieldName, nameFilter)));
 }
 
 function buildStateFilter(
@@ -646,16 +698,15 @@ function normalizeListItem(
 function normalizeDetailsRecord(
   profile: TableDataProfile,
   record: Record<string, unknown>,
+  detailFieldNames: string[],
 ): TableRecordDetails {
   const listItem = normalizeListItem(profile, record);
-  const fields = profile.detailFieldNames.map((fieldName) =>
-    buildFieldValue(profile, record, fieldName),
-  );
+  const fields = detailFieldNames.map((fieldName) => buildFieldValue(profile, record, fieldName));
 
   return {
     ...listItem,
     fields,
-    raw: normalizeRawRecord(profile, record, profile.detailFieldNames),
+    raw: normalizeRawRecord(profile, record, detailFieldNames),
   };
 }
 
@@ -816,9 +867,9 @@ function normalizeLookupSelector(options: {
   name?: string;
   rawRef: string;
 } {
-  const firstName = options.firstName?.trim();
-  const lastName = options.lastName?.trim();
-  const name = options.name?.trim();
+  const firstName = normalizeTextInput(options.firstName);
+  const lastName = normalizeTextInput(options.lastName);
+  const name = normalizeTextInput(options.name);
 
   return {
     firstName: firstName || undefined,
@@ -826,6 +877,29 @@ function normalizeLookupSelector(options: {
     name: name || undefined,
     rawRef: [name, firstName, lastName].filter(Boolean).join(" / "),
   };
+}
+
+function validateLookupSelectorSupport(
+  profile: TableDataProfile,
+  selector: ReturnType<typeof normalizeLookupSelector>,
+): void {
+  if (selector.name && profile.nameSearchFieldNames.length === 0) {
+    throw new Error(
+      `Table '${profile.table.logicalName}' does not support name lookup. Use recordId instead.`,
+    );
+  }
+
+  if (selector.firstName && !profile.columnsByLogicalName.has("firstname")) {
+    throw new Error(
+      `Table '${profile.table.logicalName}' does not support firstName lookup. Use name or recordId instead.`,
+    );
+  }
+
+  if (selector.lastName && !profile.columnsByLogicalName.has("lastname")) {
+    throw new Error(
+      `Table '${profile.table.logicalName}' does not support lastName lookup. Use name or recordId instead.`,
+    );
+  }
 }
 
 function resolveCandidates(
@@ -995,24 +1069,102 @@ function buildNotFoundMessage(
   return `Record '${ref || "(empty)"}' not found in table '${profile.table.logicalName}' and environment '${environmentName}'${stateSuffix}.`;
 }
 
-function encodeCursor(payload: CursorPayload): string {
+function buildListCursorContext(
+  environmentName: string,
+  profile: TableDataProfile,
+  options: {
+    createdWithinDays?: number;
+    limit: number;
+    modifiedWithinDays?: number;
+    nameFilter?: string;
+    state?: TableRecordState;
+  },
+): Omit<ListCursorPayload, "nextLink" | "totalCount"> {
+  return {
+    environment: environmentName,
+    tableLogicalName: profile.table.logicalName,
+    limit: options.limit,
+    filters: {
+      createdWithinDays: options.createdWithinDays ?? null,
+      modifiedWithinDays: options.modifiedWithinDays ?? null,
+      nameFilter: options.nameFilter || null,
+      state: options.state || "active",
+    },
+  };
+}
+
+function resolveListPageLimit(
+  limit: number | undefined,
+  cursorPayload: ListCursorPayload | null,
+): number {
+  if (!cursorPayload) {
+    return limit ?? 50;
+  }
+
+  if (limit !== undefined && limit !== cursorPayload.limit) {
+    throw new Error("Use the same limit value when continuing a paged record list.");
+  }
+
+  return cursorPayload.limit;
+}
+
+function validateListCursorContext(
+  cursorPayload: ListCursorPayload | null,
+  context: Omit<ListCursorPayload, "nextLink" | "totalCount">,
+): void {
+  if (!cursorPayload) {
+    return;
+  }
+
+  if (
+    cursorPayload.environment !== context.environment ||
+    cursorPayload.tableLogicalName !== context.tableLogicalName
+  ) {
+    throw new Error("This cursor belongs to a different environment or table.");
+  }
+
+  if (JSON.stringify(cursorPayload.filters) !== JSON.stringify(context.filters)) {
+    throw new Error("This cursor belongs to a different set of record filters.");
+  }
+}
+
+function encodeListCursor(payload: ListCursorPayload): string {
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
 }
 
-function decodeCursor(cursor?: string): CursorPayload | null {
+function decodeListCursor(cursor?: string): ListCursorPayload | null {
   if (!cursor) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as CursorPayload;
+    const parsed = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    ) as ListCursorPayload;
     if (
       !parsed ||
       typeof parsed !== "object" ||
       typeof parsed.nextLink !== "string" ||
-      typeof parsed.totalCount !== "number"
+      typeof parsed.totalCount !== "number" ||
+      typeof parsed.environment !== "string" ||
+      typeof parsed.tableLogicalName !== "string" ||
+      typeof parsed.limit !== "number" ||
+      !parsed.filters ||
+      typeof parsed.filters !== "object"
     ) {
       throw new Error("Invalid cursor shape");
+    }
+
+    if (
+      (parsed.filters.createdWithinDays !== null &&
+        typeof parsed.filters.createdWithinDays !== "number") ||
+      (parsed.filters.modifiedWithinDays !== null &&
+        typeof parsed.filters.modifiedWithinDays !== "number") ||
+      (parsed.filters.nameFilter !== null && typeof parsed.filters.nameFilter !== "string") ||
+      typeof parsed.filters.state !== "string" ||
+      !["active", "inactive", "all"].includes(parsed.filters.state)
+    ) {
+      throw new Error("Invalid cursor filters");
     }
 
     return parsed;
@@ -1021,8 +1173,17 @@ function decodeCursor(cursor?: string): CursorPayload | null {
   }
 }
 
+function normalizeTextInput(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+}
+
 function uniqueFieldNames(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+function resolveDetailFieldNames(profile: TableDataProfile, includeAllFields?: boolean): string[] {
+  return includeAllFields ? profile.allDetailFieldNames : profile.defaultDetailFieldNames;
 }
 
 function formatUnknownValue(value: unknown): string {
@@ -1046,6 +1207,7 @@ async function fetchFullRecordDetailsById(
   client: DynamicsClient,
   profile: TableDataProfile,
   recordId: string,
+  detailFieldNames: string[],
   stateFilter: ODataFilter | undefined,
   options: {
     firstName?: string;
@@ -1058,7 +1220,7 @@ async function fetchFullRecordDetailsById(
   const records = await client.query<Record<string, unknown>>(
     env,
     profile.table.entitySetName,
-    buildLookupByIdQuery(profile, recordId, stateFilter),
+    buildLookupByIdQuery(profile, recordId, detailFieldNames, stateFilter),
     {
       maxPages: 1,
     },
@@ -1068,5 +1230,5 @@ async function fetchFullRecordDetailsById(
     throw new Error(buildNotFoundMessage(profile, env.name, options, stateFilter));
   }
 
-  return normalizeDetailsRecord(profile, records[0]);
+  return normalizeDetailsRecord(profile, records[0], detailFieldNames);
 }

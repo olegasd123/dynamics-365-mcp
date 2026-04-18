@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
@@ -31,11 +32,24 @@ const getTableRecordDetailsSchema = {
   firstName: z.string().optional().describe("Optional first name for person tables like contact"),
   lastName: z.string().optional().describe("Optional last name for person tables like contact"),
   state: TABLE_RECORD_STATE_SCHEMA,
+  includeAllFields: z
+    .boolean()
+    .optional()
+    .describe("Optional full field mode. Defaults to false and returns a compact field set."),
   limit: LIST_LIMIT_SCHEMA,
   cursor: LIST_CURSOR_SCHEMA,
 };
 
 type GetTableRecordDetailsParams = ToolParams<typeof getTableRecordDetailsSchema>;
+
+interface FieldPageCursorPayload {
+  start: string;
+  environment: string;
+  tableLogicalName: string;
+  recordId: string;
+  limit: number;
+  includeAllFields: boolean;
+}
 
 export async function handleGetTableRecordDetails(
   {
@@ -46,6 +60,7 @@ export async function handleGetTableRecordDetails(
     firstName,
     lastName,
     state,
+    includeAllFields,
     limit,
     cursor,
   }: GetTableRecordDetailsParams,
@@ -62,7 +77,18 @@ export async function handleGetTableRecordDetails(
       name,
       recordId,
       state,
+      includeAllFields,
     });
+    const fieldCursor = decodeFieldPageCursor(cursor);
+    const fieldLimit = resolveFieldPageLimit(limit, fieldCursor);
+    const fieldCursorContext = {
+      environment: env.name,
+      tableLogicalName: profile.table.logicalName,
+      recordId: details.recordId,
+      limit: fieldLimit,
+      includeAllFields: includeAllFields === true,
+    };
+    validateFieldPageCursor(fieldCursor, fieldCursorContext);
     const fieldPage = buildPaginatedListData(
       details.fields,
       {
@@ -70,17 +96,24 @@ export async function handleGetTableRecordDetails(
         table: profile.table.logicalName,
       },
       {
-        limit,
-        cursor,
+        limit: fieldLimit,
+        cursor: fieldCursor?.start,
       },
     );
+    const encodedCursor = fieldCursor ? cursor || null : null;
+    const encodedNextCursor = fieldPage.nextCursor
+      ? encodeFieldPageCursor({
+          ...fieldCursorContext,
+          start: fieldPage.nextCursor,
+        })
+      : null;
     const requestedState = describeRequestedState(state, profile.supportsStateFilter);
     const fieldSummary = buildPaginatedListSummary({
-      cursor: fieldPage.cursor,
+      cursor: encodedCursor,
       returnedCount: fieldPage.returnedCount,
       totalCount: fieldPage.totalCount,
       hasMore: fieldPage.hasMore,
-      nextCursor: fieldPage.nextCursor,
+      nextCursor: encodedNextCursor,
       itemLabelSingular: "field",
       itemLabelPlural: "fields",
     });
@@ -124,17 +157,18 @@ export async function handleGetTableRecordDetails(
           firstName: firstName || null,
           lastName: lastName || null,
           state: state || "active",
+          includeAllFields: includeAllFields === true,
           appliedState: requestedState,
-          limit: fieldPage.limit,
-          cursor: fieldPage.cursor,
+          limit: fieldLimit,
+          cursor: encodedCursor,
         },
         fieldPage: {
-          limit: fieldPage.limit,
-          cursor: fieldPage.cursor,
+          limit: fieldLimit,
+          cursor: encodedCursor,
           returnedCount: fieldPage.returnedCount,
           totalCount: fieldPage.totalCount,
           hasMore: fieldPage.hasMore,
-          nextCursor: fieldPage.nextCursor,
+          nextCursor: encodedNextCursor,
           items: fieldPage.items,
         },
         record: {
@@ -178,10 +212,79 @@ function formatDate(value: string): string {
   return value ? value.slice(0, 10) : "-";
 }
 
+function resolveFieldPageLimit(
+  limit: number | undefined,
+  cursorPayload: FieldPageCursorPayload | null,
+): number {
+  if (!cursorPayload) {
+    return limit ?? 50;
+  }
+
+  if (limit !== undefined && limit !== cursorPayload.limit) {
+    throw new Error("Use the same limit value when continuing paged record fields.");
+  }
+
+  return cursorPayload.limit;
+}
+
+function validateFieldPageCursor(
+  cursorPayload: FieldPageCursorPayload | null,
+  context: Omit<FieldPageCursorPayload, "start">,
+): void {
+  if (!cursorPayload) {
+    return;
+  }
+
+  if (
+    cursorPayload.environment !== context.environment ||
+    cursorPayload.tableLogicalName !== context.tableLogicalName ||
+    cursorPayload.recordId !== context.recordId
+  ) {
+    throw new Error("This cursor belongs to a different record details result.");
+  }
+
+  if (cursorPayload.includeAllFields !== context.includeAllFields) {
+    throw new Error("This cursor belongs to a different field selection mode.");
+  }
+}
+
+function encodeFieldPageCursor(payload: FieldPageCursorPayload): string {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+function decodeFieldPageCursor(cursor?: string): FieldPageCursorPayload | null {
+  if (!cursor) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    ) as FieldPageCursorPayload;
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      typeof parsed.start !== "string" ||
+      typeof parsed.environment !== "string" ||
+      typeof parsed.tableLogicalName !== "string" ||
+      typeof parsed.recordId !== "string" ||
+      typeof parsed.limit !== "number" ||
+      typeof parsed.includeAllFields !== "boolean"
+    ) {
+      throw new Error("Invalid field cursor shape");
+    }
+
+    return parsed;
+  } catch {
+    throw new Error(`Invalid cursor '${cursor}'. Use the nextCursor value returned by this tool.`);
+  }
+}
+
 export const getTableRecordDetailsTool = defineTool({
   name: "get_table_record_details",
   description:
-    "Show one Dataverse table record by id or common name fields. Defaults to active rows and returns structured choices for ambiguous matches.",
+    "Show one Dataverse table record by id or common name fields. Defaults to active rows, returns a compact field set by default, and returns structured choices for ambiguous matches.",
   schema: getTableRecordDetailsSchema,
   handler: handleGetTableRecordDetails,
 });

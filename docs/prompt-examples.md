@@ -259,6 +259,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show details for the record <RECORD_ID> from table <TABLE>.`
   `In <ENV>, show details for the contact with last name <LAST_NAME>.`
   `In <ENV>, show details for the contact with first name <FIRST_NAME> and last name <LAST_NAME>.`
+  `If you need every readable field, set includeAllFields to true.`
   `If the record has many fields, ask for the next page with the returned cursor.`
   `(Required: <TABLE> and one lookup value)`
 

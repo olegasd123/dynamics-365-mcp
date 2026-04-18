@@ -43,7 +43,7 @@ const CONTACT_COLUMNS = [
 ];
 
 describe("get_table_record_details tool", () => {
-  it("returns one record by id", async () => {
+  it("returns a compact field set by default", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
     const { client } = createRecordingClient({
@@ -64,14 +64,10 @@ describe("get_table_record_details tool", () => {
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("## Record: Anna Smith");
     expect(response.content[0].text).toContain("anna@example.com");
-    expect(response.content[0].text).toContain("Custom Field");
     expect(response.structuredContent).toMatchObject({
       tool: "get_table_record_details",
       ok: true,
       data: {
-        fieldPage: {
-          totalCount: CONTACT_COLUMNS.length,
-        },
         record: {
           recordId: "contact-1",
           label: "Anna Smith",
@@ -86,10 +82,50 @@ describe("get_table_record_details tool", () => {
         };
       };
     };
+    expect(response.content[0].text).not.toContain("Custom Field");
+    expect(
+      payload.data.record.fields.some((field) => field.logicalName === "new_customfield"),
+    ).toBe(false);
+    expect(payload.data.record.fields.some((field) => field.logicalName === "jobtitle")).toBe(true);
+    expect(payload.data.record.fields.length).toBeLessThan(CONTACT_COLUMNS.length);
+  });
+
+  it("includes all readable fields when includeAllFields is true", async () => {
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [CONTACT_TABLE],
+        "EntityDefinitions(LogicalName='contact')/Attributes": CONTACT_COLUMNS,
+        contacts: [contactRecord("contact-1", "Anna Smith", "anna@example.com")],
+      },
+    });
+
+    const response = await handleGetTableRecordDetails(
+      {
+        includeAllFields: true,
+        recordId: "contact-1",
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Custom Field");
+
+    const payload = response.structuredContent as {
+      data: {
+        fieldPage: {
+          totalCount: number;
+        };
+        record: {
+          fields: Array<{ logicalName: string }>;
+        };
+      };
+    };
+    expect(payload.data.fieldPage.totalCount).toBe(CONTACT_COLUMNS.length);
     expect(
       payload.data.record.fields.some((field) => field.logicalName === "new_customfield"),
     ).toBe(true);
-    expect(payload.data.record.fields.some((field) => field.logicalName === "jobtitle")).toBe(true);
   });
 
   it("returns structured retry options when a last name is ambiguous", async () => {
@@ -146,6 +182,7 @@ describe("get_table_record_details tool", () => {
 
     const firstPage = await handleGetTableRecordDetails(
       {
+        includeAllFields: true,
         limit: 2,
         recordId: "contact-1",
         table: "contact",
@@ -177,6 +214,7 @@ describe("get_table_record_details tool", () => {
     const secondPage = await handleGetTableRecordDetails(
       {
         cursor: firstPayload.data.fieldPage.nextCursor || undefined,
+        includeAllFields: true,
         limit: 2,
         recordId: "contact-1",
         table: "contact",
@@ -193,6 +231,48 @@ describe("get_table_record_details tool", () => {
       };
     };
     expect(secondPayload.data.record.fields).toHaveLength(2);
+  });
+
+  it("rejects field cursors from a different field selection mode", async () => {
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [CONTACT_TABLE],
+        "EntityDefinitions(LogicalName='contact')/Attributes": CONTACT_COLUMNS,
+        contacts: [contactRecord("contact-1", "Anna Smith", "anna@example.com")],
+      },
+    });
+
+    const firstPage = await handleGetTableRecordDetails(
+      {
+        includeAllFields: true,
+        limit: 2,
+        recordId: "contact-1",
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    const firstPayload = firstPage.structuredContent as {
+      data: {
+        fieldPage: {
+          nextCursor: string | null;
+        };
+      };
+    };
+
+    const response = await handleGetTableRecordDetails(
+      {
+        cursor: firstPayload.data.fieldPage.nextCursor || undefined,
+        limit: 2,
+        recordId: "contact-1",
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("different field selection mode");
   });
 });
 

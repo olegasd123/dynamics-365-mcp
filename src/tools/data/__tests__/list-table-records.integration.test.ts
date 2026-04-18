@@ -112,6 +112,46 @@ describe("list_table_records tool", () => {
     expect(calls.some((call) => call.entitySet === "https://next-page")).toBe(true);
   });
 
+  it("rejects record list cursors when the next call changes the paging limit", async () => {
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [CONTACT_TABLE],
+        "EntityDefinitions(LogicalName='contact')/Attributes": CONTACT_COLUMNS,
+        contacts: {
+          "@odata.count": 3,
+          "@odata.nextLink": "https://next-page",
+          value: [
+            contactRecord("contact-1", "Anna Smith", "anna@example.com"),
+            contactRecord("contact-2", "John Smith", "john@example.com"),
+          ],
+        },
+      },
+    });
+
+    const firstPage = await handleListTableRecords(
+      {
+        limit: 2,
+        table: "contact",
+      },
+      { config, client },
+    );
+    const nextCursor = (firstPage.structuredContent as { data: { nextCursor: string | null } }).data
+      .nextCursor;
+
+    const response = await handleListTableRecords(
+      {
+        cursor: nextCursor || undefined,
+        limit: 3,
+        table: "contact",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("same limit value");
+  });
+
   it("registers and returns structured content through the MCP server wrapper", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);

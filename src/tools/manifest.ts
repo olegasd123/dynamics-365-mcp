@@ -283,6 +283,7 @@ export const TOOL_MANIFEST = [
       "firstName",
       "lastName",
       "state",
+      "includeAllFields",
       "limit",
       "cursor",
     ],

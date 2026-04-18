@@ -83,6 +83,7 @@ describe("tool contracts", () => {
         firstName: expect.any(Object),
         lastName: expect.any(Object),
         state: expect.any(Object),
+        includeAllFields: expect.any(Object),
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
