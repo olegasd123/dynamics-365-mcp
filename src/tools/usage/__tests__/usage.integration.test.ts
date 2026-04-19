@@ -222,6 +222,100 @@ describe("usage tools", () => {
     );
   });
 
+  it("supports web resource ids when finding usage", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        systemforms: [
+          {
+            formid: "form-1",
+            name: "Account Main",
+            objecttypecode: "account",
+            type: 2,
+            uniquename: "contoso_account_main",
+            formxml: "<form><Library name='contoso_/scripts/app.js' /></form>",
+          },
+        ],
+        webresourceset: [
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/app.js",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('app');").toString("base64"),
+          },
+        ],
+      },
+    });
+
+    registerFindWebResourceUsage(server as never, config, client);
+
+    const response = await server.getHandler("find_web_resource_usage")({
+      name: "wr-1",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Account Main");
+    expect(response.content[0].text).toContain("contoso_/scripts/app.js");
+    expect(calls[0]?.queryParams).toContain("webresourceid eq 'wr-1'");
+  });
+
+  it("returns structured retry options when the web resource name is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        systemforms: [],
+        webresourceset: [
+          {
+            webresourceid: "wr-1",
+            name: "contoso_/scripts/app.js",
+            displayname: "App Script",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('one');").toString("base64"),
+          },
+          {
+            webresourceid: "wr-2",
+            name: "contoso_/scripts/app.js",
+            displayname: "App Script Copy",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('two');").toString("base64"),
+          },
+        ],
+      },
+    });
+
+    registerFindWebResourceUsage(server as never, config, client);
+
+    const response = await server.getHandler("find_web_resource_usage")({
+      name: "contoso_/scripts/app.js",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("Choose a web resource and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "find_web_resource_usage",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "name",
+        options: [
+          {
+            value: "wr-1",
+            label: "contoso_/scripts/app.js - App Script (wr-1)",
+          },
+          {
+            value: "wr-2",
+            label: "contoso_/scripts/app.js - App Script Copy (wr-2)",
+          },
+        ],
+        retryable: false,
+      },
+    });
+  });
+
   it("analyzes direct update triggers without guessing from system-managed fields", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);

@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import packageJson from "../../package.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 import {
   buildHealthPayload,
@@ -97,6 +98,7 @@ describe("index runtime helpers", () => {
       status: "ok",
       service: {
         name: "dynamics-365-mcp",
+        version: packageJson.version,
         transport: "http",
         host: "127.0.0.1",
         port: 3003,

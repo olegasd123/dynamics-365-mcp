@@ -1,4 +1,4 @@
-import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
+import { and, contains, eq, or, query } from "../utils/odata-builder.js";
 import type { WorkflowState } from "./workflow-queries.js";
 import { WORKFLOW_STATE } from "./workflow-queries.js";
 
@@ -27,34 +27,36 @@ export function listCloudFlowsQuery(options?: {
   status?: WorkflowState;
   nameFilter?: string;
 }): string {
-  const filters: string[] = ["type eq 1", "category eq 5"];
-
-  if (options?.status) {
-    filters.push(`statecode eq ${WORKFLOW_STATE[options.status]}`);
-  }
-  if (options?.nameFilter) {
-    filters.push(
-      `(${odataContains("name", options.nameFilter)} or ${odataContains("uniquename", options.nameFilter)})`,
-    );
-  }
-
-  return buildQueryString({
-    select: FLOW_SELECT,
-    filter: filters.join(" and "),
-    orderby: "name asc",
-  });
+  return query()
+    .select(FLOW_SELECT)
+    .filter(
+      and(
+        eq("type", 1),
+        eq("category", 5),
+        options?.status ? eq("statecode", WORKFLOW_STATE[options.status]) : undefined,
+        options?.nameFilter
+          ? or(contains("name", options.nameFilter), contains("uniquename", options.nameFilter))
+          : undefined,
+      ),
+    )
+    .orderby("name asc")
+    .toString();
 }
 
 export function getCloudFlowDetailsByIdentityQuery(options: {
   flowName?: string;
   uniqueName?: string;
 }): string {
-  const identityFilter = options.uniqueName
-    ? odataEq("uniquename", options.uniqueName)
-    : odataEq("name", options.flowName as string);
-
-  return buildQueryString({
-    select: FLOW_SELECT,
-    filter: `${identityFilter} and type eq 1 and category eq 5`,
-  });
+  return query()
+    .select(FLOW_SELECT)
+    .filter(
+      and(
+        options.uniqueName
+          ? eq("uniquename", options.uniqueName)
+          : eq("name", options.flowName as string),
+        eq("type", 1),
+        eq("category", 5),
+      ),
+    )
+    .toString();
 }

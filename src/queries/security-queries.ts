@@ -1,8 +1,4 @@
-import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
-
-function buildOrFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
+import { contains, eq, inList, isNull, query } from "../utils/odata-builder.js";
 
 const SECURITY_ROLE_SELECT = [
   "roleid",
@@ -46,62 +42,58 @@ const PRIVILEGE_SELECT = [
 ];
 
 export function listSecurityRolesQuery(nameFilter?: string): string {
-  const filter = nameFilter ? odataContains("name", nameFilter) : undefined;
-
-  return buildQueryString({
-    select: SECURITY_ROLE_SELECT,
-    filter,
-    orderby: "name asc",
-  });
+  return query()
+    .select(SECURITY_ROLE_SELECT)
+    .filter(nameFilter ? contains("name", nameFilter) : undefined)
+    .orderby("name asc")
+    .toString();
 }
 
 export function listSecurityRolesByIdsQuery(roleIds: string[]): string {
-  return buildQueryString({
-    select: SECURITY_ROLE_SELECT,
-    filter: buildOrFilter("roleid", roleIds),
-    orderby: "name asc",
-  });
+  return query()
+    .select(SECURITY_ROLE_SELECT)
+    .filter(inList("roleid", roleIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listRootBusinessUnitsQuery(): string {
-  return buildQueryString({
-    select: ROOT_BUSINESS_UNIT_SELECT,
-    filter: "_parentbusinessunitid_value eq null",
-    orderby: "name asc",
-    top: 2,
-  });
+  return query()
+    .select(ROOT_BUSINESS_UNIT_SELECT)
+    .filter(isNull("_parentbusinessunitid_value"))
+    .orderby("name asc")
+    .top(2)
+    .toString();
 }
 
 export function listBusinessUnitsQuery(nameFilter?: string): string {
-  const filter = nameFilter ? odataContains("name", nameFilter) : undefined;
-
-  return buildQueryString({
-    select: BUSINESS_UNIT_SELECT,
-    filter,
-    orderby: "name asc",
-  });
+  return query()
+    .select(BUSINESS_UNIT_SELECT)
+    .filter(nameFilter ? contains("name", nameFilter) : undefined)
+    .orderby("name asc")
+    .toString();
 }
 
 export function listRolePrivilegesQuery(roleId: string): string {
-  return buildQueryString({
-    select: ROLE_PRIVILEGE_SELECT,
-    filter: odataEq("roleid", roleId),
-    orderby: "privilegeid asc",
-  });
+  return query()
+    .select(ROLE_PRIVILEGE_SELECT)
+    .filter(eq("roleid", roleId))
+    .orderby("privilegeid asc")
+    .toString();
 }
 
 export function listRolePrivilegesForRolesQuery(roleIds: string[]): string {
-  return buildQueryString({
-    select: ROLE_PRIVILEGE_SELECT,
-    filter: buildOrFilter("roleid", roleIds),
-    orderby: "roleid asc",
-  });
+  return query()
+    .select(ROLE_PRIVILEGE_SELECT)
+    .filter(inList("roleid", roleIds))
+    .orderby("roleid asc")
+    .toString();
 }
 
 export function listPrivilegesByIdsQuery(privilegeIds: string[]): string {
-  return buildQueryString({
-    select: PRIVILEGE_SELECT,
-    filter: buildOrFilter("privilegeid", privilegeIds),
-    orderby: "name asc",
-  });
+  return query()
+    .select(PRIVILEGE_SELECT)
+    .filter(inList("privilegeid", privilegeIds))
+    .orderby("name asc")
+    .toString();
 }

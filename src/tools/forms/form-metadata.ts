@@ -12,6 +12,7 @@ import { resolveSolution } from "../solutions/solution-inventory.js";
 import { resolveTable, type TableRecord } from "../tables/table-metadata.js";
 import { summarizeFormXml, type FormXmlSummary } from "../../utils/xml-metadata.js";
 import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const FORM_COMPONENT_TYPES = new Set([24, 60]);
 
@@ -96,9 +97,7 @@ export async function resolveForm(
   }
 
   if (exactMatches.length > 1) {
-    throw new Error(
-      `Form '${formRef}' is ambiguous in '${env.name}'. Matches: ${exactMatches.map(formatFormMatch).join(", ")}.`,
-    );
+    throw createAmbiguousFormError(formRef, env.name, exactMatches);
   }
 
   if (options?.solution) {
@@ -118,9 +117,7 @@ export async function resolveForm(
   }
 
   if (partialMatches.length > 1) {
-    throw new Error(
-      `Form '${formRef}' is ambiguous in '${env.name}'. Matches: ${partialMatches.map(formatFormMatch).join(", ")}.`,
-    );
+    throw createAmbiguousFormError(formRef, env.name, partialMatches);
   }
 
   throw new Error(`Form '${formRef}' not found in '${env.name}'.`);
@@ -361,4 +358,28 @@ const FORM_TYPE_CODES: Record<FormType, number[]> = {
 
 function formatFormMatch(form: FormRecord): string {
   return `${form.objecttypecode}/${form.typeLabel}/${form.name}`;
+}
+
+function createAmbiguousFormError(
+  formRef: string,
+  environmentName: string,
+  matches: FormRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Form '${formRef}' is ambiguous in '${environmentName}'. Choose a matching form and try again. Matches: ${matches.map(formatFormMatch).join(", ")}.`,
+    {
+      parameter: "formName",
+      options: matches.map((form) => createFormOption(form)),
+    },
+  );
+}
+
+function createFormOption(form: FormRecord): AmbiguousMatchOption {
+  const value = form.uniquename || form.formid;
+  const identity = form.uniquename || form.formid;
+
+  return {
+    value,
+    label: `${form.objecttypecode}/${form.typeLabel}/${form.name} (${identity})`,
+  };
 }

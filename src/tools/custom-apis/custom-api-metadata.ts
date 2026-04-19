@@ -8,6 +8,7 @@ import {
   listCustomApisQuery,
 } from "../../queries/custom-api-queries.js";
 import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const BINDING_TYPE_LABELS: Record<number, string> = {
   0: "Global",
@@ -120,6 +121,11 @@ export async function resolveCustomApi(
   apiRef: string,
 ): Promise<CustomApiRecord> {
   const apis = await listCustomApis(env, client);
+  const exactId = apis.filter((api) => api.customapiid === apiRef);
+  if (exactId.length === 1) {
+    return exactId[0];
+  }
+
   const exactUnique = apis.filter((api) => api.uniquename === apiRef);
   if (exactUnique.length === 1) {
     return exactUnique[0];
@@ -158,11 +164,7 @@ export async function resolveCustomApi(
   ]);
 
   if (matches.length > 1) {
-    throw new Error(
-      `Custom API '${apiRef}' is ambiguous in '${env.name}'. Matches: ${matches
-        .map((api) => `${api.name} (${api.uniquename})`)
-        .join(", ")}.`,
-    );
+    throw createAmbiguousCustomApiError(apiRef, env.name, matches);
   }
 
   throw new Error(`Custom API '${apiRef}' not found in '${env.name}'.`);
@@ -264,6 +266,30 @@ function normalizeCustomApi(record: Record<string, unknown>): CustomApiRecord {
     plugintypeid: String(record._plugintypeid_value || ""),
     sdkmessageid: String(record._sdkmessageid_value || ""),
     powerfxruleid: String(record._powerfxruleid_value || ""),
+  };
+}
+
+function createAmbiguousCustomApiError(
+  apiRef: string,
+  environmentName: string,
+  matches: CustomApiRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Custom API '${apiRef}' is ambiguous in '${environmentName}'. Choose a custom API and try again. Matches: ${matches.map((api) => `${api.name} (${api.uniquename})`).join(", ")}.`,
+    {
+      parameter: "apiName",
+      options: matches.map((api) => createCustomApiOption(api)),
+    },
+  );
+}
+
+function createCustomApiOption(api: CustomApiRecord): AmbiguousMatchOption {
+  const value = api.uniquename || api.customapiid;
+  const uniqueNameSuffix = api.uniquename ? ` (${api.uniquename})` : "";
+
+  return {
+    value,
+    label: `${api.name}${uniqueNameSuffix}`,
   };
 }
 

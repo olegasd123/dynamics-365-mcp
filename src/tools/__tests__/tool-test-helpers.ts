@@ -54,6 +54,54 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
     return (datasets[envName] || {})[key];
   }
 
+  function getDatasetArray<T>(value: unknown): T[] {
+    if (Array.isArray(value)) {
+      return value as T[];
+    }
+
+    if (
+      value &&
+      typeof value === "object" &&
+      "value" in value &&
+      Array.isArray((value as { value?: unknown }).value)
+    ) {
+      return (value as { value: T[] }).value;
+    }
+
+    return [];
+  }
+
+  function getDatasetPage<T>(value: unknown): {
+    items: T[];
+    totalCount: number | null;
+    nextLink: string | null;
+  } {
+    if (
+      value &&
+      typeof value === "object" &&
+      "value" in value &&
+      Array.isArray((value as { value?: unknown }).value)
+    ) {
+      return {
+        items: (value as { value: T[] }).value,
+        totalCount:
+          typeof (value as { "@odata.count"?: unknown })["@odata.count"] === "number"
+            ? ((value as { "@odata.count": number })["@odata.count"] ?? null)
+            : null,
+        nextLink:
+          typeof (value as { "@odata.nextLink"?: unknown })["@odata.nextLink"] === "string"
+            ? ((value as { "@odata.nextLink": string })["@odata.nextLink"] ?? null)
+            : null,
+      };
+    }
+
+    return {
+      items: getDatasetArray<T>(value),
+      totalCount: null,
+      nextLink: null,
+    };
+  }
+
   const client = {
     async query<T>(env: EnvironmentConfig, entitySet: string, queryParams?: string): Promise<T[]> {
       calls.push({
@@ -62,7 +110,7 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
         queryParams,
       });
       const value = getDatasetValue(env.name, entitySet);
-      return (Array.isArray(value) ? value : []) as T[];
+      return getDatasetArray<T>(value);
     },
     async queryPath<T>(
       env: EnvironmentConfig,
@@ -75,7 +123,35 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
         queryParams,
       });
       const value = getDatasetValue(env.name, resourcePath);
-      return (Array.isArray(value) ? value : []) as T[];
+      return getDatasetArray<T>(value);
+    },
+    async queryPage<T>(
+      env: EnvironmentConfig,
+      entitySet: string,
+      queryParams?: string,
+      options?: { pageLink?: string },
+    ): Promise<{ items: T[]; totalCount: number | null; nextLink: string | null }> {
+      const datasetKey = options?.pageLink || entitySet;
+      calls.push({
+        environment: env.name,
+        entitySet: datasetKey,
+        queryParams,
+      });
+      return getDatasetPage<T>(getDatasetValue(env.name, datasetKey));
+    },
+    async queryPagePath<T>(
+      env: EnvironmentConfig,
+      resourcePath: string,
+      queryParams?: string,
+      options?: { pageLink?: string },
+    ): Promise<{ items: T[]; totalCount: number | null; nextLink: string | null }> {
+      const datasetKey = options?.pageLink || resourcePath;
+      calls.push({
+        environment: env.name,
+        entitySet: datasetKey,
+        queryParams,
+      });
+      return getDatasetPage<T>(getDatasetValue(env.name, datasetKey));
     },
     async getPath<T>(
       env: EnvironmentConfig,
@@ -94,7 +170,28 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
       if (Array.isArray(value)) {
         return ((value[0] ?? null) as T | null) ?? null;
       }
+      if (
+        value &&
+        typeof value === "object" &&
+        "value" in value &&
+        Array.isArray((value as { value?: unknown }).value)
+      ) {
+        return (((value as { value: T[] }).value[0] ?? null) as T | null) ?? null;
+      }
       return value as T;
+    },
+    async invokeAction<T>(
+      env: EnvironmentConfig,
+      actionPath: string,
+      body?: Record<string, unknown>,
+    ): Promise<T> {
+      calls.push({
+        environment: env.name,
+        entitySet: actionPath,
+        queryParams: body ? JSON.stringify(body) : undefined,
+      });
+      const value = getDatasetValue(env.name, actionPath);
+      return (value || {}) as T;
     },
   };
 

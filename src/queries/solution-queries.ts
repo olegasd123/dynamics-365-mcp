@@ -1,4 +1,4 @@
-import { buildQueryString, odataEq, odataStringLiteral } from "../utils/odata-helpers.js";
+import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
 
 const DEFAULT_SOLUTION_SELECT = [
   "solutionid",
@@ -11,49 +11,46 @@ const DEFAULT_SOLUTION_SELECT = [
 ];
 
 export function listSolutionsQuery(nameFilter?: string): string {
-  const filter = nameFilter
-    ? `(contains(friendlyname,${odataStringLiteral(nameFilter)}) or contains(uniquename,${odataStringLiteral(nameFilter)}))`
-    : undefined;
-
-  return buildQueryString({
-    select: DEFAULT_SOLUTION_SELECT,
-    filter,
-    orderby: "friendlyname asc",
-  });
+  return query()
+    .select(DEFAULT_SOLUTION_SELECT)
+    .filter(
+      nameFilter
+        ? or(contains("friendlyname", nameFilter), contains("uniquename", nameFilter))
+        : undefined,
+    )
+    .orderby("friendlyname asc")
+    .toString();
 }
 
 export function listSolutionComponentsQuery(solutionId: string): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "solutioncomponentid",
       "_solutionid_value",
       "objectid",
       "componenttype",
       "rootsolutioncomponentid",
       "rootcomponentbehavior",
-    ],
-    filter: `_solutionid_value eq ${odataStringLiteral(solutionId)}`,
-    orderby: "componenttype asc",
-  });
+    ])
+    .filter(eq("_solutionid_value", solutionId))
+    .orderby("componenttype asc")
+    .toString();
 }
 
 export function listSolutionComponentsByObjectIdsQuery(
   componentType: number,
   objectIds: string[],
 ): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "solutioncomponentid",
       "_solutionid_value",
       "objectid",
       "componenttype",
       "rootsolutioncomponentid",
       "rootcomponentbehavior",
-    ],
-    filter: [
-      `componenttype eq ${componentType}`,
-      `(${objectIds.map((objectId) => odataEq("objectid", objectId)).join(" or ")})`,
-    ].join(" and "),
-    orderby: "solutioncomponentid asc",
-  });
+    ])
+    .filter(and(eq("componenttype", componentType), inList("objectid", objectIds)))
+    .orderby("solutioncomponentid asc")
+    .toString();
 }

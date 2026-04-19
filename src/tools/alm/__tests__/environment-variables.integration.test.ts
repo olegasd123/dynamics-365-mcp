@@ -120,4 +120,59 @@ describe("environment variable tools", () => {
       },
     });
   });
+
+  it("returns structured retry options when the environment variable is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        environmentvariabledefinitions: [
+          {
+            environmentvariabledefinitionid: "env-def-1",
+            schemaname: "contoso_BaseUrlA",
+            displayname: "Base URL",
+            type: 100000000,
+            defaultvalue: "",
+            valueschema: "",
+            ismanaged: false,
+            modifiedon: "2025-01-01T00:00:00Z",
+          },
+          {
+            environmentvariabledefinitionid: "env-def-2",
+            schemaname: "contoso_BaseUrlB",
+            displayname: "Base URL",
+            type: 100000000,
+            defaultvalue: "",
+            valueschema: "",
+            ismanaged: false,
+            modifiedon: "2025-01-01T00:00:00Z",
+          },
+        ],
+        environmentvariablevalues: [],
+      },
+    });
+
+    registerGetEnvironmentVariableDetails(server as never, config, client);
+
+    const response = await server.getHandler("get_environment_variable_details")({
+      variableName: "Base URL",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a matching environment variable");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_environment_variable_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "variableName",
+        options: [
+          { value: "contoso_BaseUrlA", label: "contoso_BaseUrlA (Base URL)" },
+          { value: "contoso_BaseUrlB", label: "contoso_BaseUrlB (Base URL)" },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });

@@ -1,11 +1,21 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
-import type { AppConfig, EnvironmentConfig } from "./types.js";
+import { DEFAULT_DYNAMICS_API_VERSION, type AppConfig, type EnvironmentConfig } from "./types.js";
 
 interface ConnectionStringEnvironmentEntry {
   name?: string;
   connectionString?: string;
+}
+
+interface EnvironmentJsonEntry {
+  name?: string;
+  url?: string;
+  apiVersion?: string;
+  tenantId?: string;
+  authType?: string;
+  clientId?: string;
+  clientSecret?: string;
 }
 
 interface ConnectionStringsEnvPayload {
@@ -14,6 +24,16 @@ interface ConnectionStringsEnvPayload {
 }
 
 const CONFIG_HELP_DOC = "docs/run-mcp.md";
+
+export class EnvironmentNotFoundError extends Error {
+  constructor(
+    public readonly environment: string,
+    public readonly availableEnvironments: string[],
+  ) {
+    super(`Environment '${environment}' not found. Available: ${availableEnvironments.join(", ")}`);
+    this.name = "EnvironmentNotFoundError";
+  }
+}
 
 function parseConnectionString(connStr: string): EnvironmentConfig {
   const parts = new Map<string, string>();
@@ -39,6 +59,7 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
     return {
       name: "default",
       url: url.replace(/\/$/, ""),
+      apiVersion: DEFAULT_DYNAMICS_API_VERSION,
       tenantId,
       authType: "deviceCode",
       clientId,
@@ -52,6 +73,7 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
   return {
     name: "default",
     url: url.replace(/\/$/, ""),
+    apiVersion: DEFAULT_DYNAMICS_API_VERSION,
     tenantId,
     authType: "clientSecret",
     clientId,
@@ -105,7 +127,7 @@ function loadFromJsonFile(filePath: string): AppConfig {
     throw new Error("Config file must contain an 'environments' array");
   }
 
-  const environments: EnvironmentConfig[] = json.environments.map((env: Record<string, string>) => {
+  const environments: EnvironmentConfig[] = json.environments.map((env: EnvironmentJsonEntry) => {
     if (!env.name || !env.url || !env.tenantId) {
       throw new Error(
         `Environment '${env.name || "unknown"}' is missing required fields (name, url, tenantId)`,
@@ -122,6 +144,7 @@ function loadFromJsonFile(filePath: string): AppConfig {
     return {
       name: env.name,
       url: env.url.replace(/\/$/, ""),
+      apiVersion: env.apiVersion || DEFAULT_DYNAMICS_API_VERSION,
       tenantId: env.tenantId,
       authType,
       clientId: env.clientId,
@@ -173,8 +196,10 @@ export function getEnvironment(config: AppConfig, name?: string): EnvironmentCon
   const envName = name || config.defaultEnvironment;
   const env = config.environments.find((e) => e.name === envName);
   if (!env) {
-    const available = config.environments.map((e) => e.name).join(", ");
-    throw new Error(`Environment '${envName}' not found. Available: ${available}`);
+    throw new EnvironmentNotFoundError(
+      envName,
+      config.environments.map((environment) => environment.name),
+    );
   }
   return env;
 }

@@ -4,8 +4,11 @@ import { requestLogger } from "../logging/request-logger.js";
 import { DynamicsRequestError } from "./errors.js";
 
 export interface HttpTransportRequest {
+  body?: string;
   env: EnvironmentConfig;
   forceRefreshToken?: boolean;
+  headers?: Record<string, string>;
+  method?: string;
   timeoutMs: number;
   url: string;
 }
@@ -28,24 +31,29 @@ export class HttpTransport {
     });
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), request.timeoutMs);
+    const method = request.method || "GET";
     const headers = {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
       "OData-MaxVersion": "4.0",
       "OData-Version": "4.0",
       Prefer: 'odata.include-annotations="*"',
+      ...(request.headers || {}),
     };
     const startedAt = Date.now();
     const callId = requestLogger.beginHttpCall({
       type: "crm",
-      method: "GET",
+      method,
       url: request.url,
       timeoutMs: request.timeoutMs,
       headers,
+      body: request.body,
     });
 
     try {
       const response = await this.fetchFn(request.url, {
+        method,
+        body: request.body,
         headers,
         signal: controller.signal,
       });

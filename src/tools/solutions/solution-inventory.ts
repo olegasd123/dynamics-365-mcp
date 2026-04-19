@@ -18,6 +18,7 @@ import {
   type PluginImageRecord,
   type PluginStepRecord,
 } from "../plugins/plugin-inventory.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 import {
   normalizeAppModule,
   normalizeConnectionReference,
@@ -208,10 +209,9 @@ export async function resolveSolution(
     ...partialMatches,
   ];
 
-  if (uniqueSolutions(ambiguousMatches).length > 1) {
-    throw new Error(
-      `Solution '${solutionRef}' is ambiguous in '${env.name}'. Matches: ${formatSolutionMatches(uniqueSolutions(ambiguousMatches))}.`,
-    );
+  const ambiguousUnique = uniqueSolutions(ambiguousMatches);
+  if (ambiguousUnique.length > 1) {
+    throw createAmbiguousSolutionError(solutionRef, env.name, ambiguousUnique);
   }
 
   throw new Error(`Solution '${solutionRef}' not found in '${env.name}'.`);
@@ -542,4 +542,28 @@ function formatSolutionMatches(solutions: SolutionRecord[]): string {
   return solutions
     .map((solution) => `${solution.friendlyname} (${solution.uniquename})`)
     .join(", ");
+}
+
+function createAmbiguousSolutionError(
+  solutionRef: string,
+  environmentName: string,
+  matches: SolutionRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Solution '${solutionRef}' is ambiguous in '${environmentName}'. Choose a solution and try again. Matches: ${formatSolutionMatches(matches)}.`,
+    {
+      parameter: "solution",
+      options: matches.map((solution) => createSolutionOption(solution)),
+    },
+  );
+}
+
+function createSolutionOption(solution: SolutionRecord): AmbiguousMatchOption {
+  const value = solution.uniquename || solution.solutionid;
+  const uniqueNameSuffix = solution.uniquename ? ` (${solution.uniquename})` : "";
+
+  return {
+    value,
+    label: `${solution.friendlyname}${uniqueNameSuffix}`,
+  };
 }

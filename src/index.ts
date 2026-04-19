@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -42,11 +43,12 @@ interface RuntimeOptions {
 const DEFAULT_HTTP_SESSION_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 const DEFAULT_HTTP_MAX_ACTIVE_SESSIONS = 25;
 const DEFAULT_HTTP_SESSION_CLEANUP_INTERVAL_MS = 30 * 1000;
+const PACKAGE_VERSION = loadPackageVersion();
 
 function buildServer(config: ReturnType<typeof loadConfig>, client: DynamicsClient): McpServer {
   const server = new McpServer({
     name: "dynamics-365-mcp",
-    version: "0.1.0",
+    version: PACKAGE_VERSION,
   });
 
   instrumentServerToolLogging(server);
@@ -126,7 +128,7 @@ export function buildHealthPayload(
     status: "ok",
     service: {
       name: "dynamics-365-mcp",
-      version: "0.1.0",
+      version: PACKAGE_VERSION,
       transport: "http",
       host: options.host,
       port: options.port,
@@ -265,6 +267,17 @@ export function loadRuntimeEnv(env: NodeJS.ProcessEnv, cwd: string): string[] {
   const repoEnvPath = fileURLToPath(new URL("../.env", import.meta.url));
   const cwdEnvPath = resolve(cwd, ".env");
   return loadEnvFiles(env, [cwdEnvPath, repoEnvPath]);
+}
+
+function loadPackageVersion(): string {
+  const packageJsonPath = fileURLToPath(new URL("../package.json", import.meta.url));
+  const manifest = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
+
+  if (typeof manifest.version !== "string" || !manifest.version.trim()) {
+    throw new Error("package.json must contain a non-empty string version");
+  }
+
+  return manifest.version;
 }
 
 function isEntrypoint(): boolean {

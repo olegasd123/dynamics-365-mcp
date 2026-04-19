@@ -116,6 +116,21 @@ describe("list_plugin_steps tool", () => {
     });
 
     expect(response.isError).toBe(true);
-    expect(response.content[0].text).toContain("ambiguous");
+    expect(response.content[0].text).toContain("Choose a plugin and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "list_plugin_steps",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "pluginName",
+        options: [
+          { value: "type-1", label: "Core.Plugins.SharedPlugin [Core.Plugins]" },
+          { value: "type-2", label: "Other.Plugins.SharedPlugin [Other.Plugins]" },
+        ],
+        retryable: false,
+      },
+    });
   });
 });

@@ -22,8 +22,11 @@ const IMAGE_TYPE_LABELS: Record<number, string> = { 0: "PreImage", 1: "PostImage
 
 const getPluginDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
-  pluginName: z.string().describe("Plugin class name or full type name"),
-  assemblyName: z.string().optional().describe("Optional plugin assembly name to narrow matches"),
+  pluginName: z.string().describe("Plugin class name, full type name, or plugin type id"),
+  assemblyName: z
+    .string()
+    .optional()
+    .describe("Optional plugin assembly name or id to narrow matches"),
   solution: z.string().optional().describe("Optional solution display name or unique name"),
 };
 

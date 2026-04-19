@@ -20,6 +20,7 @@ import { fetchCustomApiInventory, listCustomApis } from "../custom-apis/custom-a
 import { fetchFlowDetails, listCloudFlows, type CloudFlowDetails } from "../flows/flow-metadata.js";
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
 import { chunkValues } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const TEXT_WEB_RESOURCE_TYPES = new Set([1, 2, 3, 4, 9, 12]);
 const MAX_USAGE_DETAIL_ITEMS = 50;
@@ -411,16 +412,27 @@ export async function findWebResourceUsageData(
     listForms(env, client),
     client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery()),
   ]);
+  const matchingResourceRecords = resourceRecords.filter(
+    (resource) =>
+      String(resource.name || "") === resourceName ||
+      String(resource.webresourceid || "") === resourceName,
+  );
 
-  if (resourceRecords.length === 0) {
+  if (matchingResourceRecords.length === 0) {
     throw new Error(`Web resource '${resourceName}' not found in '${env.name}'.`);
   }
+
+  if (matchingResourceRecords.length > 1) {
+    throw createAmbiguousWebResourceUsageError(env.name, resourceName, matchingResourceRecords);
+  }
+
+  const targetResourceName = String(matchingResourceRecords[0]?.name || resourceName);
 
   const textResources = allResources.filter((resource) =>
     TEXT_WEB_RESOURCE_TYPES.has(Number(resource.webresourcetype || 0)),
   );
   const resourceCandidates = textResources
-    .filter((resource) => String(resource.name || "") !== resourceName)
+    .filter((resource) => String(resource.name || "") !== targetResourceName)
     .slice(0, MAX_WEB_RESOURCE_CONTENT_SCAN);
   if (textResources.length > MAX_WEB_RESOURCE_CONTENT_SCAN) {
     warnings.push(
@@ -438,18 +450,18 @@ export async function findWebResourceUsageData(
   ]);
 
   return {
-    resourceName,
+    resourceName: targetResourceName,
     warnings,
     forms: formDetails
-      .filter((form) => formReferencesWebResource(form, resourceName))
+      .filter((form) => formReferencesWebResource(form, targetResourceName))
       .map((form) => ({
         name: form.name,
         table: form.objecttypecode,
         typeLabel: form.typeLabel,
-        usage: form.summary.libraries.includes(resourceName) ? "library" : "form xml",
+        usage: form.summary.libraries.includes(targetResourceName) ? "library" : "form xml",
       })),
     webResources: resourceDetails
-      .filter((resource) => webResourceContainsReference(resource, resourceName))
+      .filter((resource) => webResourceContainsReference(resource, targetResourceName))
       .map((resource) => ({
         name: String(resource.name || ""),
         type: Number(resource.webresourcetype || 0),
@@ -827,20 +839,47 @@ async function fetchWebResourceContentsByName(
           "webresourceset",
           getWebResourceContentByNameQuery(resourceName),
         );
-        return (
-          resources.find((resource) => String(resource.name || "") === resourceName) ||
-          resources[0] ||
-          null
-        );
+        return resources.filter((resource) => String(resource.name || "") === resourceName);
       }),
     );
 
-    results.push(
-      ...batchResults.filter((resource): resource is Record<string, unknown> => resource !== null),
-    );
+    results.push(...batchResults.flat());
   }
 
   return results;
+}
+
+function createAmbiguousWebResourceUsageError(
+  environmentName: string,
+  resourceRef: string,
+  matches: Record<string, unknown>[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Web resource '${resourceRef}' is ambiguous in '${environmentName}'. Choose a web resource and try again. Matches: ${matches.map(formatWebResourceUsageMatch).join(", ")}.`,
+    {
+      parameter: "name",
+      options: matches.map((resource) => createWebResourceUsageOption(resource)),
+    },
+  );
+}
+
+function createWebResourceUsageOption(resource: Record<string, unknown>): AmbiguousMatchOption {
+  return {
+    value: String(resource.webresourceid || ""),
+    label: formatWebResourceUsageMatch(resource),
+  };
+}
+
+function formatWebResourceUsageMatch(resource: Record<string, unknown>): string {
+  const name = String(resource.name || "");
+  const displayName = String(resource.displayname || "");
+  const identity = String(resource.webresourceid || "");
+
+  if (displayName) {
+    return `${name} - ${displayName} (${identity})`;
+  }
+
+  return `${name} (${identity})`;
 }
 
 function flowJsonIncludesValue(flow: CloudFlowDetails, value: string): boolean {

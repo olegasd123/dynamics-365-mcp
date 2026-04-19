@@ -81,4 +81,64 @@ describe("connection reference tools", () => {
       },
     });
   });
+
+  it("returns structured retry options when the connection reference is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        connectionreferences: [
+          {
+            connectionreferenceid: "conn-1",
+            connectionreferencelogicalname: "contoso_sharedoffice365_a",
+            connectionreferencedisplayname: "Office 365",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "",
+            ismanaged: false,
+            modifiedon: "2025-01-02T00:00:00Z",
+            statecode: 0,
+          },
+          {
+            connectionreferenceid: "conn-2",
+            connectionreferencelogicalname: "contoso_sharedoffice365_b",
+            connectionreferencedisplayname: "Office 365",
+            connectorid: "/providers/Microsoft.PowerApps/apis/shared_office365",
+            connectionid: "",
+            ismanaged: false,
+            modifiedon: "2025-01-02T00:00:00Z",
+            statecode: 0,
+          },
+        ],
+      },
+    });
+
+    registerGetConnectionReferenceDetails(server as never, config, client);
+
+    const response = await server.getHandler("get_connection_reference_details")({
+      referenceName: "Office 365",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a matching connection reference");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_connection_reference_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "referenceName",
+        options: [
+          {
+            value: "contoso_sharedoffice365_a",
+            label: "Office 365 (contoso_sharedoffice365_a)",
+          },
+          {
+            value: "contoso_sharedoffice365_b",
+            label: "Office 365 (contoso_sharedoffice365_b)",
+          },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });

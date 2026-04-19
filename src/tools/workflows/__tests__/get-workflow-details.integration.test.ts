@@ -155,4 +155,63 @@ describe("get_workflow_details tool", () => {
       },
     });
   });
+
+  it("returns structured retry options when the workflow name is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        workflows: [
+          {
+            workflowid: "wf-1",
+            name: "Account Sync",
+            uniquename: "contoso_AccountSync",
+            category: 3,
+            statecode: 1,
+            statuscode: 2,
+            mode: 1,
+            scope: 4,
+            primaryentity: "account",
+            ismanaged: false,
+          },
+          {
+            workflowid: "wf-2",
+            name: "Account Sync",
+            uniquename: "contoso_AccountSync_v2",
+            category: 3,
+            statecode: 1,
+            statuscode: 2,
+            mode: 1,
+            scope: 4,
+            primaryentity: "account",
+            ismanaged: false,
+          },
+        ],
+      },
+    });
+
+    registerGetWorkflowDetails(server as never, config, client);
+
+    const response = await server.getHandler("get_workflow_details")({
+      workflowName: "Account Sync",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("Choose a workflow and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_workflow_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "uniqueName",
+        options: [
+          { value: "contoso_AccountSync", label: "Account Sync (contoso_AccountSync)" },
+          { value: "contoso_AccountSync_v2", label: "Account Sync (contoso_AccountSync_v2)" },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });

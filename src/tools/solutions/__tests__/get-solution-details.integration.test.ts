@@ -303,4 +303,49 @@ describe("get_solution_details tool", () => {
     expect(text).toContain("https://dev.example.test");
     expect(text).not.toContain("### Other Root Components");
   });
+
+  it("returns structured retry options when the solution name is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        solutions: [
+          {
+            solutionid: "sol-1",
+            friendlyname: "Core",
+            uniquename: "core_a",
+          },
+          {
+            solutionid: "sol-2",
+            friendlyname: "Core",
+            uniquename: "core_b",
+          },
+        ],
+      },
+    });
+
+    registerGetSolutionDetails(server as never, config, client);
+
+    const response = await server.getHandler("get_solution_details")({
+      solution: "Core",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("Choose a solution and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_solution_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "solution",
+        options: [
+          { value: "core_a", label: "Core (core_a)" },
+          { value: "core_b", label: "Core (core_b)" },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });

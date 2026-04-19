@@ -2,10 +2,12 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
+import { CACHE_TIERS } from "../../client/cache-policy.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { getWorkflowDetailsByIdentityQuery } from "../../queries/workflow-queries.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const CATEGORY_LABELS: Record<number, string> = {
   0: "Workflow",
@@ -27,7 +29,7 @@ const SCOPE_LABELS: Record<number, string> = {
 const getWorkflowDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
   workflowName: z.string().optional().describe("Workflow name (display name)"),
-  uniqueName: z.string().optional().describe("Workflow unique name"),
+  uniqueName: z.string().optional().describe("Workflow unique name or workflow id"),
 };
 
 type GetWorkflowDetailsParams = ToolParams<typeof getWorkflowDetailsSchema>;
@@ -50,9 +52,16 @@ export async function handleGetWorkflowDetails(
       env,
       "workflows",
       getWorkflowDetailsByIdentityQuery({ workflowName, uniqueName }),
+      { cacheTier: CACHE_TIERS.VOLATILE },
+    );
+    const matchingWorkflows = workflows.filter((workflow) =>
+      uniqueName
+        ? String(workflow.uniquename || "") === uniqueName ||
+          String(workflow.workflowid || "") === uniqueName
+        : String(workflow.name || "") === workflowName,
     );
 
-    if (workflows.length === 0) {
+    if (matchingWorkflows.length === 0) {
       const text = `Workflow '${workflowName || uniqueName}' not found in '${env.name}'.`;
       return createToolSuccessResponse("get_workflow_details", text, text, {
         environment: env.name,
@@ -62,7 +71,15 @@ export async function handleGetWorkflowDetails(
       });
     }
 
-    const w = workflows[0];
+    if (matchingWorkflows.length > 1) {
+      throw createAmbiguousWorkflowError(
+        env.name,
+        workflowName || uniqueName || "",
+        matchingWorkflows,
+      );
+    }
+
+    const w = matchingWorkflows[0];
     const lines: string[] = [];
     const triggers: string[] = [];
     if (w.triggeroncreate) triggers.push("Create");
@@ -148,7 +165,7 @@ export async function handleGetWorkflowDetails(
 export const getWorkflowDetailsTool = defineTool({
   name: "get_workflow_details",
   description:
-    "Get detailed information about a specific workflow including triggers, scope, and definition.",
+    "Get detailed information about a specific workflow including triggers, scope, and definition. `uniqueName` also accepts a workflow id.",
   schema: getWorkflowDetailsSchema,
   handler: handleGetWorkflowDetails,
 });
@@ -159,6 +176,35 @@ export function registerGetWorkflowDetails(
   client: DynamicsClient,
 ) {
   registerTool(server, getWorkflowDetailsTool, { config, client });
+}
+
+function createAmbiguousWorkflowError(
+  environmentName: string,
+  workflowRef: string,
+  matches: Record<string, unknown>[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Workflow '${workflowRef}' is ambiguous in '${environmentName}'. Choose a workflow and try again. Matches: ${matches.map(formatWorkflowMatch).join(", ")}.`,
+    {
+      parameter: "uniqueName",
+      options: matches.map((workflow) => createWorkflowOption(workflow)),
+    },
+  );
+}
+
+function createWorkflowOption(workflow: Record<string, unknown>): AmbiguousMatchOption {
+  const identity = String(workflow.uniquename || workflow.workflowid || "");
+
+  return {
+    value: identity,
+    label: formatWorkflowMatch(workflow),
+  };
+}
+
+function formatWorkflowMatch(workflow: Record<string, unknown>): string {
+  const name = String(workflow.name || "");
+  const identity = String(workflow.uniquename || workflow.workflowid || "");
+  return `${name} (${identity})`;
 }
 
 function parseJsonValue(value: unknown): unknown {

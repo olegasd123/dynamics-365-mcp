@@ -3,6 +3,7 @@ import {
   getWorkflowDetailsQuery,
   getWorkflowDetailsByIdentityQuery,
   listActionsQuery,
+  listWorkflowDefinitionSearchQuery,
   listWorkflowsQuery,
 } from "../workflow-queries.js";
 
@@ -26,6 +27,18 @@ describe("workflow queries", () => {
     expect(query).toContain("triggeroncreate");
   });
 
+  it("builds the workflow definition search query", () => {
+    const query = listWorkflowDefinitionSearchQuery({
+      category: "workflow",
+      status: "activated",
+    });
+
+    expect(query).toContain("$filter=type eq 1 and category eq 0 and statecode eq 1");
+    expect(query).toContain("$select=workflowid,name,uniquename,category,statecode,statuscode");
+    expect(query).toContain("xaml");
+    expect(query).toContain("clientdata");
+  });
+
   it("builds the workflow details query", () => {
     const query = getWorkflowDetailsQuery();
 
@@ -37,7 +50,9 @@ describe("workflow queries", () => {
   it("builds the workflow details query by unique name", () => {
     const query = getWorkflowDetailsByIdentityQuery({ uniqueName: "contoso_O'Hara" });
 
-    expect(query).toContain("$filter=uniquename eq 'contoso_O''Hara' and type eq 1");
+    expect(query).toContain(
+      "$filter=(uniquename eq 'contoso_O''Hara' or workflowid eq 'contoso_O''Hara') and type eq 1",
+    );
     expect(query).toContain("triggeronupdateattributelist");
   });
 });

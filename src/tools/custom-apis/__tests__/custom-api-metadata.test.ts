@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import type { DynamicsClient } from "../../../client/dynamics-client.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import { handleGetCustomApiDetails } from "../get-custom-api-details.js";
 import {
   fetchCustomApiDetails,
   fetchCustomApiInventory,
@@ -151,6 +152,54 @@ describe("custom api metadata", () => {
     expect(countFilterTerms(requestQueries[1])).toBeLessThanOrEqual(25);
     expect(countFilterTerms(responseQueries[0])).toBeLessThanOrEqual(25);
     expect(countFilterTerms(responseQueries[1])).toBeLessThanOrEqual(25);
+  });
+
+  it("returns structured retry options when the custom api name is ambiguous", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        customapis: [
+          {
+            customapiid: "api-1",
+            name: "Do Thing",
+            uniquename: "contoso_DoThing_A",
+          },
+          {
+            customapiid: "api-2",
+            name: "Do Thing",
+            uniquename: "contoso_DoThing_B",
+          },
+        ],
+      },
+    });
+
+    const response = await handleGetCustomApiDetails(
+      {
+        environment: "dev",
+        apiName: "Do Thing",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a custom API and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_custom_api_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "apiName",
+        options: [
+          { value: "contoso_DoThing_A", label: "Do Thing (contoso_DoThing_A)" },
+          { value: "contoso_DoThing_B", label: "Do Thing (contoso_DoThing_B)" },
+        ],
+        retryable: false,
+      },
+    });
   });
 });
 

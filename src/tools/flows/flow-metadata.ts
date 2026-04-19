@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { CACHE_TIERS } from "../../client/cache-policy.js";
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
@@ -8,6 +9,7 @@ import {
 import { listWorkflowsByIdsQuery, type WorkflowState } from "../../queries/workflow-queries.js";
 import { fetchSolutionComponentSets } from "../solutions/solution-inventory.js";
 import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const STATE_LABELS: Record<number, string> = {
   0: "Draft",
@@ -74,6 +76,8 @@ export async function listCloudFlows(
       [...solutionComponents.workflowIds],
       "workflowid",
       listWorkflowsByIdsQuery,
+      undefined,
+      { cacheTier: CACHE_TIERS.VOLATILE },
     );
 
     return records
@@ -90,6 +94,7 @@ export async function listCloudFlows(
         status: options?.status,
         nameFilter: options?.nameFilter,
       }),
+      { cacheTier: CACHE_TIERS.VOLATILE },
     )
   )
     .map(normalizeFlow)
@@ -103,6 +108,11 @@ export async function resolveCloudFlow(
   solution?: string,
 ): Promise<CloudFlowRecord> {
   const flows = await listCloudFlows(env, client, { solution });
+  const exactId = flows.filter((flow) => flow.workflowid === flowRef);
+  if (exactId.length === 1) {
+    return exactId[0];
+  }
+
   const exactUnique = flows.filter((flow) => flow.uniquename === flowRef);
   if (exactUnique.length === 1) {
     return exactUnique[0];
@@ -126,11 +136,7 @@ export async function resolveCloudFlow(
   }
 
   if (partialMatches.length > 1) {
-    throw new Error(
-      `Cloud flow '${flowRef}' is ambiguous in '${env.name}'. Matches: ${partialMatches
-        .map((flow) => `${flow.name} (${flow.uniquename})`)
-        .join(", ")}.`,
-    );
+    throw createAmbiguousCloudFlowError(flowRef, env.name, partialMatches, solution);
   }
 
   throw new Error(`Cloud flow '${flowRef}' not found in '${env.name}'.`);
@@ -150,6 +156,7 @@ export async function fetchFlowDetails(
       uniqueName: flow.uniquename || undefined,
       flowName: flow.uniquename ? undefined : flow.name,
     }),
+    { cacheTier: CACHE_TIERS.VOLATILE },
   );
   const record = records.find((item) => String(item.workflowid || "") === flow.workflowid);
 
@@ -258,6 +265,33 @@ function uniqueFlows(flows: CloudFlowRecord[]): CloudFlowRecord[] {
     seen.add(flow.workflowid);
     return true;
   });
+}
+
+function createAmbiguousCloudFlowError(
+  flowRef: string,
+  environmentName: string,
+  matches: CloudFlowRecord[],
+  solution?: string,
+): AmbiguousMatchError {
+  const solutionSuffix = solution ? ` in solution '${solution}'` : "";
+
+  return new AmbiguousMatchError(
+    `Cloud flow '${flowRef}' is ambiguous in '${environmentName}'${solutionSuffix}. Choose a flow and try again. Matches: ${matches.map((flow) => `${flow.name} (${flow.uniquename})`).join(", ")}.`,
+    {
+      parameter: "flowName",
+      options: matches.map((flow) => createCloudFlowOption(flow)),
+    },
+  );
+}
+
+function createCloudFlowOption(flow: CloudFlowRecord): AmbiguousMatchOption {
+  const value = flow.uniquename || flow.workflowid;
+  const uniqueNameSuffix = flow.uniquename ? ` (${flow.uniquename})` : "";
+
+  return {
+    value,
+    label: `${flow.name}${uniqueNameSuffix}`,
+  };
 }
 
 function matchesFlowFilter(

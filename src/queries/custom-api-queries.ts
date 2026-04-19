@@ -1,8 +1,4 @@
-import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
-
-function buildOrFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
+import { contains, eq, inList, or, query } from "../utils/odata-builder.js";
 
 const CUSTOM_API_SELECT = [
   "customapiid",
@@ -61,59 +57,57 @@ const CUSTOM_API_RESPONSE_SELECT = [
 ];
 
 export function listCustomApisQuery(nameFilter?: string): string {
-  const filter = nameFilter
-    ? `(${odataContains("name", nameFilter)} or ${odataContains("uniquename", nameFilter)})`
-    : undefined;
-
-  return buildQueryString({
-    select: CUSTOM_API_SELECT,
-    filter,
-    orderby: "name asc",
-  });
+  return query()
+    .select(CUSTOM_API_SELECT)
+    .filter(
+      nameFilter ? or(contains("name", nameFilter), contains("uniquename", nameFilter)) : undefined,
+    )
+    .orderby("name asc")
+    .toString();
 }
 
 export function getCustomApiByIdentityQuery(options: {
   apiName?: string;
   uniqueName?: string;
 }): string {
-  const filter = options.uniqueName
-    ? odataEq("uniquename", options.uniqueName)
-    : odataEq("name", options.apiName as string);
-
-  return buildQueryString({
-    select: CUSTOM_API_SELECT,
-    filter,
-  });
+  return query()
+    .select(CUSTOM_API_SELECT)
+    .filter(
+      options.uniqueName
+        ? eq("uniquename", options.uniqueName)
+        : eq("name", options.apiName as string),
+    )
+    .toString();
 }
 
 export function listCustomApiRequestParametersQuery(customApiId: string): string {
-  return buildQueryString({
-    select: CUSTOM_API_PARAMETER_SELECT,
-    filter: odataEq("_customapiid_value", customApiId),
-    orderby: "name asc",
-  });
+  return query()
+    .select(CUSTOM_API_PARAMETER_SELECT)
+    .filter(eq("_customapiid_value", customApiId))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listCustomApiRequestParametersForApisQuery(customApiIds: string[]): string {
-  return buildQueryString({
-    select: CUSTOM_API_PARAMETER_SELECT,
-    filter: buildOrFilter("_customapiid_value", customApiIds),
-    orderby: "name asc",
-  });
+  return query()
+    .select(CUSTOM_API_PARAMETER_SELECT)
+    .filter(inList("_customapiid_value", customApiIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listCustomApiResponsePropertiesQuery(customApiId: string): string {
-  return buildQueryString({
-    select: CUSTOM_API_RESPONSE_SELECT,
-    filter: odataEq("_customapiid_value", customApiId),
-    orderby: "name asc",
-  });
+  return query()
+    .select(CUSTOM_API_RESPONSE_SELECT)
+    .filter(eq("_customapiid_value", customApiId))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listCustomApiResponsePropertiesForApisQuery(customApiIds: string[]): string {
-  return buildQueryString({
-    select: CUSTOM_API_RESPONSE_SELECT,
-    filter: buildOrFilter("_customapiid_value", customApiIds),
-    orderby: "name asc",
-  });
+  return query()
+    .select(CUSTOM_API_RESPONSE_SELECT)
+    .filter(inList("_customapiid_value", customApiIds))
+    .orderby("name asc")
+    .toString();
 }

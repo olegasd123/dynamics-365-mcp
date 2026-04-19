@@ -9,7 +9,6 @@
       {
         "name": "account name",
         "enabled": false,
-        "skipReason": "This test is currently disabled.",
         "arguments": {
           "environment": "dev",
           "table": "account",
@@ -207,6 +206,16 @@
         }
       }
     ],
+    "find_workflow_activity_usage": [
+      {
+        "name": "set integration key workflow usage",
+        "arguments": {
+          "environment": "dev",
+          "className": "Masao.Workflows.CommonSteps.SetIntegrationKey",
+          "status": "activated"
+        }
+      }
+    ],
     "get_app_module_details": [
       {
         "name": "sales hub",
@@ -288,6 +297,18 @@
         }
       }
     ],
+    "get_ribbon_button_details": [
+      {
+        "name": "account ribbon button",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "buttonName": "Replace With Real Ribbon Button Name",
+          "location": "form"
+        }
+      }
+    ],
     "get_business_units_details": [
       {
         "name": "sales unit",
@@ -345,6 +366,17 @@
           "environment": "dev",
           "table": "account",
           "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "get_table_record_details": [
+      {
+        "name": "contact by id",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "contact",
+          "recordId": "00000000-0000-0000-0000-000000000001"
         }
       }
     ],
@@ -550,6 +582,18 @@
         }
       }
     ],
+    "list_table_records": [
+      {
+        "name": "active contacts",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "contact",
+          "state": "active",
+          "limit": 25
+        }
+      }
+    ],
     "list_tables": [
       {
         "name": "account table",
@@ -557,6 +601,15 @@
           "environment": "dev",
           "nameFilter": "account",
           "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_table_ribbons": [
+      {
+        "name": "account ribbons",
+        "arguments": {
+          "environment": "dev",
+          "table": "account"
         }
       }
     ],

@@ -12,6 +12,7 @@ import { listSolutionComponentsQuery } from "../../queries/solution-queries.js";
 import { resolveSolution } from "../solutions/solution-inventory.js";
 import { summarizeViewXml, type ViewXmlSummary } from "../../utils/xml-metadata.js";
 import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const SAVED_VIEW_COMPONENT_TYPE = 26;
 
@@ -88,21 +89,28 @@ export async function resolveView(
   },
 ): Promise<ViewRecord> {
   const views = await listViews(env, client, options);
-  const exactMatches = views.filter((view) => view.name === viewRef);
+  const exactMatches = uniqueViews(
+    views.filter((view) => view.viewid === viewRef || view.name === viewRef),
+  );
   if (exactMatches.length === 1) {
     return exactMatches[0];
   }
 
   const needle = viewRef.trim().toLowerCase();
   const caseInsensitiveMatches = uniqueViews(
-    views.filter((view) => view.name.toLowerCase() === needle),
+    views.filter(
+      (view) => view.name.toLowerCase() === needle || view.viewid.toLowerCase() === needle,
+    ),
   );
   if (caseInsensitiveMatches.length === 1) {
     return caseInsensitiveMatches[0];
   }
 
   const partialMatches = uniqueViews(
-    views.filter((view) => view.name.toLowerCase().includes(needle)),
+    views.filter(
+      (view) =>
+        view.name.toLowerCase().includes(needle) || view.viewid.toLowerCase().includes(needle),
+    ),
   );
   if (partialMatches.length === 1) {
     return partialMatches[0];
@@ -110,9 +118,7 @@ export async function resolveView(
 
   const matches = uniqueViews([...exactMatches, ...caseInsensitiveMatches, ...partialMatches]);
   if (matches.length > 1) {
-    throw new Error(
-      `View '${viewRef}' is ambiguous in '${env.name}'. Matches: ${matches.map(formatViewMatch).join(", ")}.`,
-    );
+    throw createAmbiguousViewError(viewRef, env.name, matches);
   }
 
   throw new Error(`View '${viewRef}' not found in '${env.name}'.`);
@@ -239,6 +245,27 @@ function compareViews(left: ViewRecord, right: ViewRecord): number {
 
 function formatViewMatch(view: ViewRecord): string {
   return `${view.returnedtypecode}/${view.scope}/${view.name}`;
+}
+
+function createAmbiguousViewError(
+  viewRef: string,
+  environmentName: string,
+  matches: ViewRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `View '${viewRef}' is ambiguous in '${environmentName}'. Choose a matching view and try again. Matches: ${matches.map(formatViewMatch).join(", ")}.`,
+    {
+      parameter: "viewName",
+      options: matches.map((view) => createViewOption(view)),
+    },
+  );
+}
+
+function createViewOption(view: ViewRecord): AmbiguousMatchOption {
+  return {
+    value: view.viewid,
+    label: `${view.returnedtypecode}/${view.scope}/${view.name} (${view.viewid})`,
+  };
 }
 
 async function fetchSolutionSystemViews(

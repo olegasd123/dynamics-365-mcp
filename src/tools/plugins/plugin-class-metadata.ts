@@ -11,6 +11,7 @@ import {
   type PluginStepRecord,
   type PluginTypeRecord,
 } from "./plugin-inventory.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 export interface PluginMetadataInventory {
   assemblies: Record<string, unknown>[];
@@ -66,6 +67,13 @@ export function resolvePluginAssembly(
   assemblies: Record<string, unknown>[],
   assemblyName: string,
 ): Record<string, unknown> {
+  const exactIdMatch = assemblies.find(
+    (assembly) => String(assembly.pluginassemblyid || "") === assemblyName,
+  );
+  if (exactIdMatch) {
+    return exactIdMatch;
+  }
+
   const exactMatch = assemblies.find((assembly) => String(assembly.name || "") === assemblyName);
   if (exactMatch) {
     return exactMatch;
@@ -78,11 +86,7 @@ export function resolvePluginAssembly(
     return caseInsensitiveMatches[0];
   }
   if (caseInsensitiveMatches.length > 1) {
-    throw new Error(
-      `Plugin assembly '${assemblyName}' is ambiguous. Matches: ${caseInsensitiveMatches
-        .map((assembly) => String(assembly.name || ""))
-        .join(", ")}.`,
-    );
+    throw createAmbiguousPluginAssemblyError(assemblyName, caseInsensitiveMatches);
   }
 
   throw new Error(`Plugin assembly '${assemblyName}' not found.`);
@@ -94,7 +98,9 @@ export function resolvePluginClass(
   assemblyName?: string,
 ): PluginClassRecord {
   const assemblyScoped = assemblyName
-    ? plugins.filter((plugin) => plugin.assemblyName === assemblyName)
+    ? plugins.filter(
+        (plugin) => plugin.assemblyName === assemblyName || plugin.assemblyId === assemblyName,
+      )
     : plugins;
 
   if (assemblyName && assemblyScoped.length === 0) {
@@ -104,6 +110,7 @@ export function resolvePluginClass(
   }
 
   const resolved =
+    resolveSinglePluginClass(assemblyScoped, (plugin) => plugin.pluginTypeId === pluginName) ||
     resolveSinglePluginClass(assemblyScoped, (plugin) => plugin.fullName === pluginName) ||
     resolveSinglePluginClass(assemblyScoped, (plugin) => plugin.name === pluginName) ||
     resolveSinglePluginClass(
@@ -139,9 +146,7 @@ export function resolvePluginClass(
   }
 
   if (partialMatches.length > 1) {
-    throw new Error(
-      `Plugin '${pluginName}' is ambiguous. Matches: ${formatPluginMatches(partialMatches)}.`,
-    );
+    throw createAmbiguousPluginClassError(pluginName, partialMatches);
   }
 
   throw new Error(`Plugin '${pluginName}' not found.`);
@@ -156,7 +161,11 @@ function resolveSinglePluginClass(
     return matches[0];
   }
   if (matches.length > 1) {
-    throw new Error(`Plugin match is ambiguous. Matches: ${formatPluginMatches(matches)}.`);
+    throw createAmbiguousPluginClassError(
+      matches[0]?.friendlyName || matches[0]?.fullName || "plugin",
+      matches,
+      "Plugin match is ambiguous.",
+    );
   }
   return null;
 }
@@ -178,6 +187,50 @@ function uniquePluginClasses(plugins: PluginClassRecord[]): PluginClassRecord[] 
 
 function formatPluginMatches(plugins: PluginClassRecord[]): string {
   return plugins.map((plugin) => `${plugin.fullName} [${plugin.assemblyName}]`).join(", ");
+}
+
+function createAmbiguousPluginAssemblyError(
+  assemblyName: string,
+  matches: Record<string, unknown>[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `Plugin assembly '${assemblyName}' is ambiguous. Choose an assembly and try again. Matches: ${matches.map((assembly) => String(assembly.name || "")).join(", ")}.`,
+    {
+      parameter: "assemblyName",
+      options: matches.map((assembly) => createPluginAssemblyOption(assembly)),
+    },
+  );
+}
+
+function createPluginAssemblyOption(assembly: Record<string, unknown>): AmbiguousMatchOption {
+  const id = String(assembly.pluginassemblyid || "");
+  const name = String(assembly.name || "");
+
+  return {
+    value: id || name,
+    label: id ? `${name} (${id})` : name,
+  };
+}
+
+function createAmbiguousPluginClassError(
+  pluginName: string,
+  matches: PluginClassRecord[],
+  prefix = `Plugin '${pluginName}' is ambiguous.`,
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `${prefix} Choose a plugin and try again. Matches: ${formatPluginMatches(matches)}.`,
+    {
+      parameter: "pluginName",
+      options: matches.map((plugin) => createPluginClassOption(plugin)),
+    },
+  );
+}
+
+function createPluginClassOption(plugin: PluginClassRecord): AmbiguousMatchOption {
+  return {
+    value: plugin.pluginTypeId || plugin.fullName,
+    label: `${plugin.fullName} [${plugin.assemblyName}]`,
+  };
 }
 
 export function groupStepsByPluginTypeId(

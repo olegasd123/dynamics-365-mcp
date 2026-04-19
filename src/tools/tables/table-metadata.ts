@@ -25,6 +25,7 @@ import {
 } from "../../queries/table-queries.js";
 import { resolveSolution } from "../solutions/solution-inventory.js";
 import { queryRecordsByIdsInChunks } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const TABLE_COMPONENT_TYPE = 1;
 
@@ -249,9 +250,7 @@ export async function resolveTable(
 
   const solutionSuffix = solution ? ` in solution '${solution}'` : "";
   if (ambiguousMatches.length > 1) {
-    throw new Error(
-      `Table '${tableRef}' is ambiguous in '${env.name}'${solutionSuffix}. Matches: ${formatTableMatches(ambiguousMatches)}.`,
-    );
+    throw createAmbiguousTableError(tableRef, env.name, ambiguousMatches, solution);
   }
 
   throw new Error(`Table '${tableRef}' not found in '${env.name}'${solutionSuffix}.`);
@@ -865,4 +864,36 @@ function formatTableMatches(tables: TableRecord[]): string {
   return tables
     .map((table) => `${table.logicalName} (${table.schemaName || table.displayName || "no label"})`)
     .join(", ");
+}
+
+function createAmbiguousTableError(
+  tableRef: string,
+  environmentName: string,
+  matches: TableRecord[],
+  solution?: string,
+): AmbiguousMatchError {
+  const solutionSuffix = solution ? ` in solution '${solution}'` : "";
+
+  return new AmbiguousMatchError(
+    `Table '${tableRef}' is ambiguous in '${environmentName}'${solutionSuffix}. Choose a table and try again. Matches: ${formatTableMatches(matches)}.`,
+    {
+      parameter: "table",
+      options: matches.map((table) => createTableOption(table)),
+    },
+  );
+}
+
+function createTableOption(table: TableRecord): AmbiguousMatchOption {
+  const labelParts = [
+    table.displayName || table.schemaName || table.logicalName,
+    `logical=${table.logicalName}`,
+  ];
+  if (table.schemaName && table.schemaName !== table.logicalName) {
+    labelParts.push(`schema=${table.schemaName}`);
+  }
+
+  return {
+    value: table.logicalName,
+    label: labelParts.join(", "),
+  };
 }

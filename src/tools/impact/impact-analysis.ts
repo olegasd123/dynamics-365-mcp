@@ -52,6 +52,7 @@ import {
   type SolutionComponentRecord,
   type SolutionInventory,
 } from "../solutions/solution-inventory.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 export type ImpactComponentType =
   | "table"
@@ -607,10 +608,18 @@ async function resolveColumnTarget(
   }
 
   if (matches.length > 1) {
-    throw new Error(
-      `Column '${columnName}' is ambiguous on table '${table.logicalName}' in '${env.name}'. Matches: ${matches
+    const optionValuePrefix = tableRef ? "" : `${table.logicalName}.`;
+    throw new AmbiguousMatchError(
+      `Column '${columnName}' is ambiguous on table '${table.logicalName}' in '${env.name}'. Choose a matching column and try again. Matches: ${matches
         .map((column) => column.logicalName)
         .join(", ")}.`,
+      {
+        parameter: "name",
+        options: matches.map((column) => ({
+          value: `${optionValuePrefix}${column.logicalName}`,
+          label: `${table.logicalName}.${column.logicalName}`,
+        })),
+      },
     );
   }
 
@@ -632,6 +641,7 @@ async function resolvePluginAssembly(
     listPluginAssembliesQuery(),
   );
   const matches = findNamedMatches(assemblies, pluginRef, (assembly) => [
+    String(assembly.pluginassemblyid || ""),
     String(assembly.name || ""),
   ]);
 
@@ -640,11 +650,17 @@ async function resolvePluginAssembly(
   }
 
   if (matches.length > 1) {
-    throw new Error(
-      `Plugin assembly '${pluginRef}' is ambiguous in '${env.name}'. Matches: ${matches
-        .map((assembly) => String(assembly.name || ""))
-        .join(", ")}.`,
-    );
+    throw createAmbiguousImpactError({
+      itemLabel: "Plugin assembly",
+      itemRef: pluginRef,
+      environmentName: env.name,
+      matches,
+      displayName: (assembly) => String(assembly.name || ""),
+      option: (assembly) => ({
+        value: String(assembly.pluginassemblyid || assembly.name || ""),
+        label: `${String(assembly.name || "")} (${String(assembly.pluginassemblyid || "")})`,
+      }),
+    });
   }
 
   return matches[0];
@@ -659,6 +675,7 @@ async function resolveWorkflow(
     await client.query<Record<string, unknown>>(env, "workflows", listWorkflowsQuery())
   ).filter((workflow) => Number(workflow.category || 0) !== 5);
   const matches = findNamedMatches(workflows, workflowRef, (workflow) => [
+    String(workflow.workflowid || ""),
     String(workflow.uniquename || ""),
     String(workflow.name || ""),
   ]);
@@ -668,11 +685,19 @@ async function resolveWorkflow(
   }
 
   if (matches.length > 1) {
-    throw new Error(
-      `Workflow '${workflowRef}' is ambiguous in '${env.name}'. Matches: ${matches
-        .map((workflow) => String(workflow.name || workflow.uniquename || ""))
-        .join(", ")}.`,
-    );
+    throw createAmbiguousImpactError({
+      itemLabel: "Workflow",
+      itemRef: workflowRef,
+      environmentName: env.name,
+      matches,
+      displayName: (workflow) => String(workflow.name || workflow.uniquename || ""),
+      option: (workflow) => ({
+        value: String(workflow.uniquename || workflow.workflowid || workflow.name || ""),
+        label: workflow.uniquename
+          ? `${String(workflow.name || workflow.uniquename || "")} (${String(workflow.uniquename)})`
+          : `${String(workflow.name || "")} (${String(workflow.workflowid || "")})`,
+      }),
+    });
   }
 
   return matches[0];
@@ -689,6 +714,7 @@ async function resolveWebResource(
     listWebResourcesQuery(),
   );
   const matches = findNamedMatches(resources, resourceRef, (resource) => [
+    String(resource.webresourceid || ""),
     String(resource.name || ""),
   ]);
 
@@ -697,11 +723,17 @@ async function resolveWebResource(
   }
 
   if (matches.length > 1) {
-    throw new Error(
-      `Web resource '${resourceRef}' is ambiguous in '${env.name}'. Matches: ${matches
-        .map((resource) => String(resource.name || ""))
-        .join(", ")}.`,
-    );
+    throw createAmbiguousImpactError({
+      itemLabel: "Web resource",
+      itemRef: resourceRef,
+      environmentName: env.name,
+      matches,
+      displayName: (resource) => String(resource.name || ""),
+      option: (resource) => ({
+        value: String(resource.webresourceid || resource.name || ""),
+        label: `${String(resource.name || "")} (${String(resource.webresourceid || "")})`,
+      }),
+    });
   }
 
   return matches[0];
@@ -723,6 +755,27 @@ function findNamedMatches<T>(items: T[], ref: string, selectors: (item: T) => st
 
   return items.filter((item) =>
     selectors(item).some((value) => value.toLowerCase().includes(needle)),
+  );
+}
+
+function createAmbiguousImpactError<T>(options: {
+  itemLabel: string;
+  itemRef: string;
+  environmentName: string;
+  matches: T[];
+  displayName: (item: T) => string;
+  option: (item: T) => AmbiguousMatchOption;
+}): AmbiguousMatchError {
+  const { itemLabel, itemRef, environmentName, matches, displayName, option } = options;
+
+  return new AmbiguousMatchError(
+    `${itemLabel} '${itemRef}' is ambiguous in '${environmentName}'. Choose a matching ${itemLabel.toLowerCase()} and try again. Matches: ${matches
+      .map((item) => displayName(item))
+      .join(", ")}.`,
+    {
+      parameter: "name",
+      options: matches.map((item) => option(item)),
+    },
   );
 }
 

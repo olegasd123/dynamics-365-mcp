@@ -9,7 +9,7 @@ import { fetchDashboardDetails } from "./alm-metadata.js";
 
 const getDashboardDetailsSchema = {
   environment: z.string().optional().describe("Environment name"),
-  dashboardName: z.string().describe("Dashboard name"),
+  dashboardName: z.string().describe("Dashboard name or form id"),
   solution: z.string().optional().describe("Optional solution display name or unique name"),
 };
 

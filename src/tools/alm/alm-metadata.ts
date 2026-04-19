@@ -34,6 +34,7 @@ import {
   queryRecordsByFieldValuesInChunks,
   queryRecordsByIdsInChunks,
 } from "../../utils/query-batching.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 export interface EnvironmentVariableRecord extends EnvironmentVariableDefinitionRecord {
   typeLabel: string;
@@ -110,10 +111,18 @@ export async function fetchEnvironmentVariableDetails(
   return resolveByName(
     variables,
     variableRef,
-    (item) => [item.schemaname, item.displayname],
+    (item) => [item.environmentvariabledefinitionid, item.schemaname, item.displayname],
     (item) => item.schemaname,
     "Environment variable",
     env.name,
+    {
+      parameter: "variableName",
+      option: (item) => ({
+        value: item.schemaname || item.environmentvariabledefinitionid,
+        label: item.displayname ? `${item.schemaname} (${item.displayname})` : item.schemaname,
+      }),
+      uniqueKey: (item) => item.schemaname || item.environmentvariabledefinitionid,
+    },
   );
 }
 
@@ -152,10 +161,20 @@ export async function fetchConnectionReferenceDetails(
   return resolveByName(
     references,
     referenceRef,
-    (item) => [item.displayname, item.connectionreferencelogicalname],
+    (item) => [item.connectionreferenceid, item.displayname, item.connectionreferencelogicalname],
     (item) => item.connectionreferencelogicalname || item.displayname,
     "Connection reference",
     env.name,
+    {
+      parameter: "referenceName",
+      option: (item) => ({
+        value: item.connectionreferencelogicalname || item.connectionreferenceid,
+        label: item.displayname
+          ? `${item.displayname} (${item.connectionreferencelogicalname})`
+          : item.connectionreferencelogicalname,
+      }),
+      uniqueKey: (item) => item.connectionreferencelogicalname || item.connectionreferenceid,
+    },
   );
 }
 
@@ -194,10 +213,18 @@ export async function fetchAppModuleDetails(
   return resolveByName(
     apps,
     appRef,
-    (item) => [item.name, item.uniquename],
+    (item) => [item.appmoduleid, item.name, item.uniquename],
     (item) => item.uniquename || item.name,
     "App module",
     env.name,
+    {
+      parameter: "appName",
+      option: (item) => ({
+        value: item.uniquename || item.appmoduleid,
+        label: item.uniquename ? `${item.name} (${item.uniquename})` : item.name,
+      }),
+      uniqueKey: (item) => item.uniquename || item.appmoduleid,
+    },
   );
 }
 
@@ -236,10 +263,18 @@ export async function fetchDashboardDetails(
   return resolveByName(
     dashboards,
     dashboardName,
-    (item) => [item.name],
+    (item) => [item.formid, item.name],
     (item) => item.name,
     "Dashboard",
     env.name,
+    {
+      parameter: "dashboardName",
+      option: (item) => ({
+        value: item.formid || item.name,
+        label: `${item.name}${item.objecttypecode ? ` [${item.objecttypecode}]` : ""}${item.formid ? ` (${item.formid})` : ""}`,
+      }),
+      uniqueKey: (item) => item.formid || item.name,
+    },
   );
 }
 
@@ -416,55 +451,66 @@ function resolveByName<T>(
   displayName: (item: T) => string,
   itemLabel: string,
   environmentName: string,
+  ambiguity: {
+    parameter: string;
+    option: (item: T) => AmbiguousMatchOption;
+    uniqueKey: (item: T) => string;
+  },
 ): T {
-  const exactMatches = uniqueByDisplayName(
+  const uniqueKey = ambiguity.uniqueKey;
+
+  const exactMatches = uniqueByKey(
     items.filter((item) => candidateNames(item).some((name) => name === itemRef)),
-    displayName,
+    uniqueKey,
   );
   if (exactMatches.length === 1) {
     return exactMatches[0];
   }
 
   const needle = itemRef.trim().toLowerCase();
-  const caseInsensitiveMatches = uniqueByDisplayName(
+  const caseInsensitiveMatches = uniqueByKey(
     items.filter((item) => candidateNames(item).some((name) => name.toLowerCase() === needle)),
-    displayName,
+    uniqueKey,
   );
   if (caseInsensitiveMatches.length === 1) {
     return caseInsensitiveMatches[0];
   }
 
-  const partialMatches = uniqueByDisplayName(
+  const partialMatches = uniqueByKey(
     items.filter((item) =>
       candidateNames(item).some((name) => name.toLowerCase().includes(needle)),
     ),
-    displayName,
+    uniqueKey,
   );
   if (partialMatches.length === 1) {
     return partialMatches[0];
   }
 
-  const matches = uniqueByDisplayName(
+  const matches = uniqueByKey(
     [...exactMatches, ...caseInsensitiveMatches, ...partialMatches],
-    displayName,
+    uniqueKey,
   );
 
   if (matches.length > 1) {
-    throw new Error(
-      `${itemLabel} '${itemRef}' is ambiguous in '${environmentName}'. Matches: ${matches
+    throw new AmbiguousMatchError(
+      `${itemLabel} '${itemRef}' is ambiguous in '${environmentName}'. Choose a matching ${itemLabel.toLowerCase()} and try again. Matches: ${matches
         .map((item) => displayName(item))
         .join(", ")}.`,
+      {
+        parameter: ambiguity.parameter,
+        options: matches.map((item) => ambiguity.option(item)),
+      },
     );
   }
 
   throw new Error(`${itemLabel} '${itemRef}' not found in '${environmentName}'.`);
 }
 
-function uniqueByDisplayName<T>(items: T[], displayName: (item: T) => string): T[] {
+function uniqueByKey<T>(items: T[], getKey: (item: T) => string): T[] {
   const seen = new Set<string>();
 
   return items.filter((item) => {
-    const key = displayName(item);
+    const key = getKey(item);
     if (seen.has(key)) {
       return false;
     }

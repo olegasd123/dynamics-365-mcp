@@ -60,6 +60,7 @@ describe("environments config", () => {
         {
           name: "dev",
           url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.2",
           tenantId: "tenant",
           authType: "clientSecret",
           clientId: "client",
@@ -82,6 +83,7 @@ describe("environments config", () => {
         {
           name: "default",
           url: "https://org.crm.dynamics.com",
+          apiVersion: "v9.2",
           tenantId: "tenant",
           authType: "clientSecret",
           clientId: "client",
@@ -117,6 +119,7 @@ describe("environments config", () => {
         {
           name: "dev",
           url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.2",
           tenantId: "dev-tenant",
           authType: "clientSecret",
           clientId: "dev-client",
@@ -125,6 +128,7 @@ describe("environments config", () => {
         {
           name: "prod",
           url: "https://prod.crm.dynamics.com",
+          apiVersion: "v9.2",
           tenantId: "prod-tenant",
           authType: "clientSecret",
           clientId: "prod-client",
@@ -143,6 +147,7 @@ describe("environments config", () => {
         {
           name: "dev",
           url: "https://dev",
+          apiVersion: "v9.2",
           tenantId: "t1",
           authType: "clientSecret" as const,
           clientId: "c1",
@@ -151,6 +156,7 @@ describe("environments config", () => {
         {
           name: "prod",
           url: "https://prod",
+          apiVersion: "v9.2",
           tenantId: "t2",
           authType: "clientSecret" as const,
           clientId: "c2",
@@ -201,6 +207,7 @@ describe("environments config", () => {
         {
           name: "dev",
           url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.2",
           tenantId: "tenant",
           authType: "deviceCode",
           clientId: undefined,
@@ -223,12 +230,54 @@ describe("environments config", () => {
         {
           name: "default",
           url: "https://org.crm.dynamics.com",
+          apiVersion: "v9.2",
           tenantId: "tenant",
           authType: "deviceCode",
           clientId: undefined,
         },
       ],
       defaultEnvironment: "default",
+    });
+  });
+
+  it("loads a custom api version from the JSON config file", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "dev",
+            url: "https://dev.crm.dynamics.com/",
+            apiVersion: "v9.1",
+            tenantId: "tenant",
+            clientId: "client",
+            clientSecret: "secret",
+          },
+        ],
+        defaultEnvironment: "dev",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.1",
+          tenantId: "tenant",
+          authType: "clientSecret",
+          clientId: "client",
+          clientSecret: "secret",
+        },
+      ],
+      defaultEnvironment: "dev",
     });
   });
 });

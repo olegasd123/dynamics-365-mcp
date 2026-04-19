@@ -65,6 +65,28 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.list_table_records.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        nameFilter: expect.any(Object),
+        createdWithinDays: expect.any(Object),
+        modifiedWithinDays: expect.any(Object),
+        state: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_table_record_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        recordId: expect.any(Object),
+        name: expect.any(Object),
+        firstName: expect.any(Object),
+        lastName: expect.any(Object),
+        state: expect.any(Object),
+        includeAllFields: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
       expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         query: expect.any(Object),
@@ -154,6 +176,17 @@ describe("tool contracts", () => {
         solution: expect.any(Object),
         limit: expect.any(Object),
         cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_table_ribbons.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        location: expect.any(Object),
+      });
+      expect(toolsByName.get_ribbon_button_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        buttonName: expect.any(Object),
+        location: expect.any(Object),
       });
       expect(toolsByName.list_solutions.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -386,7 +419,11 @@ describe("tool contracts", () => {
         tool: "list_solutions",
         ok: false,
         error: {
-          name: "Error",
+          name: "EnvironmentNotFoundError",
+          code: "environment_not_found",
+          environment: "missing",
+          availableEnvironments: ["dev"],
+          retryable: false,
           message: "Environment 'missing' not found. Available: dev",
         },
       });

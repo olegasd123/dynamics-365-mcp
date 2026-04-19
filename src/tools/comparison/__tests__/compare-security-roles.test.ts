@@ -90,7 +90,7 @@ describe("compare_security_roles", () => {
     expect(response.content[0].text).toContain("depthDisplay");
   });
 
-  it("uses the most recently modified role when more than one matches", async () => {
+  it("returns structured retry options when the source role is ambiguous", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["prod", "dev"]);
     const { client } = createRecordingClient({
@@ -108,7 +108,6 @@ describe("compare_security_roles", () => {
             _businessunitid_value: "bu-1",
             "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
             ismanaged: false,
-            modifiedon: "2026-01-01T00:00:00Z",
           },
           {
             roleid: "role-2",
@@ -116,13 +115,12 @@ describe("compare_security_roles", () => {
             _businessunitid_value: "bu-1",
             "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
             ismanaged: false,
-            modifiedon: "2026-02-01T00:00:00Z",
           },
         ],
         roleprivilegescollection: [
           {
-            roleprivilegeid: "rp-2",
-            roleid: "role-2",
+            roleprivilegeid: "rp-1",
+            roleid: "role-1",
             privilegeid: "priv-2",
             privilegedepthmask: 8,
           },
@@ -149,7 +147,6 @@ describe("compare_security_roles", () => {
             _businessunitid_value: "bu-1",
             "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
             ismanaged: false,
-            modifiedon: "2026-03-01T00:00:00Z",
           },
         ],
         roleprivilegescollection: [
@@ -177,14 +174,100 @@ describe("compare_security_roles", () => {
       roleName: "Salesperson",
     });
 
-    expect(response.isError).toBeUndefined();
-    expect(response.content[0].text).toContain("Warning:");
-    expect(response.content[0].text).toContain("Found 2 matching security roles");
-    expect(response.content[0].text).toContain("modified on 2026-02-01T00:00:00Z");
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("Choose a role and try again");
     expect(response.structuredContent).toMatchObject({
-      ok: true,
-      data: {
-        warnings: [expect.stringContaining("Found 2 matching security roles")],
+      version: "1",
+      tool: "compare_security_roles",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "sourceRoleName",
+        options: [
+          { value: "role-1", label: "Salesperson [Root] (role-1)" },
+          { value: "role-2", label: "Salesperson [Root] (role-2)" },
+        ],
+        retryable: false,
+      },
+    });
+  });
+
+  it("returns structured retry options when the source business unit is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["prod", "dev"]);
+    const { client } = createRecordingClient({
+      prod: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root One",
+          },
+          {
+            businessunitid: "bu-2",
+            name: "Root Two",
+          },
+        ],
+        roles: [],
+        roleprivilegescollection: [],
+        privileges: [],
+      },
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-1",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-3",
+            name: "Salesperson",
+            _businessunitid_value: "bu-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: [
+          {
+            roleprivilegeid: "rp-3",
+            roleid: "role-3",
+            privilegeid: "priv-2",
+            privilegedepthmask: 8,
+          },
+        ],
+        privileges: [
+          {
+            privilegeid: "priv-2",
+            name: "prvWriteAccount",
+            accessright: 3,
+          },
+        ],
+      },
+    });
+
+    registerCompareSecurityRoles(server as never, config, client);
+    const response = await server.getHandler("compare_security_roles")({
+      sourceEnvironment: "prod",
+      targetEnvironment: "dev",
+      roleName: "Salesperson",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain("Default global business unit is ambiguous");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "compare_security_roles",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "sourceBusinessUnit",
+        options: [
+          { value: "bu-1", label: "Root One" },
+          { value: "bu-2", label: "Root Two" },
+        ],
+        retryable: false,
       },
     });
   });

@@ -1,4 +1,4 @@
-import { buildQueryString, odataContains, odataEq } from "../utils/odata-helpers.js";
+import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
 
 export const FORM_TYPE = {
   main: [2, 12],
@@ -23,38 +23,24 @@ const FORM_SELECT = [
 
 const FORM_DETAILS_SELECT = [...FORM_SELECT, "formxml"];
 
-function buildOrNumberFilter(field: string, values: number[]): string {
-  return values.map((value) => `${field} eq ${value}`).join(" or ");
-}
-
-function buildOrStringFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
-
 export function listFormsQuery(options?: {
   table?: string;
   type?: FormType;
   nameFilter?: string;
 }): string {
-  const filters: string[] = [];
-
-  if (options?.table) {
-    filters.push(odataEq("objecttypecode", options.table));
-  }
-  if (options?.type) {
-    filters.push(`(${buildOrNumberFilter("type", [...FORM_TYPE[options.type]])})`);
-  }
-  if (options?.nameFilter) {
-    filters.push(
-      `(${odataContains("name", options.nameFilter)} or ${odataContains("uniquename", options.nameFilter)})`,
-    );
-  }
-
-  return buildQueryString({
-    select: FORM_SELECT,
-    filter: filters.length > 0 ? filters.join(" and ") : undefined,
-    orderby: "objecttypecode asc,name asc",
-  });
+  return query()
+    .select(FORM_SELECT)
+    .filter(
+      and(
+        options?.table ? eq("objecttypecode", options.table) : undefined,
+        options?.type ? inList("type", [...FORM_TYPE[options.type]]) : undefined,
+        options?.nameFilter
+          ? or(contains("name", options.nameFilter), contains("uniquename", options.nameFilter))
+          : undefined,
+      ),
+    )
+    .orderby("objecttypecode asc,name asc")
+    .toString();
 }
 
 export function getFormDetailsByIdentityQuery(options: {
@@ -63,40 +49,32 @@ export function getFormDetailsByIdentityQuery(options: {
   formName?: string;
   uniqueName?: string;
 }): string {
-  const filters: string[] = [];
+  const filter = options.formId
+    ? eq("formid", options.formId)
+    : and(
+        options.uniqueName
+          ? eq("uniquename", options.uniqueName)
+          : options.formName
+            ? eq("name", options.formName)
+            : undefined,
+        options.table ? eq("objecttypecode", options.table) : undefined,
+      );
 
-  if (options.formId) {
-    filters.push(odataEq("formid", options.formId));
-  } else {
-    if (options.uniqueName) {
-      filters.push(odataEq("uniquename", options.uniqueName));
-    } else if (options.formName) {
-      filters.push(odataEq("name", options.formName));
-    }
-
-    if (options.table) {
-      filters.push(odataEq("objecttypecode", options.table));
-    }
-  }
-
-  return buildQueryString({
-    select: FORM_DETAILS_SELECT,
-    filter: filters.length > 0 ? filters.join(" and ") : undefined,
-  });
+  return query().select(FORM_DETAILS_SELECT).filter(filter).toString();
 }
 
 export function listFormsByIdsQuery(formIds: string[]): string {
-  return buildQueryString({
-    select: FORM_SELECT,
-    filter: buildOrStringFilter("formid", formIds),
-    orderby: "objecttypecode asc,name asc",
-  });
+  return query()
+    .select(FORM_SELECT)
+    .filter(inList("formid", formIds))
+    .orderby("objecttypecode asc,name asc")
+    .toString();
 }
 
 export function listFormDetailsByIdsQuery(formIds: string[]): string {
-  return buildQueryString({
-    select: FORM_DETAILS_SELECT,
-    filter: buildOrStringFilter("formid", formIds),
-    orderby: "objecttypecode asc,name asc",
-  });
+  return query()
+    .select(FORM_DETAILS_SELECT)
+    .filter(inList("formid", formIds))
+    .orderby("objecttypecode asc,name asc")
+    .toString();
 }

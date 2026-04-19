@@ -103,6 +103,7 @@ function buildTaskRoutingResource(): string {
     "## Common Tasks",
     "- Release check before import or deploy: prompt `release_gate_check`, first tool `release_gate_report`, follow-up `get_solution_dependencies` or `compare_solutions`",
     "- Plugin step does not fire: prompt `investigate_plugin_failure`, first tool `get_plugin_details`, follow-up `list_plugin_steps`",
+    "- Need workflows that use a custom workflow activity class: tool `find_workflow_activity_usage`; do not rely on plugin step registrations for `CodeActivity` usage",
     "- Need drift view across dev, test, and prod: prompt `analyze_environment_drift`, first tool `compare_environment_matrix`, follow-up one pairwise compare tool",
     "- Need to review a security role: prompt `review_security_role`, first tool `list_security_roles`, follow-up `get_role_privileges`",
     "- Need to trace a cloud flow problem: prompt `trace_flow_dependency`, first tool `get_flow_details`, follow-up `get_solution_dependencies` or `list_connection_references`",
@@ -146,6 +147,7 @@ function buildPluginTroubleshootingResource(): string {
     "## Quick Paths",
     "- Plugin class does not run: `investigate_plugin_failure` prompt, then `get_plugin_details`, then `list_plugin_steps`",
     "- Need DLL-wide view: `get_plugin_assembly_details`",
+    "- Need workflow processes that call a workflow activity class: `find_workflow_activity_usage`",
     "- Need image details: `list_plugin_assembly_images`",
     "- Need step list by assembly: `list_plugin_assembly_steps`",
     "- Need cross-environment check: `compare_plugin_assemblies`",
@@ -160,6 +162,7 @@ function buildPluginTroubleshootingResource(): string {
     "## Boundary Reminder",
     "- Plugin class tools cover `IPlugin` classes.",
     "- Assembly detail also shows workflow activities stored in the same assembly.",
+    "- Workflow process usage of a `CodeActivity` class comes from workflow definitions, not plugin step registrations.",
   ].join("\n");
 }
 

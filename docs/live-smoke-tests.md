@@ -6,7 +6,9 @@ Do not run them on each code change.
 
 ## Goal
 
-By default, the live suite tries every registered MCP tool that has cases in `live-fixtures.json`.
+By default, the live suite tries every registered MCP tool.
+
+Your `live-fixtures.json` should keep at least one case for each registered tool.
 
 It does not use chat prompts.
 
@@ -35,6 +37,7 @@ The file is tool-first:
 - optional `execution.maxParallel` sets how many cases can run at the same time
 - optional `execution.maxLoggedRequests` sets how many CRM requests to show for one failed case
 - optional `execution.maxLoggedRequestChars` sets how long one logged CRM request line can be
+- keep one case per registered tool so a copied file can run the full suite after you fill in real names
 - `tools.<toolName>` is an array of test cases for one tool
 - each case has `arguments` with real tool input
 - one tool can have several cases with different data

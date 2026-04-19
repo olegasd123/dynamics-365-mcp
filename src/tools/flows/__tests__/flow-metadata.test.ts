@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import { handleGetFlowDetails } from "../get-flow-details.js";
 import { fetchFlowDetails, listCloudFlows } from "../flow-metadata.js";
 
 describe("flow metadata", () => {
@@ -69,5 +70,57 @@ describe("flow metadata", () => {
       "shared_commondataserviceforapps",
       "shared_office365",
     ]);
+  });
+
+  it("returns structured retry options when the flow name is ambiguous", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        workflows: [
+          {
+            workflowid: "flow-1",
+            name: "Account Flow",
+            uniquename: "contoso_AccountFlow_A",
+            category: 5,
+            statecode: 1,
+          },
+          {
+            workflowid: "flow-2",
+            name: "Account Flow",
+            uniquename: "contoso_AccountFlow_B",
+            category: 5,
+            statecode: 1,
+          },
+        ],
+      },
+    });
+
+    const response = await handleGetFlowDetails(
+      {
+        environment: "dev",
+        flowName: "Account Flow",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a flow and try again");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "get_flow_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "flowName",
+        options: [
+          { value: "contoso_AccountFlow_A", label: "Account Flow (contoso_AccountFlow_A)" },
+          { value: "contoso_AccountFlow_B", label: "Account Flow (contoso_AccountFlow_B)" },
+        ],
+        retryable: false,
+      },
+    });
   });
 });

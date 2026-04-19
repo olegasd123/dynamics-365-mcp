@@ -79,18 +79,28 @@ Replace these values before you run a prompt:
 - `<TARGET_TABLE>`: target table name if it is different
 - `<COLUMN>`: column logical name like `name`
 - `<COLUMNS>`: comma-separated column logical names like `name, accountnumber`
+- `<RECORD_ID>`: Dataverse row id
+- `<NAME>`: one full name, primary name, or last name
+- `<FIRST_NAME>`: first name like `Anna`
+- `<LAST_NAME>`: last name like `Smith`
 - `<PLUGIN>`: plugin assembly name
 - `<PLUGIN_CLASS>`: plugin class name or full type name
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
 - `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
-- `<FORM>`: form display name or unique name
-- `<VIEW>`: view name
+- `<WORKFLOW_ID>`: workflow id
+- `<FORM>`: form display name, unique name, or form id
+- `<VIEW>`: view name or view id
+- `<BUTTON>`: ribbon button label, id, or command name
 - `<API>`: Custom API name or unique name
 - `<FLOW>`: cloud flow display name or unique name
-- `<ROLE>`: security role name
-- `<BUSINESS_UNIT>`: business unit name
-- `<WEB_RESOURCE>`: web resource name like `new_/scripts/main.js`
+- `<ROLE>`: security role name or role id
+- `<SOURCE_ROLE>`: source security role name or role id override
+- `<TARGET_ROLE>`: target security role name or role id override
+- `<BUSINESS_UNIT>`: business unit name or id
+- `<SOURCE_BUSINESS_UNIT>`: source business unit name or id
+- `<TARGET_BUSINESS_UNIT>`: target business unit name or id
+- `<WEB_RESOURCE>`: web resource name or id like `new_/scripts/main.js` or `wr-123`
 - `<ENV_VAR>`: environment variable schema name or display name
 - `<CONNECTION_REFERENCE>`: connection reference display name or logical name
 - `<APP_MODULE>`: app module name or unique name
@@ -136,6 +146,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 ## Workflows And Actions
 
+- `find_workflow_activity_usage`
+  `In <ENV>, list workflows that use workflow activity class <CLASS_NAME>. Keep the search to category workflow only and show the matching workflows.`
+  `(Required: <CLASS_NAME>)`
+
 - `list_workflows`
   `In <ENV>, list activated business rules from solution <SOLUTION>.`
   `In <ENV>, list activated workflows from solution <SOLUTION>.`
@@ -149,7 +163,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: none)`
 
 - `get_workflow_details`
-  `In <ENV>, show full details for workflow <WORKFLOW>. If needed, use the unique name <WORKFLOW_UNIQUE_NAME>.`
+  `In <ENV>, show full details for workflow <WORKFLOW_NAME>. If needed, use <WORKFLOW_UNIQUE_NAME> / <WORKFLOW_ID>.`
   `(Required: none)`
 
 ## Web Resources
@@ -233,6 +247,22 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list relationships for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
 
+- `list_table_records`
+  `In <ENV>, list records from table <TABLE>.`
+  `In <ENV>, list contacts from table contact where the name matches '<NAME>'.`
+  `In <ENV>, list contacts from table contact that were created in the last 5 days.`
+  `In <ENV>, list contacts from table contact that were modified in the last 10 days.`
+  `In <ENV>, list inactive products from table product.`
+  `(Required: <TABLE>)`
+
+- `get_table_record_details`
+  `In <ENV>, show details for the record <RECORD_ID> from table <TABLE>.`
+  `In <ENV>, show details for the contact with last name <LAST_NAME>.`
+  `In <ENV>, show details for the contact with first name <FIRST_NAME> and last name <LAST_NAME>.`
+  `If you need every readable field, set includeAllFields to true.`
+  `If the record has many fields, ask for the next page with the returned cursor.`
+  `(Required: <TABLE> and one lookup value)`
+
 ## Forms
 
 - `list_forms`
@@ -242,6 +272,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_form_details`
   `In <ENV>, show details for form <FORM> on table <TABLE> from solution <SOLUTION>.`
   `(Required: <FORM>)`
+
+## Ribbons
+
+- `list_table_ribbons`
+  `In <ENV>, list ribbons for table <TABLE>. Group the result by ribbon location and include the buttons on each ribbon. If needed, limit the result to location homepageGrid.`
+  `(Required: <TABLE>)`
+
+- `get_ribbon_button_details`
+  `In <ENV>, show ribbon button details for <BUTTON> on table <TABLE>. Include the command, enable rules, display rules, and image metadata. If needed, limit the search to location form.`
+  `(Required: <TABLE>, <BUTTON>)`
 
 ## Views
 
@@ -292,7 +332,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: none)`
 
 - `get_role_privileges`
-  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit.`
+  `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
 
 ## Usage And Impact
@@ -372,7 +412,7 @@ This group needs at least two configured environments.
   `(Required: none)`
 
 - `compare_security_roles`
-  `Compare security role <ROLE> between <SOURCE_ENV> and <TARGET_ENV>. Use business unit <BUSINESS_UNIT> in both environments if needed. Otherwise use each environment's default global business unit.`
+  `Compare security role <ROLE> between <SOURCE_ENV> and <TARGET_ENV>. Use source business unit <SOURCE_BUSINESS_UNIT> and target business unit <TARGET_BUSINESS_UNIT> if needed. If only one side is ambiguous, retry with source role override <SOURCE_ROLE> or target role override <TARGET_ROLE>. Otherwise use each environment's default global business unit.`
   `(Required: <ROLE>)`
 
 ## Full Coverage Checklist
@@ -407,6 +447,7 @@ This prompt list covers these tools:
 - `get_form_details`
 - `get_plugin_details`
 - `get_plugin_assembly_details`
+- `get_ribbon_button_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
 - `get_solution_details`
@@ -424,6 +465,7 @@ This prompt list covers these tools:
 - `list_dashboards`
 - `list_environment_variables`
 - `list_forms`
+- `list_table_ribbons`
 - `list_plugin_steps`
 - `list_plugins`
 - `list_plugin_assembly_images`

@@ -1,4 +1,4 @@
-import { buildQueryString, odataEq } from "../utils/odata-helpers.js";
+import { eq, inList, query } from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",
@@ -11,39 +11,32 @@ const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "modifiedon",
 ];
 
-function buildOrFilter(field: string, values: string[]): string {
-  return values.map((value) => odataEq(field, value)).join(" or ");
-}
-
 export function listPluginAssembliesQuery(): string {
-  return buildQueryString({
-    select: DEFAULT_PLUGIN_ASSEMBLY_SELECT,
-    filter: "ishidden/Value eq false",
-    orderby: "name asc",
-  });
+  return query()
+    .select(DEFAULT_PLUGIN_ASSEMBLY_SELECT)
+    .filter(eq("ishidden/Value", false))
+    .orderby("name asc")
+    .toString();
 }
 
 export function getPluginAssemblyByNameQuery(
   assemblyName: string,
   select = DEFAULT_PLUGIN_ASSEMBLY_SELECT,
 ): string {
-  return buildQueryString({
-    select,
-    filter: odataEq("name", assemblyName),
-  });
+  return query().select(select).filter(eq("name", assemblyName)).toString();
 }
 
 export function listPluginAssembliesByIdsQuery(assemblyIds: string[]): string {
-  return buildQueryString({
-    select: DEFAULT_PLUGIN_ASSEMBLY_SELECT,
-    filter: buildOrFilter("pluginassemblyid", assemblyIds),
-    orderby: "name asc",
-  });
+  return query()
+    .select(DEFAULT_PLUGIN_ASSEMBLY_SELECT)
+    .filter(inList("pluginassemblyid", assemblyIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginTypesQuery(assemblyId: string): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "plugintypeid",
       "name",
       "typename",
@@ -51,15 +44,15 @@ export function listPluginTypesQuery(assemblyId: string): string {
       "isworkflowactivity",
       "workflowactivitygroupname",
       "customworkflowactivityinfo",
-    ],
-    filter: odataEq("pluginassemblyid/pluginassemblyid", assemblyId),
-    orderby: "name asc",
-  });
+    ])
+    .filter(eq("pluginassemblyid/pluginassemblyid", assemblyId))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginTypesForAssembliesQuery(assemblyIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "plugintypeid",
       "name",
       "typename",
@@ -68,15 +61,15 @@ export function listPluginTypesForAssembliesQuery(assemblyIds: string[]): string
       "workflowactivitygroupname",
       "customworkflowactivityinfo",
       "_pluginassemblyid_value",
-    ],
-    filter: buildOrFilter("_pluginassemblyid_value", assemblyIds),
-    orderby: "name asc",
-  });
+    ])
+    .filter(inList("_pluginassemblyid_value", assemblyIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginTypesByIdsQuery(pluginTypeIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "plugintypeid",
       "name",
       "typename",
@@ -85,15 +78,15 @@ export function listPluginTypesByIdsQuery(pluginTypeIds: string[]): string {
       "workflowactivitygroupname",
       "customworkflowactivityinfo",
       "_pluginassemblyid_value",
-    ],
-    filter: buildOrFilter("plugintypeid", pluginTypeIds),
-    orderby: "name asc",
-  });
+    ])
+    .filter(inList("plugintypeid", pluginTypeIds))
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginStepsQuery(pluginTypeId: string): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepid",
       "_eventhandler_value",
       "name",
@@ -107,16 +100,16 @@ export function listPluginStepsQuery(pluginTypeId: string): string {
       "configuration",
       "asyncautodelete",
       "supporteddeployment",
-    ],
-    filter: odataEq("_eventhandler_value", pluginTypeId),
-    expand: "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
-    orderby: "name asc",
-  });
+    ])
+    .filter(eq("_eventhandler_value", pluginTypeId))
+    .expand("sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)")
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginStepsForPluginTypesQuery(pluginTypeIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepid",
       "_eventhandler_value",
       "name",
@@ -130,16 +123,16 @@ export function listPluginStepsForPluginTypesQuery(pluginTypeIds: string[]): str
       "configuration",
       "asyncautodelete",
       "supporteddeployment",
-    ],
-    filter: buildOrFilter("_eventhandler_value", pluginTypeIds),
-    expand: "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
-    orderby: "name asc",
-  });
+    ])
+    .filter(inList("_eventhandler_value", pluginTypeIds))
+    .expand("sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)")
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginStepsByIdsQuery(stepIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepid",
       "_eventhandler_value",
       "name",
@@ -153,16 +146,16 @@ export function listPluginStepsByIdsQuery(stepIds: string[]): string {
       "configuration",
       "asyncautodelete",
       "supporteddeployment",
-    ],
-    filter: buildOrFilter("sdkmessageprocessingstepid", stepIds),
-    expand: "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
-    orderby: "name asc",
-  });
+    ])
+    .filter(inList("sdkmessageprocessingstepid", stepIds))
+    .expand("sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)")
+    .orderby("name asc")
+    .toString();
 }
 
 export function listPluginImagesQuery(stepId: string): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepimageid",
       "_sdkmessageprocessingstepid_value",
       "name",
@@ -170,14 +163,14 @@ export function listPluginImagesQuery(stepId: string): string {
       "imagetype",
       "attributes",
       "messagepropertyname",
-    ],
-    filter: odataEq("_sdkmessageprocessingstepid_value", stepId),
-  });
+    ])
+    .filter(eq("_sdkmessageprocessingstepid_value", stepId))
+    .toString();
 }
 
 export function listPluginImagesForStepsQuery(stepIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepimageid",
       "_sdkmessageprocessingstepid_value",
       "name",
@@ -185,14 +178,14 @@ export function listPluginImagesForStepsQuery(stepIds: string[]): string {
       "imagetype",
       "attributes",
       "messagepropertyname",
-    ],
-    filter: buildOrFilter("_sdkmessageprocessingstepid_value", stepIds),
-  });
+    ])
+    .filter(inList("_sdkmessageprocessingstepid_value", stepIds))
+    .toString();
 }
 
 export function listPluginImagesByIdsQuery(imageIds: string[]): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepimageid",
       "_sdkmessageprocessingstepid_value",
       "name",
@@ -200,14 +193,14 @@ export function listPluginImagesByIdsQuery(imageIds: string[]): string {
       "imagetype",
       "attributes",
       "messagepropertyname",
-    ],
-    filter: buildOrFilter("sdkmessageprocessingstepimageid", imageIds),
-  });
+    ])
+    .filter(inList("sdkmessageprocessingstepimageid", imageIds))
+    .toString();
 }
 
 export function listStepsForAssemblyQuery(assemblyName: string): string {
-  return buildQueryString({
-    select: [
+  return query()
+    .select([
       "sdkmessageprocessingstepid",
       "name",
       "stage",
@@ -215,10 +208,11 @@ export function listStepsForAssemblyQuery(assemblyName: string): string {
       "rank",
       "statecode",
       "filteringattributes",
-    ],
-    filter: odataEq("eventhandler_plugintype/pluginassemblyid/name", assemblyName),
-    expand:
+    ])
+    .filter(eq("eventhandler_plugintype/pluginassemblyid/name", assemblyName))
+    .expand(
       "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),eventhandler_plugintype($select=name,typename)",
-    orderby: "name asc",
-  });
+    )
+    .orderby("name asc")
+    .toString();
 }

@@ -70,4 +70,54 @@ describe("app module tools", () => {
       },
     });
   });
+
+  it("returns structured retry options when the app module is ambiguous", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        appmodules: [
+          {
+            appmoduleid: "app-1",
+            name: "Sales Hub",
+            uniquename: "contoso_SalesHub_A",
+            ismanaged: false,
+            modifiedon: "2025-01-02T00:00:00Z",
+            statecode: 0,
+          },
+          {
+            appmoduleid: "app-2",
+            name: "Sales Hub",
+            uniquename: "contoso_SalesHub_B",
+            ismanaged: false,
+            modifiedon: "2025-01-02T00:00:00Z",
+            statecode: 0,
+          },
+        ],
+      },
+    });
+
+    registerGetAppModuleDetails(server as never, config, client);
+
+    const response = await server.getHandler("get_app_module_details")({
+      appName: "Sales Hub",
+    });
+
+    expect(response.isError).toBe(true);
+    expect(response.content[0]?.text).toContain("Choose a matching app module");
+    expect(response.structuredContent).toMatchObject({
+      tool: "get_app_module_details",
+      ok: false,
+      error: {
+        name: "AmbiguousMatchError",
+        code: "ambiguous_match",
+        parameter: "appName",
+        options: [
+          { value: "contoso_SalesHub_A", label: "Sales Hub (contoso_SalesHub_A)" },
+          { value: "contoso_SalesHub_B", label: "Sales Hub (contoso_SalesHub_B)" },
+        ],
+        retryable: false,
+      },
+    });
+  });
 });

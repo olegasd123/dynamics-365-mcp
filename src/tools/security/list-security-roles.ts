@@ -7,6 +7,7 @@ import { defineTool, registerTool, type ToolContext, type ToolParams } from "../
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { listSecurityRoles, resolveRoleBusinessUnitName } from "./role-metadata.js";
+import { AmbiguousMatchError } from "../tool-errors.js";
 
 const listSecurityRolesSchema = {
   environment: z.string().optional().describe("Environment name"),
@@ -14,7 +15,9 @@ const listSecurityRolesSchema = {
   businessUnit: z
     .string()
     .optional()
-    .describe("Optional business unit name. If missing, use the default global business unit."),
+    .describe(
+      "Optional business unit name or id. If missing, use the default global business unit.",
+    ),
 };
 
 type ListSecurityRolesParams = ToolParams<typeof listSecurityRolesSchema>;
@@ -64,7 +67,7 @@ export async function handleListSecurityRoles(
       },
     );
   } catch (error) {
-    return createToolErrorResponse("list_security_roles", error);
+    return createToolErrorResponse("list_security_roles", remapListSecurityRolesError(error));
   }
 }
 
@@ -81,4 +84,15 @@ export function registerListSecurityRoles(
   client: DynamicsClient,
 ) {
   registerTool(server, listSecurityRolesTool, { config, client });
+}
+
+function remapListSecurityRolesError(error: unknown): unknown {
+  if (!(error instanceof AmbiguousMatchError) || error.parameter !== "businessUnitName") {
+    return error;
+  }
+
+  return new AmbiguousMatchError(error.message, {
+    parameter: "businessUnit",
+    options: error.options,
+  });
 }

@@ -75,6 +75,7 @@ Use this if you have an app registration with a client secret.
     {
       "name": "dev",
       "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
       "tenantId": "your-tenant-id",
       "authType": "clientSecret",
       "clientId": "your-client-id",
@@ -95,6 +96,7 @@ Use this if you do not have a client secret and can sign in with a user account.
     {
       "name": "dev",
       "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
       "tenantId": "your-tenant-id",
       "authType": "deviceCode"
     }
@@ -105,6 +107,7 @@ Use this if you do not have a client secret and can sign in with a user account.
 
 Optional:
 
+- Set `apiVersion` if you need something other than the default `v9.2`.
 - Add `clientId` if your team has its own public client app.
 - If `clientId` is missing, the server uses a Microsoft public client ID.
 - Device-code tokens are stored in the OS keychain.

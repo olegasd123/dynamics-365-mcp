@@ -26,8 +26,12 @@ import { listTablesTool } from "./tables/list-tables.js";
 import { getTableSchemaTool } from "./tables/get-table-schema.js";
 import { listTableColumnsTool } from "./tables/list-table-columns.js";
 import { listTableRelationshipsTool } from "./tables/list-table-relationships.js";
+import { listTableRecordsTool } from "./data/list-table-records.js";
+import { getTableRecordDetailsTool } from "./data/get-table-record-details.js";
 import { listFormsTool } from "./forms/list-forms.js";
 import { getFormDetailsTool } from "./forms/get-form-details.js";
+import { listTableRibbonsTool } from "./ribbons/list-table-ribbons.js";
+import { getRibbonButtonDetailsTool } from "./ribbons/get-ribbon-button-details.js";
 import { listViewsTool } from "./views/list-views.js";
 import { getViewDetailsTool } from "./views/get-view-details.js";
 import { getViewFetchXmlTool } from "./views/get-view-fetchxml.js";
@@ -42,6 +46,7 @@ import { getRolePrivilegesTool } from "./security/get-role-privileges.js";
 import { findTableUsageTool } from "./usage/find-table-usage.js";
 import { findColumnUsageTool } from "./usage/find-column-usage.js";
 import { findWebResourceUsageTool } from "./usage/find-web-resource-usage.js";
+import { findWorkflowActivityUsageTool } from "./usage/find-workflow-activity-usage.js";
 import { analyzeCreateTriggersTool } from "./usage/analyze-create-triggers.js";
 import { analyzeUpdateTriggersTool } from "./usage/analyze-update-triggers.js";
 import { analyzeImpactTool } from "./impact/analyze-impact.js";
@@ -256,6 +261,34 @@ export const TOOL_MANIFEST = [
     mainParams: ["environment", "table", "solution"],
   },
   {
+    ...listTableRecordsTool,
+    group: "schema_ui",
+    mainParams: [
+      "environment",
+      "table",
+      "nameFilter",
+      "createdWithinDays",
+      "modifiedWithinDays",
+      "state",
+    ],
+  },
+  {
+    ...getTableRecordDetailsTool,
+    group: "schema_ui",
+    mainParams: [
+      "environment",
+      "table",
+      "recordId",
+      "name",
+      "firstName",
+      "lastName",
+      "state",
+      "includeAllFields",
+      "limit",
+      "cursor",
+    ],
+  },
+  {
     ...listFormsTool,
     group: "schema_ui",
     mainParams: ["environment", "table", "type", "solution"],
@@ -264,6 +297,16 @@ export const TOOL_MANIFEST = [
     ...getFormDetailsTool,
     group: "schema_ui",
     mainParams: ["environment", "formName", "table", "solution"],
+  },
+  {
+    ...listTableRibbonsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "location"],
+  },
+  {
+    ...getRibbonButtonDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "buttonName", "location"],
   },
   {
     ...listViewsTool,
@@ -334,6 +377,11 @@ export const TOOL_MANIFEST = [
     ...findWebResourceUsageTool,
     group: "usage_analysis",
     mainParams: ["environment", "name"],
+  },
+  {
+    ...findWorkflowActivityUsageTool,
+    group: "usage_analysis",
+    mainParams: ["environment", "className", "solution", "status"],
   },
   {
     ...analyzeCreateTriggersTool,
@@ -408,7 +456,15 @@ export const TOOL_MANIFEST = [
   {
     ...compareSecurityRolesTool,
     group: "comparison",
-    mainParams: ["sourceEnvironment", "targetEnvironment", "roleName"],
+    mainParams: [
+      "sourceEnvironment",
+      "targetEnvironment",
+      "roleName",
+      "sourceRoleName",
+      "targetRoleName",
+      "sourceBusinessUnit",
+      "targetBusinessUnit",
+    ],
   },
 ] as const;
 
