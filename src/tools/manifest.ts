@@ -33,6 +33,7 @@ import { listTableRelationshipsTool } from "./tables/list-table-relationships.js
 import { listTableRecordsTool } from "./data/list-table-records.js";
 import { getTableRecordDetailsTool } from "./data/get-table-record-details.js";
 import { listAuditHistoryTool } from "./auditing/list-audit-history.js";
+import { getAuditDetailsTool } from "./auditing/get-audit-details.js";
 import { listFormsTool } from "./forms/list-forms.js";
 import { getFormDetailsTool } from "./forms/get-form-details.js";
 import { listTableRibbonsTool } from "./ribbons/list-table-ribbons.js";
@@ -347,6 +348,11 @@ export const TOOL_MANIFEST = [
       "limit",
       "cursor",
     ],
+  },
+  {
+    ...getAuditDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "auditId"],
   },
   {
     ...listFormsTool,

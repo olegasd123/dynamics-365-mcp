@@ -80,6 +80,7 @@ Replace these values before you run a prompt:
 - `<COLUMN>`: column logical name like `name`
 - `<COLUMNS>`: comma-separated column logical names like `name, accountnumber`
 - `<RECORD_ID>`: Dataverse row id
+- `<AUDIT_ID>`: audit row id
 - `<NAME>`: one full name, primary name, or last name
 - `<FIRST_NAME>`: first name like `Anna`
 - `<LAST_NAME>`: last name like `Smith`
@@ -294,6 +295,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list audit history for the contact with last name <LAST_NAME> from table contact.`
   `(Required: <TABLE> and a time window or one record lookup)`
 
+- `get_audit_details`
+  `In <ENV>, show full audit details for audit record <AUDIT_ID>. Include the detail type and the full field diff when it exists.`
+  `(Required: <AUDIT_ID>)`
+
 ## Forms
 
 - `list_forms`
@@ -485,6 +490,7 @@ This prompt list covers these tools:
 - `get_solution_dependencies`
 - `get_solution_details`
 - `get_table_schema`
+- `get_audit_details`
 - `list_audit_history`
 - `get_view_details`
 - `get_view_fetchxml`

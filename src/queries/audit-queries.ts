@@ -36,6 +36,25 @@ export function listAuditHistoryQuery(options: {
     .toString();
 }
 
+export function getAuditByIdQuery(): string {
+  return query()
+    .select([
+      "auditid",
+      "createdon",
+      "action",
+      "operation",
+      "objecttypecode",
+      "_objectid_value",
+      "_userid_value",
+      "_callinguserid_value",
+      "changedata",
+      "additionalinfo",
+      "useradditionalinfo",
+      "transactionid",
+    ])
+    .toString();
+}
+
 function buildDateFilter(
   fieldName: string,
   operator: "ge" | "le",

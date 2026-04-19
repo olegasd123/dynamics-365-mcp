@@ -393,6 +393,16 @@
         }
       }
     ],
+    "get_audit_details": [
+      {
+        "name": "one contact audit record",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "auditId": "00000000-0000-0000-0000-000000000001"
+        }
+      }
+    ],
     "get_view_details": [
       {
         "name": "active accounts",

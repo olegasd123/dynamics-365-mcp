@@ -28,6 +28,19 @@ export interface AuditChangedField {
   newValue: string;
 }
 
+export interface AuditDetailSection {
+  title: string;
+  lines: string[];
+}
+
+export interface AuditDetailResult {
+  detailType: string;
+  summary: string;
+  changedFields: AuditChangedField[];
+  sections: AuditDetailSection[];
+  rawDetail: Record<string, unknown>;
+}
+
 interface BaseAuditCursorPayload {
   environment: string;
   tableLogicalName: string;
@@ -244,43 +257,65 @@ async function enrichAuditHistoryItem(
   }
 
   try {
-    const response = await client.getPath<{ AuditDetail?: Record<string, unknown> }>(
-      env,
-      `audits(${item.auditId})/Microsoft.Dynamics.CRM.RetrieveAuditDetails`,
-      undefined,
-      {
-        cacheTier: CACHE_TIERS.VOLATILE,
-      },
-    );
-    const detail = response?.AuditDetail;
-
-    if (!detail || typeof detail !== "object") {
+    const detail = await fetchAuditDetailResult(env, client, item.auditId);
+    if (!detail) {
       return item;
     }
 
-    const detailType = getDetailType(detail);
-
-    if (detailType !== "AttributeAuditDetail") {
-      return {
-        ...item,
-        detailType,
-        summary: buildTypedAuditSummary(detailType, item.summary),
-      };
-    }
-
-    const changedFields = extractChangedFields(detail);
     return {
       ...item,
-      detailType,
-      changedFields,
-      summary: changedFields.length > 0 ? buildChangedFieldSummary(changedFields) : item.summary,
+      detailType: detail.detailType,
+      changedFields: detail.changedFields,
+      summary: detail.summary || item.summary,
     };
   } catch {
     return item;
   }
 }
 
-function extractChangedFields(detail: Record<string, unknown>): AuditChangedField[] {
+export async function fetchAuditDetailResult(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  auditId: string,
+): Promise<AuditDetailResult | null> {
+  const response = await client.getPath<{ AuditDetail?: Record<string, unknown> }>(
+    env,
+    `audits(${auditId})/Microsoft.Dynamics.CRM.RetrieveAuditDetails`,
+    undefined,
+    {
+      cacheTier: CACHE_TIERS.VOLATILE,
+    },
+  );
+  const detail = response?.AuditDetail;
+
+  if (!detail || typeof detail !== "object") {
+    return null;
+  }
+
+  const rawDetail = detail as Record<string, unknown>;
+  const detailType = getDetailType(rawDetail);
+
+  switch (detailType) {
+    case "AttributeAuditDetail":
+      return buildAttributeAuditDetail(rawDetail);
+    case "RelationshipAuditDetail":
+      return buildRelationshipAuditDetail(rawDetail);
+    case "ShareAuditDetail":
+      return buildShareAuditDetail(rawDetail);
+    case "UserAccessAuditDetail":
+      return buildUserAccessAuditDetail(rawDetail);
+    case "RolePrivilegeAuditDetail":
+      return buildRolePrivilegeAuditDetail(rawDetail);
+    case "ApplicationBasedAccessControlAuditDetail":
+      return buildApplicationAccessAuditDetail(rawDetail);
+    case "IPFirewallAccessAuditDetail":
+      return buildIpFirewallAuditDetail(rawDetail);
+    default:
+      return buildFallbackAuditDetail(rawDetail, detailType);
+  }
+}
+
+export function extractChangedFields(detail: Record<string, unknown>): AuditChangedField[] {
   const oldFields = extractEntityFieldValueMap(detail.OldValue);
   const newFields = extractEntityFieldValueMap(detail.NewValue);
   const fieldNames = [...new Set([...oldFields.keys(), ...newFields.keys()])].sort((left, right) =>
@@ -363,6 +398,176 @@ function buildTypedAuditSummary(detailType: string, fallback: string): string {
   }
 }
 
+function buildAttributeAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const changedFields = extractChangedFields(detail);
+
+  return {
+    detailType: "AttributeAuditDetail",
+    summary:
+      changedFields.length > 0
+        ? buildChangedFieldSummary(changedFields)
+        : "Attribute change with no field diff returned.",
+    changedFields,
+    sections: [],
+    rawDetail: detail,
+  };
+}
+
+function buildRelationshipAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const relationshipName = normalizeText(detail.RelationshipName) || "-";
+  const targetRecords = normalizeEntityCollection(detail.TargetRecords);
+
+  return {
+    detailType: "RelationshipAuditDetail",
+    summary: relationshipName === "-" ? "Relationship change" : `Relationship: ${relationshipName}`,
+    changedFields: [],
+    sections: [
+      {
+        title: "Relationship",
+        lines: [`- Name: ${relationshipName}`],
+      },
+      {
+        title: "Target Records",
+        lines: targetRecords.length > 0 ? targetRecords.map((item) => `- ${item}`) : ["None"],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
+function buildShareAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const principal = describeEntityRef(detail.Principal);
+  const oldPrivileges = formatUnknownValue(detail.OldPrivileges);
+  const newPrivileges = formatUnknownValue(detail.NewPrivileges);
+
+  return {
+    detailType: "ShareAuditDetail",
+    summary: `Privileges: ${oldPrivileges} -> ${newPrivileges}`,
+    changedFields: [],
+    sections: [
+      {
+        title: "Share",
+        lines: [
+          `- Principal: ${principal}`,
+          `- Old Privileges: ${oldPrivileges}`,
+          `- New Privileges: ${newPrivileges}`,
+        ],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
+function buildUserAccessAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const accessTime = normalizeText(detail.AccessTime) || "-";
+  const interval = formatUnknownValue(detail.Interval);
+
+  return {
+    detailType: "UserAccessAuditDetail",
+    summary: `Access at ${accessTime}`,
+    changedFields: [],
+    sections: [
+      {
+        title: "User Access",
+        lines: [`- Access Time: ${accessTime}`, `- Interval Hours: ${interval}`],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
+function buildRolePrivilegeAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const oldPrivileges = normalizeRolePrivileges(detail.OldRolePrivileges);
+  const newPrivileges = normalizeRolePrivileges(detail.NewRolePrivileges);
+  const invalidPrivileges = normalizeStringCollection(detail.InvalidNewPrivileges);
+
+  return {
+    detailType: "RolePrivilegeAuditDetail",
+    summary: `Old privileges: ${oldPrivileges.length}. New privileges: ${newPrivileges.length}.`,
+    changedFields: [],
+    sections: [
+      {
+        title: "Old Role Privileges",
+        lines: oldPrivileges.length > 0 ? oldPrivileges.map((item) => `- ${item}`) : ["None"],
+      },
+      {
+        title: "New Role Privileges",
+        lines: newPrivileges.length > 0 ? newPrivileges.map((item) => `- ${item}`) : ["None"],
+      },
+      {
+        title: "Invalid New Privileges",
+        lines:
+          invalidPrivileges.length > 0 ? invalidPrivileges.map((item) => `- ${item}`) : ["None"],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
+function buildApplicationAccessAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const applicationId = normalizeText(detail.ApplicationId) || "-";
+  const impersonatedUserId = normalizeText(detail.ImpersonatedUserId) || "-";
+  const userId = normalizeText(detail.UserID) || "-";
+
+  return {
+    detailType: "ApplicationBasedAccessControlAuditDetail",
+    summary: `Application access by ${applicationId}`,
+    changedFields: [],
+    sections: [
+      {
+        title: "Application Access",
+        lines: [
+          `- Application Id: ${applicationId}`,
+          `- Impersonated User Id: ${impersonatedUserId}`,
+          `- User Id: ${userId}`,
+        ],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
+function buildIpFirewallAuditDetail(detail: Record<string, unknown>): AuditDetailResult {
+  const ipAddress = normalizeText(detail.IPAddress) || "-";
+  const userId = normalizeText(detail.UserID) || "-";
+
+  return {
+    detailType: "IPFirewallAccessAuditDetail",
+    summary: `IP firewall access from ${ipAddress}`,
+    changedFields: [],
+    sections: [
+      {
+        title: "IP Firewall Access",
+        lines: [`- IP Address: ${ipAddress}`, `- User Id: ${userId}`],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
+function buildFallbackAuditDetail(
+  detail: Record<string, unknown>,
+  detailType: string,
+): AuditDetailResult {
+  const detailLines = Object.entries(detail)
+    .filter(([key]) => key !== "@odata.type" && key !== "OldValue" && key !== "NewValue")
+    .filter(([, value]) => !Array.isArray(value) && (typeof value !== "object" || value === null))
+    .map(([key, value]) => `- ${key}: ${formatUnknownValue(value)}`);
+
+  return {
+    detailType,
+    summary: buildTypedAuditSummary(detailType, detailType),
+    changedFields: [],
+    sections: [
+      {
+        title: "Detail Properties",
+        lines: detailLines.length > 0 ? detailLines : ["None"],
+      },
+    ],
+    rawDetail: detail,
+  };
+}
+
 export function buildChangedFieldSummary(changedFields: AuditChangedField[]): string {
   if (changedFields.length === 0) {
     return "-";
@@ -375,7 +580,7 @@ export function buildChangedFieldSummary(changedFields: AuditChangedField[]): st
     : visibleFields.join(", ");
 }
 
-function getDetailType(detail: Record<string, unknown>): string {
+export function getDetailType(detail: Record<string, unknown>): string {
   const rawType = String(detail["@odata.type"] || "");
   const typeName = rawType.split(".").pop() || rawType;
   return typeName.startsWith("#") ? typeName.slice(1) : typeName;
@@ -408,6 +613,74 @@ function formatUnknownValue(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function normalizeEntityCollection(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => describeEntityRef(item)).filter((item) => item !== "-");
+}
+
+function describeEntityRef(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return formatUnknownValue(value);
+  }
+
+  const record = value as Record<string, unknown>;
+  const displayValue =
+    Object.entries(record).find(([key]) =>
+      key.endsWith("@OData.Community.Display.V1.FormattedValue"),
+    )?.[1] ||
+    record.name ||
+    record.fullname ||
+    record.subject ||
+    record.systemuserid ||
+    record.teamid ||
+    record.accountid ||
+    record.contactid;
+  const logicalName = String(record["@odata.type"] || "")
+    .split(".")
+    .pop()
+    ?.replace(/^#/, "");
+
+  const label = normalizeText(displayValue) || "-";
+  return logicalName ? `${label} (${logicalName})` : label;
+}
+
+function normalizeRolePrivileges(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => {
+    if (!item || typeof item !== "object") {
+      return formatUnknownValue(item);
+    }
+
+    const record = item as Record<string, unknown>;
+    const privilegeName =
+      normalizeText(record.PrivilegeName) || normalizeText(record.privilegename);
+    const depth = formatUnknownValue(record.Depth ?? record.depth);
+    const businessUnitId = normalizeText(record.BusinessUnitId ?? record.businessunitid);
+
+    return [
+      privilegeName || "-",
+      depth !== "-" ? `depth=${depth}` : "",
+      businessUnitId ? `businessUnit=${businessUnitId}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+  });
+}
+
+function normalizeStringCollection(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => formatUnknownValue(item));
 }
 
 export function buildAuditHistorySummary(options: {
