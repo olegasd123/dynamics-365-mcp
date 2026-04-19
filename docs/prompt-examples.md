@@ -95,6 +95,7 @@ Replace these values before you run a prompt:
 - `<WORKFLOW_ID>`: workflow id
 - `<FORM>`: form display name, unique name, or form id
 - `<VIEW>`: view name or view id
+- `<FETCHXML>`: one read-only FetchXML query string
 - `<BUTTON>`: ribbon button label, id, or command name
 - `<API>`: Custom API name or unique name
 - `<FLOW>`: cloud flow display name or unique name
@@ -332,6 +333,12 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_view_fetchxml`
   `In <ENV>, return the normalized FetchXML for the system view <VIEW> on table <TABLE> from solution <SOLUTION>.`
   `(Required: <VIEW>)`
+
+## Advanced Escape Hatches
+
+- `run_fetchxml`
+  `In <ENV>, run this read-only FetchXML against table <TABLE>: <FETCHXML>. Keep the result short and mention the applied row limit.`
+  `(Required: <TABLE>, <FETCHXML>)`
 
 ## Custom APIs
 

@@ -1,14 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { EXPECTED_TOOL_NAMES } from "./tool-test-helpers.js";
+import { KNOWN_TOOL_NAMES } from "./tool-test-helpers.js";
 
 export const DEFAULT_FIXTURES_PATH = "live-fixtures.json";
 export const DEFAULT_LIVE_MAX_PARALLEL = 1;
 export const DEFAULT_MAX_LOGGED_REQUESTS = 3;
 export const DEFAULT_MAX_LOGGED_REQUEST_CHARS = 240;
 
-export type ToolName = (typeof EXPECTED_TOOL_NAMES)[number];
+export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
 const runnableLiveToolCaseSchema = z
   .object({
@@ -39,7 +39,7 @@ const liveFixturesSchema = z
   .object({
     execution: liveExecutionSchema.optional(),
     tools: z.record(
-      z.enum(EXPECTED_TOOL_NAMES),
+      z.enum(KNOWN_TOOL_NAMES),
       z.array(z.union([runnableLiveToolCaseSchema, skippedLiveToolCaseSchema])).min(1),
     ),
   })
@@ -83,10 +83,10 @@ export function getMaxLoggedRequestChars(fixtures: LiveFixtures): number {
   return fixtures.execution?.maxLoggedRequestChars ?? DEFAULT_MAX_LOGGED_REQUEST_CHARS;
 }
 
-export function getSelectedLiveTools(): ToolName[] {
+export function getSelectedLiveTools(defaultTools: ToolName[]): ToolName[] {
   const raw = process.env.D365_MCP_LIVE_TOOLS?.trim();
   if (!raw) {
-    return [...EXPECTED_TOOL_NAMES];
+    return [...defaultTools];
   }
 
   const requestedTools = raw
@@ -94,7 +94,7 @@ export function getSelectedLiveTools(): ToolName[] {
     .map((item) => item.trim())
     .filter(Boolean);
   const selectedTools = requestedTools.filter((toolName): toolName is ToolName =>
-    EXPECTED_TOOL_NAMES.includes(toolName as ToolName),
+    KNOWN_TOOL_NAMES.includes(toolName as ToolName),
   );
 
   if (selectedTools.length === 0) {

@@ -68,6 +68,7 @@ describe("environments config", () => {
         },
       ],
       defaultEnvironment: "dev",
+      advancedQueries: undefined,
     });
   });
 
@@ -91,6 +92,7 @@ describe("environments config", () => {
         },
       ],
       defaultEnvironment: "default",
+      advancedQueries: undefined,
     });
   });
 
@@ -136,6 +138,7 @@ describe("environments config", () => {
         },
       ],
       defaultEnvironment: "prod",
+      advancedQueries: undefined,
     });
   });
 
@@ -215,6 +218,7 @@ describe("environments config", () => {
         },
       ],
       defaultEnvironment: "dev",
+      advancedQueries: undefined,
     });
   });
 
@@ -237,6 +241,7 @@ describe("environments config", () => {
         },
       ],
       defaultEnvironment: "default",
+      advancedQueries: undefined,
     });
   });
 
@@ -278,6 +283,63 @@ describe("environments config", () => {
         },
       ],
       defaultEnvironment: "dev",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads advanced FetchXML query settings from the JSON config file", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "dev",
+            url: "https://dev.crm.dynamics.com/",
+            tenantId: "tenant",
+            clientId: "client",
+            clientSecret: "secret",
+          },
+        ],
+        defaultEnvironment: "dev",
+        advancedQueries: {
+          fetchXml: {
+            enabled: true,
+            allowedEnvironments: ["dev"],
+            defaultLimit: 25,
+            maxLimit: 100,
+          },
+        },
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientSecret",
+          clientId: "client",
+          clientSecret: "secret",
+        },
+      ],
+      defaultEnvironment: "dev",
+      advancedQueries: {
+        fetchXml: {
+          enabled: true,
+          allowedEnvironments: ["dev"],
+          defaultLimit: 25,
+          maxLimit: 100,
+        },
+      },
     });
   });
 });

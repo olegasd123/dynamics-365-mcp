@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { EXPECTED_TOOL_NAMES } from "../tools/__tests__/tool-test-helpers.js";
+import { createTestConfig, getExpectedToolNames } from "../tools/__tests__/tool-test-helpers.js";
 
 const workspaceRoot = fileURLToPath(new URL("../..", import.meta.url));
 const entryPath = resolve(workspaceRoot, "src", "index.ts");
@@ -230,7 +230,7 @@ describe("runtime transports", () => {
         .map((tool) => tool.name)
         .sort((left, right) => left.localeCompare(right));
 
-      expect(toolNames).toEqual(EXPECTED_TOOL_NAMES);
+      expect(toolNames).toEqual(getExpectedToolNames(createTestConfig(["dev"])));
     } catch (error) {
       throw new Error(
         `Stdio runtime smoke test failed: ${error instanceof Error ? error.message : String(error)}\n${stderr.buffer}`,
@@ -305,7 +305,7 @@ describe("runtime transports", () => {
         .map((tool) => tool.name)
         .sort((left, right) => left.localeCompare(right));
 
-      expect(toolNames).toEqual(EXPECTED_TOOL_NAMES);
+      expect(toolNames).toEqual(getExpectedToolNames(createTestConfig(["dev"])));
 
       const connectedHealth = await waitForHealthValue(
         baseUrl,

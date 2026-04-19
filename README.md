@@ -104,6 +104,36 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.jso
 }
 ```
 
+### Enable Advanced FetchXML Escape Hatch
+
+`run_fetchxml` is disabled by default. Enable it explicitly in the JSON config when you want a read-only fallback for ad-hoc Dataverse queries.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://dev-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientSecret",
+      "clientId": "...",
+      "clientSecret": "..."
+    }
+  ],
+  "defaultEnvironment": "dev",
+  "advancedQueries": {
+    "fetchXml": {
+      "enabled": true,
+      "allowedEnvironments": ["dev"],
+      "defaultLimit": 25,
+      "maxLimit": 100
+    }
+  }
+}
+```
+
+Use `allowedEnvironments` when you want the escape hatch available only in lower-risk orgs like `dev` or `test`.
+
 ### JSON Config File With Interactive Auth
 
 Use this when the user can sign in in a browser and does not have a client secret.
@@ -294,6 +324,7 @@ Priority order:
 | `list_views`                       | List system or personal views with normalized metadata.                                                                                                                                                                              | `environment`, `table`, `scope`, `solution`                                                                             |
 | `get_view_details`                 | Show one view with normalized FetchXML and layout summary.                                                                                                                                                                           | `environment`, `viewName`, `table`, `scope`                                                                             |
 | `get_view_fetchxml`                | Return normalized FetchXML for one system or personal view.                                                                                                                                                                          | `environment`, `viewName`, `table`, `scope`                                                                             |
+| `run_fetchxml`                     | Run a read-only FetchXML query against one Dataverse table as an advanced escape hatch. Disabled unless advancedQueries.fetchXml.enabled is true.                                                                                    | `environment`, `table`, `fetchXml`, `limit`                                                                             |
 | `list_plugins`                     | List plugin classes (IPlugin implementations, also called plugin types) registered in Dynamics 365. Workflow activities (CodeActivity) are excluded. Use filter='no_steps' to find orphaned plugin classes with no registered steps. | `environment`, `filter`, `solution`                                                                                     |
 | `list_plugin_steps`                | List registered steps (message processing steps) for one plugin class in Dynamics 365. Workflow activities (CodeActivity) are excluded.                                                                                              | `environment`, `pluginName`, `assemblyName`, `solution`                                                                 |
 | `get_plugin_details`               | Get detailed information about one plugin class including its assembly, steps, and images. Workflow activities (CodeActivity) are excluded.                                                                                          | `environment`, `pluginName`, `assemblyName`, `solution`                                                                 |

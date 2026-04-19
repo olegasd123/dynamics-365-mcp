@@ -15,7 +15,7 @@ import {
   type LiveFixtures,
 } from "./live-test-support.js";
 import { formatFailuresAssertionMessage } from "./live-test-reporting.js";
-import { EXPECTED_TOOL_NAMES } from "./tool-test-helpers.js";
+import { createTestConfig, getExpectedToolNames } from "./tool-test-helpers.js";
 
 describe("live test support", () => {
   it("defaults live parallelism to one", () => {
@@ -146,8 +146,9 @@ describe("live test support", () => {
     const fixtures = loadLiveFixtures(
       fileURLToPath(new URL("../../../live-fixtures.example.json", import.meta.url)),
     );
+    const expectedToolNames = getExpectedToolNames(createTestConfig(["dev"]));
 
-    expect(() => getSelectedLiveCases(fixtures, EXPECTED_TOOL_NAMES, () => 0)).not.toThrow();
+    expect(() => getSelectedLiveCases(fixtures, expectedToolNames as never, () => 0)).not.toThrow();
     expect(fixtures.tools.list_table_ribbons).toHaveLength(1);
     expect(fixtures.tools.get_ribbon_button_details).toHaveLength(1);
   });

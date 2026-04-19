@@ -68,6 +68,8 @@ import { compareFormsTool } from "./comparison/compare-forms.js";
 import { compareViewsTool } from "./comparison/compare-views.js";
 import { compareCustomApisTool } from "./comparison/compare-custom-apis.js";
 import { compareSecurityRolesTool } from "./comparison/compare-security-roles.js";
+import { runFetchXmlTool, isRunFetchXmlEnabled } from "./data/run-fetchxml.js";
+import type { AppConfig } from "../config/types.js";
 
 export const TOOL_GROUP_IDS = [
   "discovery",
@@ -85,6 +87,12 @@ export interface ToolGroupDefinition {
   id: ToolGroupId;
   title: string;
   readmeSection: "metadata" | "comparison";
+}
+
+export interface ToolManifestMeta {
+  group: ToolGroupId;
+  mainParams: readonly string[];
+  isEnabled?: (config: AppConfig) => boolean;
 }
 
 export const TOOL_GROUPS: readonly ToolGroupDefinition[] = [
@@ -390,6 +398,12 @@ export const TOOL_MANIFEST = [
     mainParams: ["environment", "viewName", "table", "scope"],
   },
   {
+    ...runFetchXmlTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "fetchXml", "limit"],
+    isEnabled: isRunFetchXmlEnabled,
+  },
+  {
     ...listCustomApisTool,
     group: "automation_runtime",
     mainParams: ["environment", "nameFilter"],
@@ -534,11 +548,27 @@ export const TOOL_MANIFEST = [
   },
 ] as const;
 
-export type ToolManifestEntry = (typeof TOOL_MANIFEST)[number];
+export type ToolManifestEntry = (typeof TOOL_MANIFEST)[number] & ToolManifestMeta;
 
-export const EXPECTED_TOOL_NAMES = TOOL_MANIFEST.map((entry) => entry.name).sort((left, right) =>
+export const KNOWN_TOOL_NAMES = TOOL_MANIFEST.map((entry) => entry.name).sort((left, right) =>
   left.localeCompare(right),
 );
+
+export function isToolEnabled(entry: ToolManifestEntry, config: AppConfig): boolean {
+  return entry.isEnabled ? entry.isEnabled(config) : true;
+}
+
+export function getExpectedToolNames(config: AppConfig): string[] {
+  return getRegisteredToolManifest(config)
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+export function getRegisteredToolManifest(config: AppConfig): ToolManifestEntry[] {
+  return TOOL_MANIFEST.filter((entry) =>
+    isToolEnabled(entry as ToolManifestEntry, config),
+  ) as ToolManifestEntry[];
+}
 
 export function getToolGroup(groupId: ToolGroupId): ToolGroupDefinition {
   const group = TOOL_GROUPS.find((item) => item.id === groupId);
@@ -549,7 +579,7 @@ export function getToolGroup(groupId: ToolGroupId): ToolGroupDefinition {
 }
 
 export function getToolEntriesByGroup(groupId: ToolGroupId): ToolManifestEntry[] {
-  return TOOL_MANIFEST.filter((entry) => entry.group === groupId);
+  return TOOL_MANIFEST.filter((entry) => entry.group === groupId) as ToolManifestEntry[];
 }
 
 export function getToolEntriesByReadmeSection(

@@ -427,6 +427,18 @@
         }
       }
     ],
+    "run_fetchxml": [
+      {
+        "name": "active accounts escape hatch",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "limit": 25,
+          "fetchXml": "<fetch><entity name='account'><attribute name='name' /><filter><condition attribute='statecode' operator='eq' value='0' /></filter></entity></fetch>"
+        }
+      }
+    ],
     "get_web_resource_content": [
       {
         "name": "account script",

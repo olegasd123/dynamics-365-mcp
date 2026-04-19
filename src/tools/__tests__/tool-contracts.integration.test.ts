@@ -5,22 +5,22 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerAllTools } from "../index.js";
 import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
-  EXPECTED_TOOL_NAMES,
   REMOVED_LEGACY_TOOL_NAMES,
   createRecordingClient,
   createTestConfig,
+  getExpectedToolNames,
   type ToolResponse,
 } from "./tool-test-helpers.js";
 
 async function createConnectedToolClient(
   datasets: Record<string, Record<string, unknown>>,
   environmentNames: string[],
+  config = createTestConfig(environmentNames),
 ) {
   const server = new McpServer({
     name: "tool-contract-test-server",
     version: "1.0.0",
   });
-  const config = createTestConfig(environmentNames);
   const { client: dynamicsClient } = createRecordingClient(datasets);
   registerAllTools(server, config, dynamicsClient);
   installToolCallCompatibility(server);
@@ -52,7 +52,7 @@ describe("tool contracts", () => {
         .sort((left, right) => left.localeCompare(right));
       const toolsByName = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
 
-      expect(names).toEqual(EXPECTED_TOOL_NAMES);
+      expect(names).toEqual(getExpectedToolNames(createTestConfig(["dev", "prod"])));
 
       for (const tool of result.tools) {
         expect(tool.inputSchema.type).toBe("object");
@@ -290,6 +290,34 @@ describe("tool contracts", () => {
       expect(REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName))).toBe(
         true,
       );
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("publishes the gated run_fetchxml tool only when enabled in config", async () => {
+    const config = createTestConfig(["dev"], {
+      advancedQueries: {
+        fetchXml: {
+          enabled: true,
+          defaultLimit: 25,
+          maxLimit: 100,
+        },
+      },
+    });
+    const harness = await createConnectedToolClient({ dev: {} }, ["dev"], config);
+
+    try {
+      const result = await harness.client.listTools();
+      const tool = result.tools.find((item) => item.name === "run_fetchxml");
+
+      expect(tool).toBeDefined();
+      expect(tool?.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        fetchXml: expect.any(Object),
+        limit: expect.any(Object),
+      });
     } finally {
       await harness.close();
     }

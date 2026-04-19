@@ -6,7 +6,7 @@ import { TokenManager } from "../../auth/token-manager.js";
 import { DynamicsClient } from "../../client/dynamics-client.js";
 import { loadConfig } from "../../config/environments.js";
 import { registerAllTools } from "../index.js";
-import type { ToolResponse } from "./tool-test-helpers.js";
+import { getExpectedToolNames, type ToolResponse } from "./tool-test-helpers.js";
 import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
   countConfiguredLiveCases,
@@ -383,8 +383,9 @@ describeLive("live tool smoke tests", () => {
     "calls every tool with real CRM data and records request coverage",
     async () => {
       const fixtures = loadLiveFixtures();
+      const config = loadConfig();
       const tokenManager = new TokenManager();
-      const selectedTools = getSelectedLiveTools();
+      const selectedTools = getSelectedLiveTools(getExpectedToolNames(config) as ToolName[]);
       const selectedCases = getSelectedLiveCases(fixtures, selectedTools, getToolTimeoutMs);
       const configuredCaseCount = countConfiguredLiveCases(fixtures, selectedTools);
       const runnableCaseCount = countRunnableLiveCases(selectedCases);
