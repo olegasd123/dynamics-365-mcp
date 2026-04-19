@@ -85,6 +85,8 @@ Replace these values before you run a prompt:
 - `<LAST_NAME>`: last name like `Smith`
 - `<PLUGIN>`: plugin assembly name
 - `<PLUGIN_CLASS>`: plugin class name or full type name
+- `<CORRELATION_ID>`: plugin trace correlation id
+- `<TRACE_LOG_ID>`: plugin trace log id
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
 - `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
@@ -143,6 +145,15 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_plugin_assembly_details`
   `In <ENV>, show full details for the plugin assembly <PLUGIN>, and keep plugin classes and workflow activities in separate sections. Include steps and images.`
   `(Required: <PLUGIN>)`
+
+- `list_plugin_trace_logs`
+  `In <ENV>, list recent plugin trace logs for plugin class <PLUGIN_CLASS>. Show only logs with exceptions from the last 1 day.`
+  `In <ENV>, list recent plugin trace logs for correlation id <CORRELATION_ID>.`
+  `(Required: none)`
+
+- `get_plugin_trace_log_details`
+  `In <ENV>, show full details for plugin trace log <TRACE_LOG_ID>. Include exception details, message block, configuration, and timing fields.`
+  `(Required: <TRACE_LOG_ID>)`
 
 ## Workflows And Actions
 
@@ -447,6 +458,7 @@ This prompt list covers these tools:
 - `get_form_details`
 - `get_plugin_details`
 - `get_plugin_assembly_details`
+- `get_plugin_trace_log_details`
 - `get_ribbon_button_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
@@ -467,6 +479,7 @@ This prompt list covers these tools:
 - `list_forms`
 - `list_table_ribbons`
 - `list_plugin_steps`
+- `list_plugin_trace_logs`
 - `list_plugins`
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`

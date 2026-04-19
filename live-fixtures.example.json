@@ -547,6 +547,12 @@
         }
       }
     ],
+    "get_plugin_trace_log_details": [
+      {
+        "name": "one account plugin trace log",
+        "skipReason": "Fill in a real pluginTraceLogId from your environment."
+      }
+    ],
     "list_plugins": [
       {
         "name": "plugins in solution",

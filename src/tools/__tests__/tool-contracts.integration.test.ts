@@ -172,6 +172,10 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.get_plugin_trace_log_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginTraceLogId: expect.any(Object),
+      });
       expect(toolsByName.list_plugins.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         filter: expect.any(Object),

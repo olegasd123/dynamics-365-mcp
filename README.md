@@ -299,6 +299,7 @@ Priority order:
 | `list_plugin_assembly_images`      | List pre/post entity images registered on steps for a plugin assembly in Dynamics 365.                                                                                                                                               | `environment`, `assemblyName`, `stepName`, `message`                                                                |
 | `get_plugin_assembly_details`      | Get detailed information about a plugin assembly. Output separates plugin classes and workflow activities.                                                                                                                           | `environment`, `assemblyName`                                                                                       |
 | `list_plugin_trace_logs`           | List Dataverse plug-in trace logs with filters for plugin class, correlation id, time range, and exception presence.                                                                                                                 | `environment`, `pluginName`, `correlationId`, `createdAfter`, `createdBefore`, `hasException`, `limit`, `cursor`    |
+| `get_plugin_trace_log_details`     | Show one Dataverse plug-in trace log with full runtime details.                                                                                                                                                                      | `environment`, `pluginTraceLogId`                                                                                   |
 | `list_workflows`                   | List workflows and processes in Dynamics 365 with their status.                                                                                                                                                                      | `environment`, `category`, `status`, `solution`                                                                     |
 | `list_actions`                     | List custom actions registered in Dynamics 365.                                                                                                                                                                                      | `environment`, `solution`                                                                                           |
 | `get_workflow_details`             | Get detailed information about a specific workflow including triggers, scope, and definition. `uniqueName` also accepts a workflow id.                                                                                               | `environment`, `workflowName`, `uniqueName`                                                                         |
@@ -562,6 +563,20 @@ Use this when metadata looks correct but the runtime still fails and you need re
     "createdAfter": "2026-04-20T08:00:00Z",
     "hasException": true,
     "limit": 10
+  }
+}
+```
+
+### Get One Plugin Trace Log
+
+Use this when you already have one `pluginTraceLogId` from `list_plugin_trace_logs` and need the full exception and trace text.
+
+```json
+{
+  "tool": "get_plugin_trace_log_details",
+  "arguments": {
+    "environment": "dev",
+    "pluginTraceLogId": "00000000-0000-0000-0000-000000000001"
   }
 }
 ```

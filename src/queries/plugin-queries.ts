@@ -255,3 +255,30 @@ export function listPluginTraceLogsQuery(options?: {
     .count(true)
     .toString();
 }
+
+export function getPluginTraceLogByIdQuery(): string {
+  return query()
+    .select([
+      "plugintracelogid",
+      "typename",
+      "correlationid",
+      "createdon",
+      "messagename",
+      "primaryentity",
+      "mode",
+      "depth",
+      "performanceexecutionduration",
+      "performanceconstructorduration",
+      "exceptiondetails",
+      "messageblock",
+      "configuration",
+      "secureconfiguration",
+      "profile",
+      "requestid",
+      "operationtype",
+      "pluginstepid",
+      "issystemcreated",
+      "persistencekey",
+    ])
+    .toString();
+}

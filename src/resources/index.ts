@@ -151,6 +151,7 @@ function buildPluginTroubleshootingResource(): string {
     "- Need image details: `list_plugin_assembly_images`",
     "- Need step list by assembly: `list_plugin_assembly_steps`",
     "- Need recent runtime failures: `list_plugin_trace_logs`",
+    "- Need one full runtime log: `get_plugin_trace_log_details`",
     "- Need cross-environment check: `compare_plugin_assemblies`",
     "",
     "## What To Look For",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPluginTraceLogByIdQuery,
   getPluginAssemblyByNameQuery,
   listPluginAssembliesQuery,
   listPluginImagesForStepsQuery,
@@ -112,5 +113,13 @@ describe("plugin queries", () => {
     expect(query).toContain("$orderby=createdon desc");
     expect(query).toContain("$top=25");
     expect(query).toContain("$count=true");
+  });
+
+  it("builds the plugin trace log by id query", () => {
+    const query = getPluginTraceLogByIdQuery();
+
+    expect(query).toContain(
+      "$select=plugintracelogid,typename,correlationid,createdon,messagename,primaryentity,mode,depth,performanceexecutionduration,performanceconstructorduration,exceptiondetails,messageblock,configuration,secureconfiguration,profile,requestid,operationtype,pluginstepid,issystemcreated,persistencekey",
+    );
   });
 });
