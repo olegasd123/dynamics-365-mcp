@@ -288,6 +288,12 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `If the record has many fields, ask for the next page with the returned cursor.`
   `(Required: <TABLE> and one lookup value)`
 
+- `list_audit_history`
+  `In <ENV>, list audit history for table <TABLE> from 2026-04-20T08:00:00Z to 2026-04-20T18:00:00Z.`
+  `In <ENV>, list audit history for the record <RECORD_ID> from table <TABLE>.`
+  `In <ENV>, list audit history for the contact with last name <LAST_NAME> from table contact.`
+  `(Required: <TABLE> and a time window or one record lookup)`
+
 ## Forms
 
 - `list_forms`
@@ -479,6 +485,7 @@ This prompt list covers these tools:
 - `get_solution_dependencies`
 - `get_solution_details`
 - `get_table_schema`
+- `list_audit_history`
 - `get_view_details`
 - `get_view_fetchxml`
 - `get_web_resource_content`
@@ -503,7 +510,9 @@ This prompt list covers these tools:
 - `list_security_roles`
 - `list_solutions`
 - `list_table_columns`
+- `list_table_records`
 - `list_table_relationships`
+- `get_table_record_details`
 - `list_tables`
 - `list_views`
 - `list_web_resources`
