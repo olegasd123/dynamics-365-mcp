@@ -66,9 +66,14 @@ describe("run_fetchxml", () => {
         appliedLimit: 25,
         limitSource: "default",
         returnedCount: 1,
+        curatedToolHint: {
+          tool: "get_table_record_details",
+        },
       },
     });
     expect(response.content[0]?.text).toContain("count='25'");
+    expect(response.content[0]?.text).toContain("Curated Alternative");
+    expect(response.content[0]?.text).toContain("`get_table_record_details`");
     expect(calls).toContainEqual({
       environment: "dev",
       entitySet: "accounts",
@@ -105,5 +110,82 @@ describe("run_fetchxml", () => {
     expect(response.content[0]?.text).toContain(
       "Environment 'dev' is not allowed for run_fetchxml",
     );
+  });
+
+  it("suggests list_table_records for simple filtered lists", async () => {
+    const config = createTestConfig(["dev"], {
+      advancedQueries: {
+        fetchXml: {
+          enabled: true,
+        },
+      },
+    });
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [createTableMetadataRecord()],
+        accounts: [
+          { accountid: "acc-1", name: "Acme" },
+          { accountid: "acc-2", name: "Beta" },
+        ],
+      },
+    });
+
+    const response = await handleRunFetchXml(
+      {
+        environment: "dev",
+        table: "account",
+        fetchXml:
+          "<fetch><entity name='account'><attribute name='name' /><filter><condition attribute='name' operator='like' value='A%' /></filter></entity></fetch>",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).not.toBe(true);
+    expect(response.structuredContent).toMatchObject({
+      ok: true,
+      data: {
+        curatedToolHint: {
+          tool: "list_table_records",
+        },
+      },
+    });
+    expect(response.content[0]?.text).toContain("`list_table_records`");
+  });
+
+  it("suggests get_view_fetchxml for view-like FetchXML", async () => {
+    const config = createTestConfig(["dev"], {
+      advancedQueries: {
+        fetchXml: {
+          enabled: true,
+        },
+      },
+    });
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [createTableMetadataRecord()],
+        accounts: [{ accountid: "acc-1", name: "Acme" }],
+      },
+    });
+
+    const response = await handleRunFetchXml(
+      {
+        environment: "dev",
+        table: "account",
+        fetchXml:
+          "<fetch><entity name='account'><attribute name='name' /><order attribute='name' descending='false' /><filter><condition attribute='statecode' operator='eq' value='0' /></filter></entity></fetch>",
+      },
+      { config, client },
+    );
+
+    expect(response.isError).not.toBe(true);
+    expect(response.structuredContent).toMatchObject({
+      ok: true,
+      data: {
+        curatedToolHint: {
+          tool: "get_view_fetchxml",
+        },
+      },
+    });
+    expect(response.content[0]?.text).toContain("`get_view_fetchxml`");
   });
 });

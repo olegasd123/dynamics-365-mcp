@@ -36,6 +36,11 @@ interface RunFetchXmlSettings {
   maxLimit: number;
 }
 
+interface CuratedToolHint {
+  tool: "list_table_records" | "get_table_record_details" | "get_view_fetchxml";
+  reason: string;
+}
+
 export async function handleRunFetchXml(
   { environment, table, fetchXml, limit }: RunFetchXmlParams,
   { config, client }: ToolContext,
@@ -91,12 +96,16 @@ export async function handleRunFetchXml(
       items.length > previewItems.length
         ? `Preview Rows (${previewItems.length} of ${items.length})`
         : `Rows (${items.length})`;
+    const curatedToolHint = getCuratedToolHint(cappedFetchXml, items.length);
     const text = [
       `## FetchXML results for '${resolvedTable.logicalName}' in '${env.name}'`,
       "",
       `- Returned Rows: ${items.length}`,
       `- Applied Limit: ${appliedLimit} (${limitSource})`,
       `- Entity Set: ${resolvedTable.entitySetName}`,
+      curatedToolHint
+        ? `- Curated Alternative: \`${curatedToolHint.tool}\` (${curatedToolHint.reason})`
+        : "",
       "",
       "### FetchXML",
       "",
@@ -126,6 +135,7 @@ export async function handleRunFetchXml(
         fetchXml: cappedFetchXml,
         returnedCount: items.length,
         previewCount: previewItems.length,
+        curatedToolHint,
         items,
       },
     );
@@ -191,6 +201,46 @@ function readExistingFetchLimit(fetchXml: string): number | null {
   }
 
   return count === null ? top : top === null ? count : Math.min(count, top);
+}
+
+function getCuratedToolHint(fetchXml: string, returnedCount: number): CuratedToolHint | null {
+  const hasLinkEntity = /<link-entity\b/i.test(fetchXml);
+  const hasOrder = /<order\b/i.test(fetchXml);
+  const hasAggregate = /\baggregate=(["'])true\1/i.test(fetchXml);
+  const hasDistinct = /\bdistinct=(["'])true\1/i.test(fetchXml);
+  const hasNameFilterLikeCondition =
+    /\boperator=(["'])(like|begins-with|eq)\1/i.test(fetchXml) &&
+    /\battribute=(["'])(fullname|name|firstname|lastname)\1/i.test(fetchXml);
+  const attributeCount = [...fetchXml.matchAll(/<attribute\b/gi)].length;
+  const conditionCount = [...fetchXml.matchAll(/<condition\b/gi)].length;
+
+  if (hasAggregate || hasDistinct || hasLinkEntity) {
+    return null;
+  }
+
+  if (hasOrder && attributeCount > 0 && conditionCount > 0) {
+    return {
+      tool: "get_view_fetchxml",
+      reason: "this looks like saved-view-style FetchXML with ordering and filters",
+    };
+  }
+
+  if (returnedCount === 1 && attributeCount <= 12 && !hasOrder) {
+    return {
+      tool: "get_table_record_details",
+      reason:
+        "single-row reads are usually easier to resolve and explain with the record detail tool",
+    };
+  }
+
+  if (attributeCount <= 12 && (hasNameFilterLikeCondition || conditionCount <= 3)) {
+    return {
+      tool: "list_table_records",
+      reason: "simple single-table reads are usually better handled by the paged record list tool",
+    };
+  }
+
+  return null;
 }
 
 function readFetchAttributeNumber(fetchXml: string, attributeName: string): number | null {
