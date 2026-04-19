@@ -47,6 +47,10 @@ Required notes below do not repeat environment placeholders.
   `Run the built-in prompt analyze_environment_drift with baseline <SOURCE_ENV>, targets <TARGET_ENVS>, and component type plugins.`
   `(Required: none)`
 
+- `advanced_query_fallback`
+  `Run the built-in prompt advanced_query_fallback for environment <ENV>, goal <TASK>, and table <TABLE>. Ask whether curated tools are enough or if a gated run_fetchxml fallback is justified.`
+  `(Required: <TASK>)`
+
 - `trace_flow_dependency`
   `Run the built-in prompt trace_flow_dependency for environment <ENV>, flow <FLOW>, and solution <SOLUTION>.`
   `(Required: <FLOW>)`
@@ -76,6 +80,7 @@ Replace these values before you run a prompt:
 - `<TARGET_SOLUTION>`: target solution display name or unique name
 - `<QUERY>`: search text like `account` or `sync`
 - `<TABLE>`: table logical name like `account`
+- `<TASK>`: short goal statement like `check active accounts with a custom filter`
 - `<TARGET_TABLE>`: target table name if it is different
 - `<COLUMN>`: column logical name like `name`
 - `<COLUMNS>`: comma-separated column logical names like `name, accountnumber`

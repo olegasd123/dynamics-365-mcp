@@ -210,6 +210,7 @@ The server also supports HTTP mode for service scripts. Use this when you want a
 
 The server also exposes MCP prompts for common tasks:
 
+- `advanced_query_fallback`
 - `analyze_environment_drift`
 - `discover_metadata`
 - `investigate_plugin_failure`
@@ -227,6 +228,7 @@ These prompts guide the client toward the right tool flow. They are useful when 
 The server also exposes MCP resources for reusable context:
 
 - `d365://guides/getting-started`
+- `d365://reference/advanced-query-guidance`
 - `d365://reference/environments`
 - `d365://reference/prompts`
 - `d365://reference/tool-groups`

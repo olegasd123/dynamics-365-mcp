@@ -10,6 +10,7 @@ import { buildToolGroupsResourceSection } from "../tools/readme-docs.js";
 
 export const STATIC_RESOURCE_URIS = [
   "d365://guides/getting-started",
+  "d365://reference/advanced-query-guidance",
   "d365://reference/environments",
   "d365://reference/prompts",
   "d365://reference/tool-groups",
@@ -51,6 +52,7 @@ function buildGettingStartedResource(config: AppConfig): string {
     "- Use the `discover_metadata` prompt if you know a name but not the right tool yet.",
     "- Use the `review_solution` prompt to inspect one solution.",
     "- Use the `release_gate_check` prompt before a release check.",
+    "- Read `d365://reference/advanced-query-guidance` before using any escape-hatch query path.",
     "- Read `d365://reference/task-routing` to map common tasks to the right prompt or tool.",
     "",
     "## By Role",
@@ -80,6 +82,41 @@ function buildEnvironmentReferenceResource(config: AppConfig): string {
   ].join("\n");
 }
 
+function buildAdvancedQueryGuidanceResource(): string {
+  return [
+    "# Advanced Query Guidance",
+    "",
+    "Use this guide before you reach for the ad-hoc FetchXML escape hatch.",
+    "",
+    "## Default Rule",
+    "- Prefer curated tools first because they resolve names, normalize output, and guide the next step.",
+    "- Use `run_fetchxml` only when the curated tools cannot answer a specific read-only question.",
+    "- Keep the fallback query scoped to one known table and the smallest useful row set.",
+    "",
+    "## Good Reasons To Use `run_fetchxml`",
+    "- You already know the table and need a one-off filter that the curated tools do not expose.",
+    "- You need to verify a suspected condition from a view or troubleshooting note.",
+    "- You need a temporary escape hatch while deciding whether a new first-class tool is worth adding.",
+    "",
+    "## Bad Reasons To Use `run_fetchxml`",
+    "- Broad discovery when `find_metadata`, `list_*`, or detail tools would work better.",
+    "- Routine record reads already covered by `list_table_records` or `get_table_record_details`.",
+    "- Cross-table exploration when you do not yet know the right entity or relationship path.",
+    "",
+    "## Safer First Choices",
+    "- Unknown name or object: `discover_metadata` prompt, then `find_metadata`",
+    "- Need one row or a short record list: `list_table_records` or `get_table_record_details`",
+    "- Need view logic: `get_view_details` or `get_view_fetchxml`",
+    "- Need release or dependency context: `review_solution`, `release_gate_check`, `get_solution_dependencies`",
+    "",
+    "## Escape Hatch Checklist",
+    "1. Confirm the exact table first.",
+    "2. Keep the query read-only and focused on one question.",
+    "3. Request the smallest reasonable limit.",
+    "4. Prefer a curated follow-up if the first fallback query reveals a clearer next tool.",
+  ].join("\n");
+}
+
 function buildPromptReferenceResource(): string {
   return [
     "# Built-in MCP Prompts",
@@ -101,6 +138,7 @@ function buildTaskRoutingResource(): string {
     "Use this guide when you know the task, but not the best prompt or tool.",
     "",
     "## Common Tasks",
+    "- Need to decide whether an escape hatch is justified: prompt `advanced_query_fallback`, then use the best curated tool first and `run_fetchxml` only if the gap stays specific",
     "- Release check before import or deploy: prompt `release_gate_check`, first tool `release_gate_report`, follow-up `get_solution_dependencies` or `compare_solutions`",
     "- Plugin step does not fire: prompt `investigate_plugin_failure`, first tool `get_plugin_details`, follow-up `list_plugin_steps`",
     "- Need workflows that use a custom workflow activity class: tool `find_workflow_activity_usage`; do not rely on plugin step registrations for `CodeActivity` usage",
@@ -223,8 +261,20 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
   );
 
   server.registerResource(
-    "environment-reference",
+    "advanced-query-guidance",
     STATIC_RESOURCE_URIS[1],
+    {
+      title: "Advanced Query Guidance",
+      description:
+        "When to use curated tools first and when a gated FetchXML escape hatch is justified.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => markdownResource(uri.toString(), buildAdvancedQueryGuidanceResource()),
+  );
+
+  server.registerResource(
+    "environment-reference",
+    STATIC_RESOURCE_URIS[2],
     {
       title: "Environment Reference",
       description: "Configured environment names and URLs.",
@@ -235,7 +285,7 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
 
   server.registerResource(
     "prompt-reference",
-    STATIC_RESOURCE_URIS[2],
+    STATIC_RESOURCE_URIS[3],
     {
       title: "Prompt Reference",
       description: "Built-in prompt names and what they are for.",
@@ -246,7 +296,7 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
 
   server.registerResource(
     "tool-groups",
-    STATIC_RESOURCE_URIS[3],
+    STATIC_RESOURCE_URIS[4],
     {
       title: "Tool Groups",
       description: "Grouped entry points for the main tool areas.",
@@ -257,7 +307,7 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
 
   server.registerResource(
     "task-routing",
-    STATIC_RESOURCE_URIS[4],
+    STATIC_RESOURCE_URIS[5],
     {
       title: "Task Routing",
       description: "Map common Dynamics 365 tasks and roles to the right prompts and tools.",
@@ -268,7 +318,7 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
 
   server.registerResource(
     "release-checklist",
-    STATIC_RESOURCE_URIS[5],
+    STATIC_RESOURCE_URIS[6],
     {
       title: "Release Checklist",
       description: "A short release-readiness path for solution and environment checks.",
@@ -279,7 +329,7 @@ export function registerAllResources(server: McpServer, config: AppConfig): void
 
   server.registerResource(
     "plugin-troubleshooting",
-    STATIC_RESOURCE_URIS[6],
+    STATIC_RESOURCE_URIS[7],
     {
       title: "Plugin Troubleshooting",
       description: "Common plugin failure paths and the best tools to inspect them.",

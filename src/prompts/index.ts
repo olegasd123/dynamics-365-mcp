@@ -5,6 +5,10 @@ import type { AppConfig } from "../config/types.js";
 
 export const PROMPT_REFERENCE_ITEMS = [
   {
+    name: "advanced_query_fallback",
+    summary: "use curated tools first and fall back to run_fetchxml only when the gap is specific",
+  },
+  {
     name: "analyze_environment_drift",
     summary: "compare one baseline with many environments and drill into the riskiest drift",
   },
@@ -77,6 +81,47 @@ function compareEnvironmentArgument(config: AppConfig, description: string) {
 }
 
 export function registerAllPrompts(server: McpServer, config: AppConfig): void {
+  server.registerPrompt(
+    "advanced_query_fallback",
+    {
+      title: "Advanced Query Fallback",
+      description: "Use curated tools first and fall back to run_fetchxml only for a specific gap.",
+      argsSchema: {
+        environment: environmentArgument(config, "Environment where you need the data"),
+        goal: z
+          .string()
+          .min(3)
+          .describe("What specific data you still need after trying the curated tools"),
+        table: z
+          .string()
+          .optional()
+          .describe("Optional table logical name when you already know the target table"),
+      },
+    },
+    ({ environment, goal, table }) => ({
+      description: `Use curated tools first in '${environment}', then fall back only if needed.`,
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              `I need a Dynamics 365 answer in environment "${environment}" for this goal: ${goal}.`,
+              table ? `The most likely table is "${table}".` : "",
+              "Do not start with `run_fetchxml`.",
+              "First choose the best curated tool or prompt path for this goal and explain why it is the safest and highest-signal option.",
+              "Only suggest `run_fetchxml` if the curated tools cannot answer the exact question and only if the server has that tool enabled.",
+              "If you do fall back to `run_fetchxml`, keep it read-only, scope it to one table, and ask for the smallest useful result set.",
+              "Mention the exact curated tool you would try first, the likely follow-up tool, and the reason an escape hatch is or is not justified.",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          },
+        },
+      ],
+    }),
+  );
+
   server.registerPrompt(
     "discover_metadata",
     {
