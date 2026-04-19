@@ -216,6 +216,7 @@ export function registerAllPrompts(server: McpServer, config: AppConfig): void {
                 symptom ? `Current symptom: ${symptom}.` : "",
                 `Start with \`${firstTool}\`.`,
                 `Then use \`${followUpTool}\` to narrow the failing step or image path.`,
+                "If the metadata looks correct but the failure still happens, check recent runtime errors with `list_plugin_trace_logs`.",
                 "Summarize the likely failure point, the affected message and entity, and the next manual check if the metadata alone is not enough.",
               ]
                 .filter(Boolean)

@@ -535,6 +535,18 @@
         }
       }
     ],
+    "list_plugin_trace_logs": [
+      {
+        "name": "recent account plugin errors",
+        "arguments": {
+          "environment": "dev",
+          "pluginName": "Contoso.Plugins.AccountPlugin",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "hasException": true,
+          "limit": 10
+        }
+      }
+    ],
     "list_plugins": [
       {
         "name": "plugins in solution",

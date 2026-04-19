@@ -150,6 +150,7 @@ function buildPluginTroubleshootingResource(): string {
     "- Need workflow processes that call a workflow activity class: `find_workflow_activity_usage`",
     "- Need image details: `list_plugin_assembly_images`",
     "- Need step list by assembly: `list_plugin_assembly_steps`",
+    "- Need recent runtime failures: `list_plugin_trace_logs`",
     "- Need cross-environment check: `compare_plugin_assemblies`",
     "",
     "## What To Look For",

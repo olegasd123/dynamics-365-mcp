@@ -46,7 +46,12 @@ const METADATA_ROOTS = new Set([
   "webresourceset",
 ]);
 
-const VOLATILE_ROOTS = new Set(["connectionreferences", "environmentvariablevalues", "workflows"]);
+const VOLATILE_ROOTS = new Set([
+  "connectionreferences",
+  "environmentvariablevalues",
+  "plugintracelogs",
+  "workflows",
+]);
 
 export function resolveCachePolicy(
   resourcePath: string,

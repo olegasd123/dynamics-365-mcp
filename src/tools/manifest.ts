@@ -14,6 +14,7 @@ import { listPluginAssembliesTool } from "./plugins/list-plugin-assemblies.js";
 import { listPluginAssemblyStepsTool } from "./plugins/list-plugin-assembly-steps.js";
 import { listPluginAssemblyImagesTool } from "./plugins/list-plugin-assembly-images.js";
 import { getPluginAssemblyDetailsTool } from "./plugins/get-plugin-assembly-details.js";
+import { listPluginTraceLogsTool } from "./plugins/list-plugin-trace-logs.js";
 import { listWorkflowsTool } from "./workflows/list-workflows.js";
 import { listActionsTool } from "./workflows/list-actions.js";
 import { getWorkflowDetailsTool } from "./workflows/get-workflow-details.js";
@@ -199,6 +200,20 @@ export const TOOL_MANIFEST = [
     ...getPluginAssemblyDetailsTool,
     group: "automation_runtime",
     mainParams: ["environment", "assemblyName"],
+  },
+  {
+    ...listPluginTraceLogsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "pluginName",
+      "correlationId",
+      "createdAfter",
+      "createdBefore",
+      "hasException",
+      "limit",
+      "cursor",
+    ],
   },
   {
     ...listWorkflowsTool,

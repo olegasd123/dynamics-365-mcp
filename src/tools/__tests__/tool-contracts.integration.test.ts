@@ -161,6 +161,17 @@ describe("tool contracts", () => {
         stepName: expect.any(Object),
         message: expect.any(Object),
       });
+      expect(toolsByName.list_plugin_trace_logs.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        correlationId: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        hasException: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
       expect(toolsByName.list_plugins.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         filter: expect.any(Object),

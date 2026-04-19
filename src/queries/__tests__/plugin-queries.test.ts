@@ -4,6 +4,7 @@ import {
   listPluginAssembliesQuery,
   listPluginImagesForStepsQuery,
   listPluginImagesQuery,
+  listPluginTraceLogsQuery,
   listPluginStepsForPluginTypesQuery,
   listPluginStepsQuery,
   listPluginTypesForAssembliesQuery,
@@ -88,5 +89,28 @@ describe("plugin queries", () => {
       "$filter=eventhandler_plugintype/pluginassemblyid/name eq 'My.Assembly'",
     );
     expect(query).toContain("eventhandler_plugintype($select=name,typename)");
+  });
+
+  it("builds the plugin trace logs query", () => {
+    const query = listPluginTraceLogsQuery({
+      pluginTypeName: "Contoso.Plugins.AccountPlugin",
+      correlationId: "00000000-0000-0000-0000-000000000001",
+      createdAfter: "2026-04-20T08:00:00.000Z",
+      createdBefore: "2026-04-20T09:00:00.000Z",
+      hasException: true,
+      top: 25,
+    });
+
+    expect(query).toContain(
+      "$select=plugintracelogid,typename,correlationid,createdon,messagename,primaryentity,mode,depth,performanceexecutionduration,exceptiondetails,messageblock",
+    );
+    expect(query).toContain("typename eq 'Contoso.Plugins.AccountPlugin'");
+    expect(query).toContain("correlationid eq '00000000-0000-0000-0000-000000000001'");
+    expect(query).toContain("createdon ge 2026-04-20T08:00:00.000Z");
+    expect(query).toContain("createdon le 2026-04-20T09:00:00.000Z");
+    expect(query).toContain("(exceptiondetails ne null and exceptiondetails ne '')");
+    expect(query).toContain("$orderby=createdon desc");
+    expect(query).toContain("$top=25");
+    expect(query).toContain("$count=true");
   });
 });

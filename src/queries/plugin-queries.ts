@@ -1,4 +1,4 @@
-import { eq, inList, query } from "../utils/odata-builder.js";
+import { and, eq, inList, query, rawFilter } from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",
@@ -214,5 +214,44 @@ export function listStepsForAssemblyQuery(assemblyName: string): string {
       "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),eventhandler_plugintype($select=name,typename)",
     )
     .orderby("name asc")
+    .toString();
+}
+
+export function listPluginTraceLogsQuery(options?: {
+  pluginTypeName?: string;
+  correlationId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  hasException?: boolean;
+  top?: number;
+}): string {
+  const filter = and(
+    options?.pluginTypeName ? eq("typename", options.pluginTypeName) : undefined,
+    options?.correlationId ? eq("correlationid", options.correlationId) : undefined,
+    options?.createdAfter ? rawFilter(`createdon ge ${options.createdAfter}`) : undefined,
+    options?.createdBefore ? rawFilter(`createdon le ${options.createdBefore}`) : undefined,
+    options?.hasException
+      ? rawFilter("(exceptiondetails ne null and exceptiondetails ne '')")
+      : undefined,
+  );
+
+  return query()
+    .select([
+      "plugintracelogid",
+      "typename",
+      "correlationid",
+      "createdon",
+      "messagename",
+      "primaryentity",
+      "mode",
+      "depth",
+      "performanceexecutionduration",
+      "exceptiondetails",
+      "messageblock",
+    ])
+    .filter(filter)
+    .orderby("createdon desc")
+    .top(options?.top ?? 50)
+    .count(true)
     .toString();
 }
