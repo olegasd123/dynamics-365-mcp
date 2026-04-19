@@ -547,10 +547,29 @@
         }
       }
     ],
+    "list_system_jobs": [
+      {
+        "name": "recent failed import jobs",
+        "arguments": {
+          "environment": "dev",
+          "status": "failed",
+          "jobType": "import",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "failedOnly": true,
+          "limit": 10
+        }
+      }
+    ],
     "get_plugin_trace_log_details": [
       {
         "name": "one account plugin trace log",
         "skipReason": "Fill in a real pluginTraceLogId from your environment."
+      }
+    ],
+    "get_system_job_details": [
+      {
+        "name": "one failed system job",
+        "skipReason": "Fill in a real systemJobId from your environment."
       }
     ],
     "list_plugins": [

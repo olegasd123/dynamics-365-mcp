@@ -16,6 +16,8 @@ import { listPluginAssemblyImagesTool } from "./plugins/list-plugin-assembly-ima
 import { getPluginAssemblyDetailsTool } from "./plugins/get-plugin-assembly-details.js";
 import { getPluginTraceLogDetailsTool } from "./plugins/get-plugin-trace-log-details.js";
 import { listPluginTraceLogsTool } from "./plugins/list-plugin-trace-logs.js";
+import { getSystemJobDetailsTool } from "./system-jobs/get-system-job-details.js";
+import { listSystemJobsTool } from "./system-jobs/list-system-jobs.js";
 import { listWorkflowsTool } from "./workflows/list-workflows.js";
 import { listActionsTool } from "./workflows/list-actions.js";
 import { getWorkflowDetailsTool } from "./workflows/get-workflow-details.js";
@@ -220,6 +222,26 @@ export const TOOL_MANIFEST = [
     ...getPluginTraceLogDetailsTool,
     group: "automation_runtime",
     mainParams: ["environment", "pluginTraceLogId"],
+  },
+  {
+    ...listSystemJobsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "status",
+      "jobType",
+      "correlationId",
+      "createdAfter",
+      "completedAfter",
+      "failedOnly",
+      "limit",
+      "cursor",
+    ],
+  },
+  {
+    ...getSystemJobDetailsTool,
+    group: "automation_runtime",
+    mainParams: ["environment", "systemJobId"],
   },
   {
     ...listWorkflowsTool,

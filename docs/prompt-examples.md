@@ -87,6 +87,7 @@ Replace these values before you run a prompt:
 - `<PLUGIN_CLASS>`: plugin class name or full type name
 - `<CORRELATION_ID>`: plugin trace correlation id
 - `<TRACE_LOG_ID>`: plugin trace log id
+- `<SYSTEM_JOB_ID>`: system job id (`asyncoperationid`)
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
 - `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
@@ -154,6 +155,19 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_plugin_trace_log_details`
   `In <ENV>, show full details for plugin trace log <TRACE_LOG_ID>. Include exception details, message block, configuration, and timing fields.`
   `(Required: <TRACE_LOG_ID>)`
+
+## System Jobs
+
+- `list_system_jobs`
+  `In <ENV>, list failed import system jobs from the last 1 day. Show created time, status, category, and message preview.`
+  `In <ENV>, list failed bulk delete system jobs from the last 7 days.`
+  `In <ENV>, list system jobs for correlation id <CORRELATION_ID>.`
+  `In <ENV>, list in-progress workflow system jobs that were created in the last 2 hours.`
+  `(Required: none)`
+
+- `get_system_job_details`
+  `In <ENV>, show full details for system job <SYSTEM_JOB_ID>. Include message text, timing fields, recurrence data, and related workflow, plug-in step, or bulk delete details when they exist.`
+  `(Required: <SYSTEM_JOB_ID>)`
 
 ## Workflows And Actions
 
@@ -459,6 +473,7 @@ This prompt list covers these tools:
 - `get_plugin_details`
 - `get_plugin_assembly_details`
 - `get_plugin_trace_log_details`
+- `get_system_job_details`
 - `get_ribbon_button_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
@@ -480,6 +495,7 @@ This prompt list covers these tools:
 - `list_table_ribbons`
 - `list_plugin_steps`
 - `list_plugin_trace_logs`
+- `list_system_jobs`
 - `list_plugins`
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`
