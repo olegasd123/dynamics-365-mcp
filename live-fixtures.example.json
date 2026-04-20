@@ -350,6 +350,18 @@
         }
       }
     ],
+    "get_solution_layers": [
+      {
+        "name": "web resource layers",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core",
+          "componentType": "web_resource",
+          "componentName": "contoso_/scripts/account.js",
+          "maxLayers": 10
+        }
+      }
+    ],
     "get_solution_details": [
       {
         "name": "contoso core",

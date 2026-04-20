@@ -27,6 +27,7 @@ import { getWebResourceContentTool } from "./web-resources/get-web-resource-cont
 import { listSolutionsTool } from "./solutions/list-solutions.js";
 import { getSolutionDetailsTool } from "./solutions/get-solution-details.js";
 import { getSolutionDependenciesTool } from "./solutions/get-solution-dependencies.js";
+import { getSolutionLayersTool } from "./solutions/get-solution-layers.js";
 import { listTablesTool } from "./tables/list-tables.js";
 import { getTableSchemaTool } from "./tables/get-table-schema.js";
 import { listTableAlternateKeysTool } from "./tables/list-table-alternate-keys.js";
@@ -303,6 +304,11 @@ export const TOOL_MANIFEST = [
     ...getSolutionDependenciesTool,
     group: "solutions_alm",
     mainParams: ["environment", "solution", "direction", "componentType"],
+  },
+  {
+    ...getSolutionLayersTool,
+    group: "solutions_alm",
+    mainParams: ["environment", "solution", "componentType", "componentName"],
   },
   {
     ...listTablesTool,

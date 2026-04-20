@@ -286,6 +286,12 @@ describe("tool contracts", () => {
         direction: expect.any(Object),
         componentType: expect.any(Object),
       });
+      expect(toolsByName.get_solution_layers.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        solution: expect.any(Object),
+        componentType: expect.any(Object),
+        componentName: expect.any(Object),
+      });
       expect(toolsByName.list_table_alternate_keys.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         table: expect.any(Object),

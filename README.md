@@ -307,6 +307,7 @@ Priority order:
 | `list_solutions`                   | List Dynamics 365 solutions. Users can later select a solution by display name or unique name.                                                                                                                                       | `environment`, `nameFilter`                                                                                             |
 | `get_solution_details`             | Show a solution summary and list supported components like tables, apps, environment variables, plugins, and web resources.                                                                                                          | `environment`, `solution`                                                                                               |
 | `get_solution_dependencies`        | Show Dataverse dependency links for supported components in one solution.                                                                                                                                                            | `environment`, `solution`, `direction`, `componentType`                                                                 |
+| `get_solution_layers`              | Show the active solution layer stack for one supported solution component to debug why a change is not taking effect.                                                                                                                | `environment`, `solution`, `componentType`, `componentName`                                                             |
 | `list_business_units`              | List business units with parent and state details.                                                                                                                                                                                   | `environment`, `nameFilter`                                                                                             |
 | `get_business_units_details`       | Show one business unit with parent and child context.                                                                                                                                                                                | `environment`, `businessUnitName`                                                                                       |
 | `list_security_roles`              | List security roles with business unit context.                                                                                                                                                                                      | `environment`, `nameFilter`, `businessUnit`                                                                             |
@@ -451,6 +452,14 @@ Use `get_solution_dependencies` when you want to see which supported solution co
 This tool uses Dataverse dependency functions instead of guessing links from names.
 
 `componentType` can now target both old and new groups like `table`, `column`, `security_role`, `dashboard`, `app_module`, `connection_reference`, `environment_variable_definition`, and `environment_variable_value`.
+
+### Layer View
+
+Use `get_solution_layers` when you need to understand which layer is currently winning for one supported solution component.
+
+- It resolves the component from the selected solution first, so you can target the exact web resource, view, form, plugin step, or other supported component.
+- It queries Dataverse component layers directly and shows the ordered stack from top to bottom.
+- The summary calls out the current runtime layer and whether an unmanaged layer appears to be present.
 
 ### Impact Analysis
 

@@ -262,6 +262,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show both required and dependent links for solution <SOLUTION>. Limit the result to component type web_resource and component name <WEB_RESOURCE>.`
   `(Required: <SOLUTION>)`
 
+- `get_solution_layers`
+  `In <ENV>, show the active layer stack for solution <SOLUTION>. Limit the result to component type web_resource and component name <WEB_RESOURCE> so I can see whether an unmanaged layer is winning.`
+  `(Required: <SOLUTION>)`
+
 ## Tables
 
 - `find_metadata`
@@ -526,6 +530,7 @@ This prompt list covers these tools:
 - `get_ribbon_button_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
+- `get_solution_layers`
 - `get_solution_details`
 - `get_table_schema`
 - `get_audit_details`

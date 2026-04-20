@@ -114,7 +114,12 @@ const NEXT_TOOLS: Record<MetadataComponentType, string[]> = {
   ],
   plugin_class: ["get_plugin_details", "list_plugin_steps"],
   web_resource: ["get_web_resource_content", "find_web_resource_usage", "list_web_resources"],
-  solution: ["get_solution_details", "get_solution_dependencies", "list_solutions"],
+  solution: [
+    "get_solution_details",
+    "get_solution_dependencies",
+    "get_solution_layers",
+    "list_solutions",
+  ],
   custom_api: ["get_custom_api_details", "list_custom_apis"],
 };
 
