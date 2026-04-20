@@ -388,6 +388,16 @@
         }
       }
     ],
+    "get_table_message_details": [
+      {
+        "name": "account update message",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "messageName": "Update"
+        }
+      }
+    ],
     "get_table_record_details": [
       {
         "name": "contact by id",

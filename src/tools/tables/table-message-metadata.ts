@@ -3,6 +3,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listSdkMessageFiltersForTableQuery } from "../../queries/sdk-message-queries.js";
 import { listActionsQuery } from "../../queries/workflow-queries.js";
 import { listCustomApis } from "../custom-apis/custom-api-metadata.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 import { resolveTable, type TableRecord } from "./table-metadata.js";
 
 const ACTION_STATE_LABELS: Record<number, string> = {
@@ -45,11 +46,25 @@ export interface TableBoundCustomApiRecord extends Record<string, unknown> {
   modifiedon: string;
 }
 
+export interface TableSdkMessageFilterRecord extends Record<string, unknown> {
+  sdkmessagefilterid: string;
+  primaryobjecttypecode: string;
+  sdkmessageid: string;
+  messageName: string;
+  customProcessingStepAllowed: boolean;
+}
+
 export interface TableMessageInventory {
   table: TableRecord;
   sdkMessages: TableSdkMessageRecord[];
   customActions: TableBoundActionRecord[];
   customApis: TableBoundCustomApiRecord[];
+}
+
+export interface TableMessageDetails {
+  table: TableRecord;
+  message: TableSdkMessageRecord;
+  filters: TableSdkMessageFilterRecord[];
 }
 
 export async function fetchTableMessages(
@@ -98,44 +113,44 @@ export async function fetchTableMessages(
   };
 }
 
+export async function fetchTableMessageDetails(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  tableRef: string,
+  messageRef: string,
+): Promise<TableMessageDetails> {
+  const table = await resolveTable(env, client, tableRef);
+  const sdkMessageFilters = await client.query<Record<string, unknown>>(
+    env,
+    "sdkmessagefilters",
+    listSdkMessageFiltersForTableQuery(table.logicalName),
+  );
+  const normalizedFilters = normalizeSdkMessageFilters(sdkMessageFilters, table.logicalName);
+  const sdkMessages = aggregateSdkMessagesFromNormalizedFilters(
+    normalizedFilters,
+    table.logicalName,
+  );
+  const message = resolveTableMessage(table.logicalName, messageRef, sdkMessages);
+
+  return {
+    table,
+    message,
+    filters: normalizedFilters.filter((filter) => {
+      const matchesId = message.sdkmessageid && filter.sdkmessageid === message.sdkmessageid;
+      const matchesName = !message.sdkmessageid && filter.messageName === message.name;
+      return matchesId || matchesName;
+    }),
+  };
+}
+
 function aggregateSdkMessages(
   filters: Record<string, unknown>[],
   tableLogicalName: string,
 ): TableSdkMessageRecord[] {
-  const byMessage = new Map<string, TableSdkMessageRecord>();
-
-  for (const filter of filters.filter(
-    (item) => String(item.primaryobjecttypecode || "") === tableLogicalName,
-  )) {
-    const sdkMessage = getRecord(filter.sdkmessageid);
-    const sdkMessageId = String(sdkMessage?.sdkmessageid || "");
-    const messageName = String(sdkMessage?.name || "");
-    const key = sdkMessageId || messageName;
-    if (!key) {
-      continue;
-    }
-
-    const current = byMessage.get(key);
-    if (!current) {
-      byMessage.set(key, {
-        sdkmessageid: sdkMessageId,
-        name: messageName,
-        primaryobjecttypecode: String(filter.primaryobjecttypecode || tableLogicalName),
-        filterIds: [String(filter.sdkmessagefilterid || "")].filter(Boolean),
-        customProcessingStepAllowed: getBooleanValue(filter.iscustomprocessingstepallowed),
-      });
-      continue;
-    }
-
-    current.customProcessingStepAllowed =
-      current.customProcessingStepAllowed || getBooleanValue(filter.iscustomprocessingstepallowed);
-    const filterId = String(filter.sdkmessagefilterid || "");
-    if (filterId && !current.filterIds.includes(filterId)) {
-      current.filterIds.push(filterId);
-    }
-  }
-
-  return [...byMessage.values()].sort((left, right) => left.name.localeCompare(right.name));
+  return aggregateSdkMessagesFromNormalizedFilters(
+    normalizeSdkMessageFilters(filters, tableLogicalName),
+    tableLogicalName,
+  );
 }
 
 function normalizeBoundAction(workflow: Record<string, unknown>): TableBoundActionRecord {
@@ -151,6 +166,157 @@ function normalizeBoundAction(workflow: Record<string, unknown>): TableBoundActi
     ismanaged: Boolean(workflow.ismanaged),
     modifiedon: String(workflow.modifiedon || ""),
   };
+}
+
+function resolveTableMessage(
+  tableLogicalName: string,
+  messageRef: string,
+  messages: TableSdkMessageRecord[],
+): TableSdkMessageRecord {
+  const exactId = messages.filter((message) => message.sdkmessageid === messageRef);
+  if (exactId.length === 1) {
+    return exactId[0];
+  }
+
+  const exactName = messages.filter((message) => message.name === messageRef);
+  if (exactName.length === 1) {
+    return exactName[0];
+  }
+
+  const needle = messageRef.trim().toLowerCase();
+  const caseInsensitiveMatches = uniqueMessages(
+    messages.filter(
+      (message) =>
+        message.sdkmessageid.toLowerCase() === needle || message.name.toLowerCase() === needle,
+    ),
+  );
+  if (caseInsensitiveMatches.length === 1) {
+    return caseInsensitiveMatches[0];
+  }
+
+  const partialMatches = uniqueMessages(
+    messages.filter(
+      (message) =>
+        message.sdkmessageid.toLowerCase().includes(needle) ||
+        message.name.toLowerCase().includes(needle),
+    ),
+  );
+  if (partialMatches.length === 1) {
+    return partialMatches[0];
+  }
+
+  const matches = uniqueMessages([
+    ...exactId,
+    ...exactName,
+    ...caseInsensitiveMatches,
+    ...partialMatches,
+  ]);
+
+  if (matches.length > 1) {
+    throw createAmbiguousTableMessageError(tableLogicalName, messageRef, matches);
+  }
+
+  throw new Error(`SDK message '${messageRef}' not found for table '${tableLogicalName}'.`);
+}
+
+function createAmbiguousTableMessageError(
+  tableLogicalName: string,
+  messageRef: string,
+  matches: TableSdkMessageRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `SDK message '${messageRef}' is ambiguous for table '${tableLogicalName}'. Choose a message and try again. Matches: ${matches.map(formatMessageMatch).join(", ")}.`,
+    {
+      parameter: "messageName",
+      options: matches.map((message) => createMessageOption(message)),
+    },
+  );
+}
+
+function createMessageOption(message: TableSdkMessageRecord): AmbiguousMatchOption {
+  return {
+    value: message.sdkmessageid || message.name,
+    label: formatMessageMatch(message),
+  };
+}
+
+function formatMessageMatch(message: TableSdkMessageRecord): string {
+  const idSuffix = message.sdkmessageid ? ` (${message.sdkmessageid})` : "";
+  return `${message.name}${idSuffix}`;
+}
+
+function aggregateSdkMessagesFromNormalizedFilters(
+  filters: TableSdkMessageFilterRecord[],
+  tableLogicalName: string,
+): TableSdkMessageRecord[] {
+  const byMessage = new Map<string, TableSdkMessageRecord>();
+
+  for (const filter of filters) {
+    const key = filter.sdkmessageid || filter.messageName;
+    if (!key) {
+      continue;
+    }
+
+    const current = byMessage.get(key);
+    if (!current) {
+      byMessage.set(key, {
+        sdkmessageid: filter.sdkmessageid,
+        name: filter.messageName,
+        primaryobjecttypecode: filter.primaryobjecttypecode || tableLogicalName,
+        filterIds: [filter.sdkmessagefilterid].filter(Boolean),
+        customProcessingStepAllowed: filter.customProcessingStepAllowed,
+      });
+      continue;
+    }
+
+    current.customProcessingStepAllowed =
+      current.customProcessingStepAllowed || filter.customProcessingStepAllowed;
+    if (filter.sdkmessagefilterid && !current.filterIds.includes(filter.sdkmessagefilterid)) {
+      current.filterIds.push(filter.sdkmessagefilterid);
+    }
+  }
+
+  return [...byMessage.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function normalizeSdkMessageFilters(
+  filters: Record<string, unknown>[],
+  tableLogicalName: string,
+): TableSdkMessageFilterRecord[] {
+  return filters
+    .filter((item) => String(item.primaryobjecttypecode || "") === tableLogicalName)
+    .map((filter) => {
+      const sdkMessage = getRecord(filter.sdkmessageid);
+      return {
+        ...filter,
+        sdkmessagefilterid: String(filter.sdkmessagefilterid || ""),
+        primaryobjecttypecode: String(filter.primaryobjecttypecode || tableLogicalName),
+        sdkmessageid: String(sdkMessage?.sdkmessageid || ""),
+        messageName: String(sdkMessage?.name || ""),
+        customProcessingStepAllowed: getBooleanValue(filter.iscustomprocessingstepallowed),
+      };
+    })
+    .filter((filter) => Boolean(filter.sdkmessageid || filter.messageName))
+    .sort((left, right) => {
+      const nameComparison = left.messageName.localeCompare(right.messageName);
+      if (nameComparison !== 0) {
+        return nameComparison;
+      }
+      return left.sdkmessagefilterid.localeCompare(right.sdkmessagefilterid);
+    });
+}
+
+function uniqueMessages(messages: TableSdkMessageRecord[]): TableSdkMessageRecord[] {
+  const seen = new Set<string>();
+
+  return messages.filter((message) => {
+    const key = message.sdkmessageid || message.name;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function getRecord(value: unknown): Record<string, unknown> | undefined {

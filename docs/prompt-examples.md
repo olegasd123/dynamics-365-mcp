@@ -83,6 +83,7 @@ Replace these values before you run a prompt:
 - `<TASK>`: short goal statement like `check active accounts with a custom filter`
 - `<TARGET_TABLE>`: target table name if it is different
 - `<COLUMN>`: column logical name like `name`
+- `<MESSAGE>`: SDK message name like `Update` or an sdkmessage id
 - `<COLUMNS>`: comma-separated column logical names like `name, accountnumber`
 - `<RECORD_ID>`: Dataverse row id
 - `<AUDIT_ID>`: audit row id
@@ -283,6 +284,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `list_table_messages`
   `In <ENV>, list which platform SDK messages are valid for table <TABLE>. Keep platform SDK messages, bound custom actions, and bound Custom APIs in separate sections.`
   `(Required: <TABLE>)`
+
+- `get_table_message_details`
+  `In <ENV>, show the SDK message details for message <MESSAGE> on table <TABLE>. Include the raw sdkmessagefilter rows behind that table-message combination.`
+  `(Required: <TABLE>, <MESSAGE>)`
 
 - `list_table_columns`
   `In <ENV>, list columns for table <TABLE> from solution <SOLUTION>.`
@@ -543,6 +548,7 @@ This prompt list covers these tools:
 - `list_table_columns`
 - `list_table_alternate_keys`
 - `list_table_messages`
+- `get_table_message_details`
 - `list_table_records`
 - `list_table_relationships`
 - `get_table_record_details`
