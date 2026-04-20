@@ -235,6 +235,11 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.get_bpf_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        workflowName: expect.any(Object),
+        uniqueName: expect.any(Object),
+      });
       expect(toolsByName.list_web_resources.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         type: expect.any(Object),

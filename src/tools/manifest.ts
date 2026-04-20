@@ -21,6 +21,7 @@ import { listSystemJobsTool } from "./system-jobs/list-system-jobs.js";
 import { listWorkflowsTool } from "./workflows/list-workflows.js";
 import { listActionsTool } from "./workflows/list-actions.js";
 import { getWorkflowDetailsTool } from "./workflows/get-workflow-details.js";
+import { getBpfDetailsTool } from "./workflows/get-bpf-details.js";
 import { listWebResourcesTool } from "./web-resources/list-web-resources.js";
 import { getWebResourceContentTool } from "./web-resources/get-web-resource-content.js";
 import { listSolutionsTool } from "./solutions/list-solutions.js";
@@ -265,6 +266,11 @@ export const TOOL_MANIFEST = [
   },
   {
     ...getWorkflowDetailsTool,
+    group: "automation_runtime",
+    mainParams: ["environment", "workflowName", "uniqueName"],
+  },
+  {
+    ...getBpfDetailsTool,
     group: "automation_runtime",
     mainParams: ["environment", "workflowName", "uniqueName"],
   },

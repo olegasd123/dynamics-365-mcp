@@ -457,6 +457,12 @@
         }
       }
     ],
+    "get_bpf_details": [
+      {
+        "name": "opportunity sales process by unique name",
+        "skipReason": "Set a real BPF uniqueName here when the environment has an activated business process flow."
+      }
+    ],
     "list_actions": [
       {
         "name": "contoso core actions",

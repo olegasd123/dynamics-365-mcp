@@ -198,6 +198,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show full details for workflow <WORKFLOW_NAME>. If needed, use <WORKFLOW_UNIQUE_NAME> / <WORKFLOW_ID>.`
   `(Required: none)`
 
+- `get_bpf_details`
+  `In <ENV>, show full details for business process flow <BPF_NAME>. Include fields used, stages, branching, backing table, and runtime-state behavior.`
+  `If needed, use <BPF_UNIQUE_NAME> / <WORKFLOW_ID>.`
+  `(Required: none)`
+
 ## Web Resources
 
 - `list_web_resources`
