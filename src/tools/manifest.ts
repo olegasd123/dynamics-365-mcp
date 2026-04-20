@@ -24,6 +24,7 @@ import { getWorkflowDetailsTool } from "./workflows/get-workflow-details.js";
 import { getBpfDetailsTool } from "./workflows/get-bpf-details.js";
 import { listWebResourcesTool } from "./web-resources/list-web-resources.js";
 import { getWebResourceContentTool } from "./web-resources/get-web-resource-content.js";
+import { listPublishersTool } from "./publishers/list-publishers.js";
 import { listSolutionsTool } from "./solutions/list-solutions.js";
 import { getSolutionDetailsTool } from "./solutions/get-solution-details.js";
 import { getSolutionDependenciesTool } from "./solutions/get-solution-dependencies.js";
@@ -289,6 +290,11 @@ export const TOOL_MANIFEST = [
     ...getWebResourceContentTool,
     group: "automation_runtime",
     mainParams: ["environment", "name"],
+  },
+  {
+    ...listPublishersTool,
+    group: "solutions_alm",
+    mainParams: ["environment", "nameFilter", "prefixFilter", "limit", "cursor"],
   },
   {
     ...listSolutionsTool,

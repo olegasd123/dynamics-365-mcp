@@ -250,6 +250,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 ## Solutions
 
+- `list_publishers`
+  `In <ENV>, list solution publishers whose name contains 'Contoso' or whose prefix contains 'cts'.`
+  `(Required: none)`
+
 - `list_solutions`
   `In <ENV>, list solutions with names that contain 'Core'.`
   `(Required: none)`
@@ -548,6 +552,7 @@ This prompt list covers these tools:
 - `list_dashboards`
 - `list_environment_variables`
 - `list_forms`
+- `list_publishers`
 - `list_table_ribbons`
 - `list_plugin_steps`
 - `list_plugin_trace_logs`

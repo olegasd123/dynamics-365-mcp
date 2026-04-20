@@ -337,6 +337,16 @@
         }
       }
     ],
+    "list_publishers": [
+      {
+        "name": "contoso publishers",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Contoso",
+          "prefixFilter": "cts"
+        }
+      }
+    ],
     "get_solution_dependencies": [
       {
         "name": "web resource dependencies",
