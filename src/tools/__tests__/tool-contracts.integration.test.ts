@@ -144,6 +144,10 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.get_publisher_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        publisher: expect.any(Object),
+      });
       expect(toolsByName.get_business_units_details.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         businessUnitName: expect.any(Object),

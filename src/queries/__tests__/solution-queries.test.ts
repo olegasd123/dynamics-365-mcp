@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   listSolutionComponentsByObjectIdsQuery,
   listSolutionComponentsQuery,
+  listSolutionsByPublisherQuery,
   listSolutionsQuery,
 } from "../solution-queries.js";
 
@@ -20,6 +21,15 @@ describe("solution queries", () => {
 
     expect(query).toContain("contains(friendlyname,'Core')");
     expect(query).toContain("contains(uniquename,'Core')");
+  });
+
+  it("builds the solutions-by-publisher query", () => {
+    const query = listSolutionsByPublisherQuery("pub-1");
+
+    expect(query).toContain(
+      "$select=solutionid,friendlyname,uniquename,version,ismanaged,publisherid,modifiedon",
+    );
+    expect(query).toContain("$filter=publisherid eq 'pub-1'");
   });
 
   it("builds the solution components query", () => {

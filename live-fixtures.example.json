@@ -318,6 +318,15 @@
         }
       }
     ],
+    "get_publisher_details": [
+      {
+        "name": "contoso publisher",
+        "arguments": {
+          "environment": "dev",
+          "publisher": "cts"
+        }
+      }
+    ],
     "get_role_privileges": [
       {
         "name": "salesperson role",

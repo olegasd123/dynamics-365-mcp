@@ -254,6 +254,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list solution publishers whose name contains 'Contoso' or whose prefix contains 'cts'.`
   `(Required: none)`
 
+- `get_publisher_details`
+  `In <ENV>, show full details for publisher <PUBLISHER>, including its prefix metadata and the solutions that use it.`
+  `(Required: <PUBLISHER>)`
+
 - `list_solutions`
   `In <ENV>, list solutions with names that contain 'Core'.`
   `(Required: none)`
@@ -530,6 +534,7 @@ This prompt list covers these tools:
 - `get_plugin_details`
 - `get_plugin_assembly_details`
 - `get_plugin_trace_log_details`
+- `get_publisher_details`
 - `get_system_job_details`
 - `get_ribbon_button_details`
 - `get_role_privileges`
