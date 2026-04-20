@@ -4,6 +4,7 @@ import {
   getWebResourceContentQuery,
   listWebResourcesQuery,
   listWebResourcesWithContentQuery,
+  searchWebResourcesQuery,
 } from "../web-resource-queries.js";
 
 describe("web resource queries", () => {
@@ -14,6 +15,15 @@ describe("web resource queries", () => {
     });
 
     expect(query).toContain("$filter=webresourcetype eq 3 and contains(name,'account')");
+    expect(query).toContain("$orderby=name asc");
+  });
+
+  it("builds the web resource discovery search query", () => {
+    const query = searchWebResourcesQuery("candidateCvViewer");
+
+    expect(query).toContain(
+      "$filter=contains(name,'candidateCvViewer') or contains(displayname,'candidateCvViewer') or contains(description,'candidateCvViewer')",
+    );
     expect(query).toContain("$orderby=name asc");
   });
 

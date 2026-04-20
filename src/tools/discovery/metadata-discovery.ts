@@ -17,7 +17,7 @@ import {
 } from "../tables/table-metadata.js";
 import { listViews, type ViewRecord } from "../views/view-metadata.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
-import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
+import { searchWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listSolutionComponentsByObjectIdsQuery } from "../../queries/solution-queries.js";
 import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
 
@@ -204,7 +204,7 @@ async function loadCandidates(
       ? listCloudFlows(env, client)
       : Promise.resolve<CloudFlowRecord[]>([]),
     shouldLoad("web_resource", componentType)
-      ? client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery())
+      ? client.query<Record<string, unknown>>(env, "webresourceset", searchWebResourcesQuery(query))
       : Promise.resolve<Record<string, unknown>[]>([]),
     shouldLoad("solution", componentType)
       ? listSolutions(env, client)

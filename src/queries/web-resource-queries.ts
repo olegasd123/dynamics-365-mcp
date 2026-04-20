@@ -41,6 +41,32 @@ export function listWebResourcesQuery(options?: {
     .toString();
 }
 
+export function searchWebResourcesQuery(searchText: string): string {
+  const queryText = searchText.trim();
+
+  return query()
+    .select([
+      "webresourceid",
+      "name",
+      "displayname",
+      "webresourcetype",
+      "ismanaged",
+      "description",
+      "modifiedon",
+    ])
+    .filter(
+      queryText
+        ? or(
+            contains("name", queryText),
+            contains("displayname", queryText),
+            contains("description", queryText),
+          )
+        : undefined,
+    )
+    .orderby("name asc")
+    .toString();
+}
+
 export function getWebResourceContentQuery(): string {
   return query()
     .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])

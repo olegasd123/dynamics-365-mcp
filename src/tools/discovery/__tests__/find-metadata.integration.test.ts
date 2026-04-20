@@ -216,6 +216,33 @@ function createDiscoveryHarness() {
           description: "Helper for account forms",
           modifiedon: "2025-01-02T00:00:00Z",
         },
+        {
+          webresourceid: "wr-candidate-cv-html",
+          name: "mso_/candidateCvViewer/button.html",
+          displayname: "(deprecated) mso_/candidateCvViewer/button.html",
+          webresourcetype: 1,
+          ismanaged: false,
+          description: "",
+          modifiedon: "2025-01-02T00:00:00Z",
+        },
+        {
+          webresourceid: "wr-candidate-cv-css",
+          name: "mso_/candidateCvViewer/static/css/main.74a6cd71.css",
+          displayname: "(deprecated) mso_/candidateCvViewer/static/css/main.74a6cd71.css",
+          webresourcetype: 2,
+          ismanaged: false,
+          description: "",
+          modifiedon: "2025-01-02T00:00:00Z",
+        },
+        {
+          webresourceid: "wr-candidate-cv-js",
+          name: "mso_/candidateCvViewer/static/js/main.0dad79fb.js",
+          displayname: "(deprecated) mso_/candidateCvViewer/static/js/main.0dad79fb.js",
+          webresourcetype: 3,
+          ismanaged: false,
+          description: "",
+          modifiedon: "2025-01-02T00:00:00Z",
+        },
       ],
       solutions: [
         {
@@ -288,6 +315,14 @@ function createDiscoveryHarness() {
           solutioncomponentid: "sc-webresource-account",
           _solutionid_value: "solution-core",
           objectid: "wr-account",
+          componenttype: 61,
+          rootsolutioncomponentid: null,
+          rootcomponentbehavior: 0,
+        },
+        {
+          solutioncomponentid: "sc-webresource-candidate-cv-html",
+          _solutionid_value: "solution-core",
+          objectid: "wr-candidate-cv-html",
           componenttype: 61,
           rootsolutioncomponentid: null,
           rootcomponentbehavior: 0,
@@ -386,6 +421,45 @@ describe("find_metadata tool", () => {
         displayName: "Account Sync Flow",
       },
     ]);
+  });
+
+  it("uses a server-side web resource search for discovery", async () => {
+    const { server, calls } = createDiscoveryHarness();
+
+    const response = await server.getHandler("find_metadata")({
+      query: "candidateCvViewer",
+      componentType: "web_resource",
+    });
+
+    expect(response.isError).toBeUndefined();
+
+    const payload = response.structuredContent as {
+      data: {
+        count: number;
+        items: Array<{ componentType: string; uniqueName: string | null }>;
+      };
+    };
+
+    expect(payload.data.count).toBe(3);
+    expect(payload.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          componentType: "web_resource",
+          uniqueName: "mso_/candidateCvViewer/button.html",
+        }),
+        expect.objectContaining({
+          componentType: "web_resource",
+          uniqueName: "mso_/candidateCvViewer/static/css/main.74a6cd71.css",
+        }),
+        expect.objectContaining({
+          componentType: "web_resource",
+          uniqueName: "mso_/candidateCvViewer/static/js/main.0dad79fb.js",
+        }),
+      ]),
+    );
+    expect(calls.find((call) => call.entitySet === "webresourceset")?.queryParams).toContain(
+      "contains(name,'candidateCvViewer')",
+    );
   });
 
   it("returns multiple matches for ambiguous searches instead of failing", async () => {
