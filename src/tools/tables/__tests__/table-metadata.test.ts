@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
 import { handleGetTableSchema } from "../get-table-schema.js";
+import { handleListTableAlternateKeys } from "../list-table-alternate-keys.js";
 import {
+  fetchTableKeys,
   fetchTableSchema,
   listTables,
   resolveTable,
@@ -251,11 +253,19 @@ describe("table metadata", () => {
 
     const tables = await listTables(env, client, { solution: "Core" });
     const table = await resolveTable(env, client, "Account", "Core");
+    const keysResult = await fetchTableKeys(env, client, "account", "Core");
     const schema = await fetchTableSchema(env, client, "account", "Core");
 
     expect(tables).toHaveLength(1);
     expect(tables[0].logicalName).toBe("account");
     expect(table.logicalName).toBe("account");
+    expect(keysResult.table.logicalName).toBe("account");
+    expect(keysResult.keys).toEqual([
+      expect.objectContaining({
+        logicalName: "accountnumberkey",
+        keyAttributes: ["accountnumber"],
+      }),
+    ]);
     expect(schema.table.displayName).toBe("Account");
     expect(schema.columns).toHaveLength(4);
     expect(
@@ -277,6 +287,72 @@ describe("table metadata", () => {
       }),
     ]);
     expect(schema.relationships).toHaveLength(3);
+  });
+
+  it("lists alternate keys for one table", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Accounts" } },
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Keys": [
+          {
+            MetadataId: "key-1",
+            LogicalName: "accountnumberkey",
+            SchemaName: "AccountNumberKey",
+            DisplayName: { UserLocalizedLabel: { Label: "Account Number Key" } },
+            KeyAttributes: ["accountnumber"],
+            EntityKeyIndexStatus: { Value: "Active" },
+            IsManaged: true,
+          },
+        ],
+      },
+    });
+
+    const response = await handleListTableAlternateKeys(
+      {
+        environment: "dev",
+        table: "account",
+      },
+      {
+        config: createTestConfig(["dev"]),
+        client,
+      },
+    );
+
+    expect(response.isError).not.toBe(true);
+    expect(response.content[0]?.text).toContain("## Alternate Keys: account");
+    expect(response.content[0]?.text).toContain("AccountNumberKey");
+    expect(response.structuredContent).toMatchObject({
+      version: "1",
+      tool: "list_table_alternate_keys",
+      ok: true,
+      data: {
+        environment: "dev",
+        count: 1,
+        table: {
+          logicalName: "account",
+        },
+        items: [
+          {
+            logicalName: "accountnumberkey",
+            schemaName: "AccountNumberKey",
+            keyAttributes: ["accountnumber"],
+            indexStatus: "Active",
+            isManaged: true,
+          },
+        ],
+      },
+    });
   });
 
   it("filters searched columns in memory for metadata paths", async () => {

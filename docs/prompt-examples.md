@@ -276,6 +276,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show the full schema for table <TABLE> from solution <SOLUTION>. Include columns, keys, and relationships.`
   `(Required: <TABLE>)`
 
+- `list_table_alternate_keys`
+  `In <ENV>, list alternate keys for table <TABLE> from solution <SOLUTION>.`
+  `(Required: <TABLE>)`
+
 - `list_table_columns`
   `In <ENV>, list columns for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
@@ -533,6 +537,7 @@ This prompt list covers these tools:
 - `list_security_roles`
 - `list_solutions`
 - `list_table_columns`
+- `list_table_alternate_keys`
 - `list_table_records`
 - `list_table_relationships`
 - `get_table_record_details`

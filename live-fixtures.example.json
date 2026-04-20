@@ -369,6 +369,16 @@
         }
       }
     ],
+    "list_table_alternate_keys": [
+      {
+        "name": "account alternate keys",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
     "get_table_record_details": [
       {
         "name": "contact by id",
