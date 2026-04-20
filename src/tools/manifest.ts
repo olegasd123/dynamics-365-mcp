@@ -34,6 +34,8 @@ import { getTableMessageDetailsTool } from "./tables/get-table-message-details.j
 import { listTableMessagesTool } from "./tables/list-table-messages.js";
 import { listTableColumnsTool } from "./tables/list-table-columns.js";
 import { listTableRelationshipsTool } from "./tables/list-table-relationships.js";
+import { listGlobalOptionSetsTool } from "./optionsets/list-global-option-sets.js";
+import { getOptionSetDetailsTool } from "./optionsets/get-option-set-details.js";
 import { listTableRecordsTool } from "./data/list-table-records.js";
 import { getTableRecordDetailsTool } from "./data/get-table-record-details.js";
 import { listAuditHistoryTool } from "./auditing/list-audit-history.js";
@@ -331,6 +333,16 @@ export const TOOL_MANIFEST = [
     ...listTableColumnsTool,
     group: "schema_ui",
     mainParams: ["environment", "table", "solution"],
+  },
+  {
+    ...listGlobalOptionSetsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "nameFilter", "limit", "cursor"],
+  },
+  {
+    ...getOptionSetDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "optionSet"],
   },
   {
     ...listTableRelationshipsTool,

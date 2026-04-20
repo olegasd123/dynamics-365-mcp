@@ -293,6 +293,14 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list columns for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
 
+- `list_global_option_sets`
+  `In <ENV>, list shared global option sets whose name matches 'priority'.`
+  `(Required: none)`
+
+- `get_option_set_details`
+  `In <ENV>, show details for global option set <OPTION_SET>. Include every option value and label.`
+  `(Required: <OPTION_SET>)`
+
 - `list_table_relationships`
   `In <ENV>, list relationships for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`

@@ -398,6 +398,12 @@
         }
       }
     ],
+    "get_option_set_details": [
+      {
+        "name": "shared priority option set",
+        "skipReason": "Fill in a real global option set name or metadata id from your environment."
+      }
+    ],
     "get_table_record_details": [
       {
         "name": "contact by id",
@@ -676,6 +682,15 @@
           "environment": "dev",
           "table": "account",
           "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_global_option_sets": [
+      {
+        "name": "shared option sets",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "priority"
         }
       }
     ],

@@ -300,6 +300,16 @@ describe("tool contracts", () => {
         table: expect.any(Object),
         messageName: expect.any(Object),
       });
+      expect(toolsByName.list_global_option_sets.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_option_set_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        optionSet: expect.any(Object),
+      });
       expect(toolsByName.release_gate_report.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         solution: expect.any(Object),
