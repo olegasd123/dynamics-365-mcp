@@ -379,6 +379,15 @@
         }
       }
     ],
+    "list_table_messages": [
+      {
+        "name": "account table messages",
+        "arguments": {
+          "environment": "dev",
+          "table": "account"
+        }
+      }
+    ],
     "get_table_record_details": [
       {
         "name": "contact by id",

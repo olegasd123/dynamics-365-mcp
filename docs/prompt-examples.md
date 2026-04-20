@@ -280,6 +280,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list alternate keys for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
 
+- `list_table_messages`
+  `In <ENV>, list which platform SDK messages are valid for table <TABLE>. Keep platform SDK messages, bound custom actions, and bound Custom APIs in separate sections.`
+  `(Required: <TABLE>)`
+
 - `list_table_columns`
   `In <ENV>, list columns for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
@@ -538,6 +542,7 @@ This prompt list covers these tools:
 - `list_solutions`
 - `list_table_columns`
 - `list_table_alternate_keys`
+- `list_table_messages`
 - `list_table_records`
 - `list_table_relationships`
 - `get_table_record_details`

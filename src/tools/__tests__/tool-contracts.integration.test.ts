@@ -291,6 +291,10 @@ describe("tool contracts", () => {
         table: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_table_messages.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+      });
       expect(toolsByName.release_gate_report.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         solution: expect.any(Object),

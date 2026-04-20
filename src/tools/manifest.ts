@@ -30,6 +30,7 @@ import { getSolutionDependenciesTool } from "./solutions/get-solution-dependenci
 import { listTablesTool } from "./tables/list-tables.js";
 import { getTableSchemaTool } from "./tables/get-table-schema.js";
 import { listTableAlternateKeysTool } from "./tables/list-table-alternate-keys.js";
+import { listTableMessagesTool } from "./tables/list-table-messages.js";
 import { listTableColumnsTool } from "./tables/list-table-columns.js";
 import { listTableRelationshipsTool } from "./tables/list-table-relationships.js";
 import { listTableRecordsTool } from "./data/list-table-records.js";
@@ -314,6 +315,11 @@ export const TOOL_MANIFEST = [
     ...listTableAlternateKeysTool,
     group: "schema_ui",
     mainParams: ["environment", "table", "solution"],
+  },
+  {
+    ...listTableMessagesTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table"],
   },
   {
     ...listTableColumnsTool,
