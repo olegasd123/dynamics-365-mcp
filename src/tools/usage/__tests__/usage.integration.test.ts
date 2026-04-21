@@ -451,6 +451,34 @@ describe("usage tools", () => {
             connectionreferences: "",
           },
         ],
+        duplicaterules: [
+          {
+            duplicateruleid: "rule-1",
+            name: "Contact same first name",
+            uniquename: "contact_same_firstname",
+            baseentityname: "contact",
+            matchingentityname: "contact",
+            statuscode: 2,
+            statecode: 1,
+            iscasesensitive: false,
+            excludeinactiverecords: true,
+            ismanaged: false,
+            createdon: "2026-04-01T08:00:00Z",
+            modifiedon: "2026-04-20T08:00:00Z",
+          },
+        ],
+        duplicateruleconditions: [
+          {
+            duplicateruleconditionid: "condition-1",
+            baseattributename: "firstname",
+            matchingattributename: "firstname",
+            operatorcode: 0,
+            operatorparam: null,
+            ignoreblankvalues: true,
+            uniquerulename: "contact_same_firstname_firstname",
+            _regardingobjectid_value: "rule-1",
+          },
+        ],
       },
     });
 
@@ -470,6 +498,8 @@ describe("usage tools", () => {
     expect(response.content[0].text).toContain("Plugin3 Step");
     expect(response.content[0].text).toContain("Contact Last Name Sync");
     expect(response.content[0].text).toContain("Contact Flow");
+    expect(response.content[0].text).toContain("Contact same first name");
+    expect(response.content[0].text).toContain("### Published Duplicate Detection Rules");
     expect(response.content[0].text).toContain(
       "System-managed columns like modifiedon and modifiedby are not treated as direct matches",
     );
@@ -501,6 +531,13 @@ describe("usage tools", () => {
           ],
           relatedCloudFlows: [
             expect.objectContaining({ name: "Contact Flow", matchedAttributes: ["firstname"] }),
+          ],
+          duplicateDetectionRules: [
+            expect.objectContaining({
+              name: "Contact same first name",
+              baseTable: "contact",
+              matchingTable: "contact",
+            }),
           ],
         },
       },
@@ -610,6 +647,34 @@ describe("usage tools", () => {
             connectionreferences: "",
           },
         ],
+        duplicaterules: [
+          {
+            duplicateruleid: "rule-1",
+            name: "Contact same first name",
+            uniquename: "contact_same_firstname",
+            baseentityname: "contact",
+            matchingentityname: "contact",
+            statuscode: 2,
+            statecode: 1,
+            iscasesensitive: false,
+            excludeinactiverecords: true,
+            ismanaged: false,
+            createdon: "2026-04-01T08:00:00Z",
+            modifiedon: "2026-04-20T08:00:00Z",
+          },
+        ],
+        duplicateruleconditions: [
+          {
+            duplicateruleconditionid: "condition-1",
+            baseattributename: "firstname",
+            matchingattributename: "firstname",
+            operatorcode: 0,
+            operatorparam: null,
+            ignoreblankvalues: true,
+            uniquerulename: "contact_same_firstname_firstname",
+            _regardingobjectid_value: "rule-1",
+          },
+        ],
       },
     });
 
@@ -624,6 +689,8 @@ describe("usage tools", () => {
     expect(response.content[0].text).toContain("Contact Create Step");
     expect(response.content[0].text).toContain("Contact Create Workflow");
     expect(response.content[0].text).toContain("Contact Create Flow");
+    expect(response.content[0].text).toContain("Contact same first name");
+    expect(response.content[0].text).toContain("### Published Duplicate Detection Rules");
     expect(response.content[0].text).not.toContain("Contact Update Step");
     expect(response.content[0].text).not.toContain("Contact Update Workflow");
     expect(response.content[0].text).toContain(
@@ -640,6 +707,13 @@ describe("usage tools", () => {
             expect.objectContaining({
               name: "Contact Create Flow",
               matchedAttributes: ["firstname"],
+            }),
+          ],
+          duplicateDetectionRules: [
+            expect.objectContaining({
+              name: "Contact same first name",
+              baseTable: "contact",
+              matchingTable: "contact",
             }),
           ],
         },

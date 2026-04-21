@@ -7,6 +7,10 @@ import { defineTool, registerTool, type ToolContext, type ToolParams } from "../
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { analyzeCreateTriggersData } from "./usage-analysis.js";
+import {
+  formatDuplicateRuleConditions,
+  getDuplicateRuleMatchedAttributes,
+} from "./duplicate-rule-display.js";
 
 const analyzeCreateTriggersSchema = {
   environment: z.string().optional().describe("Environment name"),
@@ -36,7 +40,7 @@ export async function handleAnalyzeCreateTriggers(
       lines.push(`- Warnings: ${analysis.warnings.join(" | ")}`);
     }
     lines.push(
-      `- Summary: Direct Plugin Steps ${analysis.directPluginSteps.length} | Direct Workflows ${analysis.directWorkflows.length} | Related Cloud Flows ${analysis.relatedCloudFlows.length}`,
+      `- Summary: Direct Plugin Steps ${analysis.directPluginSteps.length} | Direct Workflows ${analysis.directWorkflows.length} | Published Duplicate Rules ${analysis.duplicateDetectionRules.length} | Related Cloud Flows ${analysis.relatedCloudFlows.length}`,
     );
     lines.push(`- Notes: ${analysis.notes.join(" | ")}`);
 
@@ -67,6 +71,22 @@ export async function handleAnalyzeCreateTriggers(
             workflow.uniqueName || "-",
             workflow.categoryLabel,
             workflow.modeLabel || "-",
+          ]),
+        ),
+      );
+    }
+
+    if (analysis.duplicateDetectionRules.length > 0) {
+      lines.push("");
+      lines.push("### Published Duplicate Detection Rules");
+      lines.push(
+        formatTable(
+          ["Rule", "Matching Table", "Conditions", "Provided Field Match"],
+          analysis.duplicateDetectionRules.map((rule) => [
+            rule.name || rule.uniqueName || rule.duplicateRuleId,
+            rule.matchingTable || "-",
+            formatDuplicateRuleConditions(rule),
+            getDuplicateRuleMatchedAttributes(rule, analysis.providedAttributes).join(", ") || "-",
           ]),
         ),
       );

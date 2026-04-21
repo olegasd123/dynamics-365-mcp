@@ -10,6 +10,10 @@ import {
   type TableRelationshipRecord,
 } from "../tables/table-metadata.js";
 import {
+  fetchDuplicateDetectionRules,
+  type DuplicateRuleRecord,
+} from "../tables/list-duplicate-detection-rules.js";
+import {
   fetchFormDetails,
   fetchFormDetailsByIds,
   listForms,
@@ -111,6 +115,7 @@ export interface UpdateTriggerAnalysisData {
     matchedAttributes: string[];
     reason: string;
   }>;
+  duplicateDetectionRules: DuplicateRuleRecord[];
 }
 
 export interface CreateTriggerAnalysisData {
@@ -141,6 +146,7 @@ export interface CreateTriggerAnalysisData {
     matchedAttributes: string[];
     reason: string;
   }>;
+  duplicateDetectionRules: DuplicateRuleRecord[];
 }
 
 const PLUGIN_STAGE_LABELS: Record<number, string> = {
@@ -487,10 +493,11 @@ export async function analyzeUpdateTriggersData(
     "Direct matches use exact registered update metadata only.",
     "System-managed columns like modifiedon and modifiedby are not treated as direct matches unless they are part of the input changed attributes.",
     "System-managed column matches are shown separately when update registrations mention modifiedon or modifiedby.",
+    "Published duplicate detection rules are shown when this table is the base table.",
     "The report does not simulate downstream updates done by plugins, workflows, or cloud flows.",
   ];
 
-  const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
+  const [pluginAssemblies, workflows, cloudFlows, duplicateDetectionRules] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
     client.query<Record<string, unknown>>(
       env,
@@ -498,6 +505,11 @@ export async function analyzeUpdateTriggersData(
       listWorkflowsQuery({ status: "activated" }),
     ),
     listCloudFlows(env, client, { status: "activated" }),
+    fetchDuplicateDetectionRules(env, client, {
+      table,
+      status: "published",
+      tableRole: "base",
+    }),
   ]);
 
   const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
@@ -643,6 +655,7 @@ export async function analyzeUpdateTriggersData(
     directWorkflows,
     systemManagedPluginSteps,
     systemManagedWorkflows,
+    duplicateDetectionRules,
     relatedCloudFlows: flowDetails
       .map((flow) => {
         const matchedAttributes = normalizedAttributes.filter((attribute) =>
@@ -678,11 +691,12 @@ export async function analyzeCreateTriggersData(
   const warnings: string[] = [];
   const notes = [
     "Direct create matches are table-level. The provided fields do not narrow plugin Create steps or workflow Create triggers.",
-    "Provided fields are used only for related cloud flow references in this report.",
+    "Provided fields are used for related cloud flow references and duplicate rule field matches in this report.",
+    "Published duplicate detection rules are shown when this table is the base table.",
     "The report does not simulate downstream updates done by plugins, workflows, or cloud flows.",
   ];
 
-  const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
+  const [pluginAssemblies, workflows, cloudFlows, duplicateDetectionRules] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
     client.query<Record<string, unknown>>(
       env,
@@ -690,6 +704,11 @@ export async function analyzeCreateTriggersData(
       listWorkflowsQuery({ status: "activated" }),
     ),
     listCloudFlows(env, client, { status: "activated" }),
+    fetchDuplicateDetectionRules(env, client, {
+      table,
+      status: "published",
+      tableRole: "base",
+    }),
   ]);
 
   const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
@@ -712,6 +731,7 @@ export async function analyzeCreateTriggersData(
     providedAttributes: normalizedAttributes,
     warnings,
     notes,
+    duplicateDetectionRules,
     directPluginSteps: pluginInventory.steps
       .filter(
         (step) =>

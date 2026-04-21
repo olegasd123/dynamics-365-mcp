@@ -73,9 +73,10 @@ const listDuplicateDetectionRulesSchema = {
 };
 
 type ListDuplicateDetectionRulesParams = ToolParams<typeof listDuplicateDetectionRulesSchema>;
-type DuplicateRuleStatusFilter = NonNullable<ListDuplicateDetectionRulesParams["status"]>;
+export type DuplicateRuleStatusFilter = NonNullable<ListDuplicateDetectionRulesParams["status"]>;
+export type DuplicateRuleTableRole = "base" | "matching" | "either";
 
-interface DuplicateRuleRecord {
+export interface DuplicateRuleRecord {
   duplicateRuleId: string;
   name: string;
   uniqueName: string;
@@ -95,7 +96,7 @@ interface DuplicateRuleRecord {
   conditions: DuplicateRuleConditionRecord[];
 }
 
-interface DuplicateRuleConditionRecord {
+export interface DuplicateRuleConditionRecord {
   duplicateRuleConditionId: string;
   baseAttributeName: string;
   matchingAttributeName: string;
@@ -142,12 +143,11 @@ export async function handleListDuplicateDetectionRules(
     const env = getEnvironment(config, environment);
     const statusFilter = status || "all";
     const resolvedTable = table ? await resolveTable(env, client, table) : null;
-    const ruleRecords = await client.query<RawDuplicateRule>(
-      env,
-      "duplicaterules",
-      buildDuplicateRulesQuery(resolvedTable, statusFilter),
-    );
-    const allRules = ruleRecords.map(normalizeDuplicateRule).sort(compareDuplicateRules);
+    const allRules = await fetchDuplicateDetectionRules(env, client, {
+      table: resolvedTable,
+      status: statusFilter,
+      tableRole: "either",
+    });
     const page = buildPaginatedListData(
       allRules,
       {
@@ -157,12 +157,7 @@ export async function handleListDuplicateDetectionRules(
       },
       { limit, cursor },
     );
-    const conditionsByRuleId = await fetchConditionsByRuleId(
-      env,
-      client,
-      page.items.map((rule) => rule.duplicateRuleId),
-    );
-    const items = page.items.map((rule) => addConditions(rule, conditionsByRuleId));
+    const items = page.items;
     const publishedCount = items.filter((rule) => rule.isPublished).length;
     const summary = buildPaginatedListSummary({
       cursor: page.cursor,
@@ -214,13 +209,38 @@ export function registerListDuplicateDetectionRules(
   registerTool(server, listDuplicateDetectionRulesTool, { config, client });
 }
 
+export async function fetchDuplicateDetectionRules(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  options?: {
+    table?: TableRecord | null;
+    status?: DuplicateRuleStatusFilter;
+    tableRole?: DuplicateRuleTableRole;
+  },
+): Promise<DuplicateRuleRecord[]> {
+  const status = options?.status || "all";
+  const tableRole = options?.tableRole || "either";
+  const ruleRecords = await client.query<RawDuplicateRule>(
+    env,
+    "duplicaterules",
+    buildDuplicateRulesQuery(options?.table || null, status, tableRole),
+  );
+  const rules = ruleRecords.map(normalizeDuplicateRule).sort(compareDuplicateRules);
+  const conditionsByRuleId = await fetchConditionsByRuleId(
+    env,
+    client,
+    rules.map((rule) => rule.duplicateRuleId),
+  );
+
+  return rules.map((rule) => addConditions(rule, conditionsByRuleId));
+}
+
 function buildDuplicateRulesQuery(
   table: TableRecord | null,
   status: DuplicateRuleStatusFilter,
+  tableRole: DuplicateRuleTableRole,
 ): string {
-  const tableFilter = table
-    ? or(eq("baseentityname", table.logicalName), eq("matchingentityname", table.logicalName))
-    : undefined;
+  const tableFilter = buildTableRoleFilter(table, tableRole);
   const statusFilter =
     status === "all" ? undefined : eq("statuscode", DUPLICATE_RULE_STATUS[status]);
 
@@ -229,6 +249,24 @@ function buildDuplicateRulesQuery(
     .filter(and(tableFilter, statusFilter))
     .orderby("name asc")
     .toString();
+}
+
+function buildTableRoleFilter(table: TableRecord | null, tableRole: DuplicateRuleTableRole) {
+  if (!table) {
+    return undefined;
+  }
+
+  switch (tableRole) {
+    case "base":
+      return eq("baseentityname", table.logicalName);
+    case "matching":
+      return eq("matchingentityname", table.logicalName);
+    case "either":
+      return or(
+        eq("baseentityname", table.logicalName),
+        eq("matchingentityname", table.logicalName),
+      );
+  }
 }
 
 async function fetchConditionsByRuleId(
