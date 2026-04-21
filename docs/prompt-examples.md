@@ -425,6 +425,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
 
+- `list_field_security_profiles`
+  `In <ENV>, list field security profiles that grant access to column <COLUMN> on table <TABLE>. Include member names only when needed.`
+  `(Required: none)`
+
 ## Usage And Impact
 
 - `find_table_usage`
@@ -571,6 +575,7 @@ This prompt list covers these tools:
 - `list_plugin_assembly_steps`
 - `list_plugin_assemblies`
 - `list_security_roles`
+- `list_field_security_profiles`
 - `list_solutions`
 - `list_table_columns`
 - `list_table_alternate_keys`

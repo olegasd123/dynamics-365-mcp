@@ -152,6 +152,16 @@ describe("tool contracts", () => {
         environment: expect.any(Object),
         businessUnitName: expect.any(Object),
       });
+      expect(toolsByName.list_field_security_profiles.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        profileName: expect.any(Object),
+        table: expect.any(Object),
+        column: expect.any(Object),
+        solution: expect.any(Object),
+        includeMembers: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
       expect(toolsByName.analyze_create_triggers.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         table: expect.any(Object),

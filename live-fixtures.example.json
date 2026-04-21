@@ -169,6 +169,17 @@
         }
       }
     ],
+    "list_field_security_profiles": [
+      {
+        "name": "account secured column",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "column": "creditlimit",
+          "includeMembers": false
+        }
+      }
+    ],
     "find_metadata": [
       {
         "name": "account search",

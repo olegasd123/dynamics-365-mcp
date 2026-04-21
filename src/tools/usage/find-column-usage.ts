@@ -38,6 +38,30 @@ export async function handleFindColumnUsage(
       `- Summary: Plugin Steps ${usage.pluginSteps.length} | Plugin Images ${usage.pluginImages.length} | Workflows ${usage.workflows.length} | Forms ${usage.forms.length} | Views ${usage.views.length} | Relationships ${usage.relationships.length} | Cloud Flows ${usage.cloudFlows.length}`,
     );
 
+    if (usage.fieldSecurity) {
+      lines.push("");
+      lines.push("### Field Security");
+      if (!usage.fieldSecurity.isSecured) {
+        lines.push("Column is not field-secured.");
+      } else if (usage.fieldSecurity.profiles.length === 0) {
+        lines.push("Column is field-secured, but no profile grants were found.");
+      } else {
+        lines.push(
+          formatTable(
+            ["Profile", "Users", "Teams", "Read", "Create", "Update"],
+            usage.fieldSecurity.profiles.map((profile) => [
+              profile.name,
+              String(profile.userCount),
+              String(profile.teamCount),
+              profile.canRead,
+              profile.canCreate,
+              profile.canUpdate,
+            ]),
+          ),
+        );
+      }
+    }
+
     if (usage.pluginSteps.length > 0) {
       lines.push("");
       lines.push("### Plugin Steps");

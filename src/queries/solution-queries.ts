@@ -30,6 +30,14 @@ export function listSolutionsByPublisherQuery(publisherId: string): string {
     .toString();
 }
 
+export function listSolutionsByIdsQuery(solutionIds: string[]): string {
+  return query()
+    .select(DEFAULT_SOLUTION_SELECT)
+    .filter(inList("solutionid", solutionIds))
+    .orderby("friendlyname asc")
+    .toString();
+}
+
 export function listSolutionComponentsQuery(solutionId: string): string {
   return query()
     .select([

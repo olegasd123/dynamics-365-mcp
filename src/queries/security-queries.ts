@@ -1,4 +1,4 @@
-import { contains, eq, inList, isNull, query } from "../utils/odata-builder.js";
+import { and, contains, eq, inList, isNull, query } from "../utils/odata-builder.js";
 
 const SECURITY_ROLE_SELECT = [
   "roleid",
@@ -40,6 +40,32 @@ const PRIVILEGE_SELECT = [
   "canbedeep",
   "canbeglobal",
 ];
+
+const FIELD_SECURITY_PROFILE_SELECT = [
+  "fieldsecurityprofileid",
+  "name",
+  "description",
+  "ismanaged",
+  "modifiedon",
+  "solutionid",
+];
+
+const FIELD_PERMISSION_SELECT = [
+  "fieldpermissionid",
+  "_fieldsecurityprofileid_value",
+  "attributelogicalname",
+  "entityname",
+  "canread",
+  "cancreate",
+  "canupdate",
+  "ismanaged",
+  "solutionid",
+];
+
+const FIELD_SECURITY_PROFILE_EXPAND = [
+  "systemuserprofiles_association($select=systemuserid,fullname,domainname)",
+  "teamprofiles_association($select=teamid,name)",
+].join(",");
 
 export function listSecurityRolesQuery(nameFilter?: string): string {
   return query()
@@ -95,5 +121,36 @@ export function listPrivilegesByIdsQuery(privilegeIds: string[]): string {
     .select(PRIVILEGE_SELECT)
     .filter(inList("privilegeid", privilegeIds))
     .orderby("name asc")
+    .toString();
+}
+
+export function listFieldSecurityProfilesQuery(nameFilter?: string): string {
+  return query()
+    .select(FIELD_SECURITY_PROFILE_SELECT)
+    .filter(nameFilter ? contains("name", nameFilter) : undefined)
+    .expand(FIELD_SECURITY_PROFILE_EXPAND)
+    .orderby("name asc")
+    .toString();
+}
+
+export function listFieldPermissionsQuery(
+  profileIds: string[],
+  options?: {
+    tableLogicalName?: string;
+    columnLogicalName?: string;
+  },
+): string {
+  return query()
+    .select(FIELD_PERMISSION_SELECT)
+    .filter(
+      and(
+        inList("_fieldsecurityprofileid_value", profileIds),
+        options?.tableLogicalName ? eq("entityname", options.tableLogicalName) : undefined,
+        options?.columnLogicalName
+          ? eq("attributelogicalname", options.columnLogicalName)
+          : undefined,
+      ),
+    )
+    .orderby("entityname asc,attributelogicalname asc")
     .toString();
 }

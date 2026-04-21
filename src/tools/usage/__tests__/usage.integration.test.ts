@@ -222,6 +222,84 @@ describe("usage tools", () => {
     );
   });
 
+  it("adds field security context when column usage is checked for a secured column", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "column-1",
+            LogicalName: "creditlimit",
+            SchemaName: "CreditLimit",
+            AttributeType: "Money",
+            RequiredLevel: { Value: "None" },
+            IsSecured: true,
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/PicklistAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/MultiSelectPicklistAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/BooleanAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/StateAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/StatusAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/LookupAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/StringAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/MemoAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/DateTimeAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/ManyToOneRelationships": [],
+        "EntityDefinitions(LogicalName='account')/OneToManyRelationships": [],
+        "EntityDefinitions(LogicalName='account')/ManyToManyRelationships": [],
+        pluginassemblies: [],
+        workflows: [],
+        systemforms: [],
+        savedqueries: [],
+        fieldsecurityprofiles: [
+          {
+            fieldsecurityprofileid: "profile-1",
+            name: "Finance",
+            systemuserprofiles_association: [{ systemuserid: "user-1", fullname: "Adele Vance" }],
+            teamprofiles_association: [],
+          },
+        ],
+        fieldpermissions: [
+          {
+            fieldpermissionid: "permission-1",
+            _fieldsecurityprofileid_value: "profile-1",
+            entityname: "account",
+            attributelogicalname: "creditlimit",
+            canread: 4,
+            cancreate: 0,
+            canupdate: 4,
+          },
+        ],
+        solutioncomponents: [],
+        solutions: [],
+      },
+    });
+
+    registerFindColumnUsage(server as never, config, client);
+    const response = await server.getHandler("find_column_usage")({
+      table: "account",
+      column: "creditlimit",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("### Field Security");
+    expect(response.content[0].text).toContain("Finance");
+    expect(response.content[0].text).toContain("AllowedAlways");
+  });
+
   it("supports web resource ids when finding usage", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);

@@ -5,10 +5,12 @@ import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
 import {
+  fetchColumnsByLogicalName,
   fetchTableRelationships,
   resolveTable,
   type TableRelationshipRecord,
 } from "../tables/table-metadata.js";
+import { listFieldSecurityProfilesData } from "../security/field-security-metadata.js";
 import {
   fetchDuplicateDetectionRules,
   type DuplicateRuleRecord,
@@ -47,6 +49,17 @@ export interface ColumnUsageData {
   columnName: string;
   tableLogicalName?: string;
   warnings?: string[];
+  fieldSecurity?: {
+    isSecured: boolean;
+    profiles: Array<{
+      name: string;
+      userCount: number;
+      teamCount: number;
+      canRead: string;
+      canCreate: string;
+      canUpdate: string;
+    }>;
+  };
   pluginSteps: Array<{ name: string; assemblyName: string; attributes: string }>;
   pluginImages: Array<{ name: string; stepName: string; assemblyName: string; attributes: string }>;
   workflows: Array<{ name: string; uniqueName: string; triggerAttributes: string }>;
@@ -337,12 +350,16 @@ export async function findColumnUsageData(
       flowCandidates.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name)),
     ),
   ]);
+  const fieldSecurity = table
+    ? await fetchColumnFieldSecuritySummary(env, client, table.logicalName, columnName)
+    : undefined;
   const normalizedColumn = columnName.toLowerCase();
 
   return {
     columnName,
     tableLogicalName: table?.logicalName,
     warnings,
+    fieldSecurity,
     pluginSteps: pluginInventory.steps
       .filter(
         (step) =>
@@ -400,6 +417,46 @@ export async function findColumnUsageData(
         name: flow.name,
         uniqueName: flow.uniquename,
       })),
+  };
+}
+
+async function fetchColumnFieldSecuritySummary(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  tableLogicalName: string,
+  columnName: string,
+): Promise<ColumnUsageData["fieldSecurity"]> {
+  const normalizedColumn = columnName.toLowerCase();
+  const columns = await fetchColumnsByLogicalName(env, client, tableLogicalName);
+  const column = columns.find((item) => item.logicalName.toLowerCase() === normalizedColumn);
+  const isSecured = Boolean(column?.isSecured);
+
+  if (!isSecured) {
+    return {
+      isSecured: false,
+      profiles: [],
+    };
+  }
+
+  const fieldSecurity = await listFieldSecurityProfilesData(env, client, {
+    table: tableLogicalName,
+    column: normalizedColumn,
+  });
+
+  return {
+    isSecured: true,
+    profiles: fieldSecurity.items.map((profile) => {
+      const permission = profile.permissions[0];
+
+      return {
+        name: profile.name,
+        userCount: profile.memberCounts.users,
+        teamCount: profile.memberCounts.teams,
+        canRead: permission?.canRead || "NotAllowed",
+        canCreate: permission?.canCreate || "NotAllowed",
+        canUpdate: permission?.canUpdate || "NotAllowed",
+      };
+    }),
   };
 }
 
