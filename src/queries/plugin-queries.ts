@@ -1,4 +1,12 @@
-import { and, eq, inList, query, rawFilter } from "../utils/odata-builder.js";
+import {
+  and,
+  eq,
+  inList,
+  odataStringLiteral,
+  or,
+  query,
+  rawFilter,
+} from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",
@@ -195,6 +203,55 @@ export function listPluginImagesByIdsQuery(imageIds: string[]): string {
       "messagepropertyname",
     ])
     .filter(inList("sdkmessageprocessingstepimageid", imageIds))
+    .toString();
+}
+
+export function listSdkMessageProcessingStepsQuery(options: {
+  message: string;
+  primaryEntity?: string;
+  stage?: number;
+  mode?: number;
+  statecode?: number;
+}): string {
+  return query()
+    .select([
+      "sdkmessageprocessingstepid",
+      "_eventhandler_value",
+      "_sdkmessageid_value",
+      "_sdkmessagefilterid_value",
+      "_impersonatinguserid_value",
+      "name",
+      "stage",
+      "mode",
+      "rank",
+      "statecode",
+      "statuscode",
+      "filteringattributes",
+      "description",
+      "configuration",
+      "asyncautodelete",
+      "supporteddeployment",
+    ])
+    .filter(
+      and(
+        or(
+          rawFilter(
+            `tolower(sdkmessageid/name) eq ${odataStringLiteral(options.message.toLowerCase())}`,
+          ),
+          eq("_sdkmessageid_value", options.message),
+        ),
+        options.primaryEntity
+          ? eq("sdkmessagefilterid/primaryobjecttypecode", options.primaryEntity)
+          : undefined,
+        options.stage !== undefined ? eq("stage", options.stage) : undefined,
+        options.mode !== undefined ? eq("mode", options.mode) : undefined,
+        options.statecode !== undefined ? eq("statecode", options.statecode) : undefined,
+      ),
+    )
+    .expand(
+      "sdkmessageid($select=sdkmessageid,name),sdkmessagefilterid($select=sdkmessagefilterid,primaryobjecttypecode),eventhandler_plugintype($select=plugintypeid,name,typename,isworkflowactivity,workflowactivitygroupname,customworkflowactivityinfo,_pluginassemblyid_value;$expand=pluginassemblyid($select=pluginassemblyid,name)),impersonatinguserid($select=systemuserid,fullname,domainname)",
+    )
+    .orderby("stage asc,rank asc,name asc")
     .toString();
 }
 

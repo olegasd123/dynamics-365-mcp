@@ -652,6 +652,17 @@
         }
       }
     ],
+    "list_sdk_message_processing_steps": [
+      {
+        "name": "account update steps",
+        "arguments": {
+          "environment": "dev",
+          "message": "Update",
+          "primaryEntity": "account",
+          "statecode": "enabled"
+        }
+      }
+    ],
     "list_plugin_steps": [
       {
         "name": "account plugin steps",

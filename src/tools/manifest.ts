@@ -13,6 +13,7 @@ import { getPluginDetailsTool } from "./plugins/get-plugin-details.js";
 import { listPluginAssembliesTool } from "./plugins/list-plugin-assemblies.js";
 import { listPluginAssemblyStepsTool } from "./plugins/list-plugin-assembly-steps.js";
 import { listPluginAssemblyImagesTool } from "./plugins/list-plugin-assembly-images.js";
+import { listSdkMessageProcessingStepsTool } from "./plugins/list-sdk-message-processing-steps.js";
 import { getPluginAssemblyDetailsTool } from "./plugins/get-plugin-assembly-details.js";
 import { getPluginTraceLogDetailsTool } from "./plugins/get-plugin-trace-log-details.js";
 import { listPluginTraceLogsTool } from "./plugins/list-plugin-trace-logs.js";
@@ -219,6 +220,19 @@ export const TOOL_MANIFEST = [
     ...listPluginAssemblyImagesTool,
     group: "automation_runtime",
     mainParams: ["environment", "assemblyName", "stepName", "message"],
+  },
+  {
+    ...listSdkMessageProcessingStepsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "message",
+      "primaryEntity",
+      "stage",
+      "mode",
+      "statecode",
+      "includeImages",
+    ],
   },
   {
     ...getPluginAssemblyDetailsTool,

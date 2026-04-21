@@ -151,6 +151,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list plugin images for the plugin assembly <PLUGIN>. Filter to step <STEP> and message Update if possible.`
   `(Required: <PLUGIN>)`
 
+- `list_sdk_message_processing_steps`
+  `In <ENV>, list all enabled SDK message processing steps for message Update on table account. Include assembly, class, rank, filtering attributes, user context, and images.`
+  `In <ENV>, list disabled SDK message processing steps for message Update on table account.`
+  `(Required: <MESSAGE>)`
+
 - `get_plugin_assembly_details`
   `In <ENV>, show full details for the plugin assembly <PLUGIN>, and keep plugin classes and workflow activities in separate sections. Include steps and images.`
   `(Required: <PLUGIN>)`
@@ -574,6 +579,7 @@ This prompt list covers these tools:
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`
 - `list_plugin_assemblies`
+- `list_sdk_message_processing_steps`
 - `list_security_roles`
 - `list_field_security_profiles`
 - `list_solutions`

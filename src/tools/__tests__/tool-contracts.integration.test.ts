@@ -182,6 +182,15 @@ describe("tool contracts", () => {
         stepName: expect.any(Object),
         message: expect.any(Object),
       });
+      expect(toolsByName.list_sdk_message_processing_steps.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        message: expect.any(Object),
+        primaryEntity: expect.any(Object),
+        stage: expect.any(Object),
+        mode: expect.any(Object),
+        statecode: expect.any(Object),
+        includeImages: expect.any(Object),
+      });
       expect(toolsByName.list_plugin_trace_logs.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         pluginName: expect.any(Object),

@@ -10,6 +10,7 @@ import {
   listPluginStepsQuery,
   listPluginTypesForAssembliesQuery,
   listPluginTypesQuery,
+  listSdkMessageProcessingStepsQuery,
   listStepsForAssemblyQuery,
 } from "../plugin-queries.js";
 
@@ -90,6 +91,27 @@ describe("plugin queries", () => {
       "$filter=eventhandler_plugintype/pluginassemblyid/name eq 'My.Assembly'",
     );
     expect(query).toContain("eventhandler_plugintype($select=name,typename)");
+  });
+
+  it("builds the org-wide SDK message processing steps query", () => {
+    const query = listSdkMessageProcessingStepsQuery({
+      message: "Update",
+      primaryEntity: "account",
+      stage: 20,
+      mode: 0,
+      statecode: 0,
+    });
+
+    expect(query).toContain("tolower(sdkmessageid/name) eq 'update'");
+    expect(query).toContain("_sdkmessageid_value eq 'Update'");
+    expect(query).toContain("sdkmessagefilterid/primaryobjecttypecode eq 'account'");
+    expect(query).toContain("stage eq 20");
+    expect(query).toContain("mode eq 0");
+    expect(query).toContain("statecode eq 0");
+    expect(query).toContain("eventhandler_plugintype");
+    expect(query).toContain("pluginassemblyid($select=pluginassemblyid,name)");
+    expect(query).toContain("impersonatinguserid($select=systemuserid,fullname,domainname)");
+    expect(query).toContain("$orderby=stage asc,rank asc,name asc");
   });
 
   it("builds the plugin trace logs query", () => {
