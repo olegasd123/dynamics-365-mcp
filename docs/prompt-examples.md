@@ -293,6 +293,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list alternate keys for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
 
+- `list_duplicate_detection_rules`
+  `In <ENV>, list published duplicate detection rules for table <TABLE>. Include base table, matching table, status, and conditions.`
+  `(Required: none)`
+
 - `list_table_messages`
   `In <ENV>, list which platform SDK messages are valid for table <TABLE>. Keep platform SDK messages, bound custom actions, and bound Custom APIs in separate sections.`
   `(Required: <TABLE>)`
@@ -570,6 +574,7 @@ This prompt list covers these tools:
 - `list_solutions`
 - `list_table_columns`
 - `list_table_alternate_keys`
+- `list_duplicate_detection_rules`
 - `list_table_messages`
 - `get_table_message_details`
 - `list_table_records`

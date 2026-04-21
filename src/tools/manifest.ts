@@ -33,6 +33,7 @@ import { getSolutionLayersTool } from "./solutions/get-solution-layers.js";
 import { listTablesTool } from "./tables/list-tables.js";
 import { getTableSchemaTool } from "./tables/get-table-schema.js";
 import { listTableAlternateKeysTool } from "./tables/list-table-alternate-keys.js";
+import { listDuplicateDetectionRulesTool } from "./tables/list-duplicate-detection-rules.js";
 import { getTableMessageDetailsTool } from "./tables/get-table-message-details.js";
 import { listTableMessagesTool } from "./tables/list-table-messages.js";
 import { listTableColumnsTool } from "./tables/list-table-columns.js";
@@ -336,6 +337,11 @@ export const TOOL_MANIFEST = [
     ...listTableAlternateKeysTool,
     group: "schema_ui",
     mainParams: ["environment", "table", "solution"],
+  },
+  {
+    ...listDuplicateDetectionRulesTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "status", "limit", "cursor"],
   },
   {
     ...getTableMessageDetailsTool,

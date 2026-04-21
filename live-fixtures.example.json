@@ -410,6 +410,16 @@
         }
       }
     ],
+    "list_duplicate_detection_rules": [
+      {
+        "name": "account published duplicate rules",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "status": "published"
+        }
+      }
+    ],
     "list_table_messages": [
       {
         "name": "account table messages",

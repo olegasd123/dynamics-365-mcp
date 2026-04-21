@@ -308,6 +308,13 @@ describe("tool contracts", () => {
         table: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_duplicate_detection_rules.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        status: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
       expect(toolsByName.list_table_messages.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         table: expect.any(Object),
