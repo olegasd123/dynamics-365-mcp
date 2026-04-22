@@ -300,6 +300,23 @@
         "skipReason": "Fill in a real email template title or template id from your environment."
       }
     ],
+    "list_document_templates": [
+      {
+        "name": "account word document templates",
+        "arguments": {
+          "environment": "dev",
+          "associatedEntityTypeCode": "account",
+          "documentType": "word",
+          "limit": 25
+        }
+      }
+    ],
+    "get_document_template_details": [
+      {
+        "name": "account document template",
+        "skipReason": "Fill in a real document template name or document template id from your environment."
+      }
+    ],
     "get_environment_variable_details": [
       {
         "name": "base url",

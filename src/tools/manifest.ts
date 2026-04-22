@@ -58,6 +58,8 @@ import { listChartsTool } from "./charts/list-charts.js";
 import { getChartDetailsTool } from "./charts/get-chart-details.js";
 import { listEmailTemplatesTool } from "./email-templates/list-email-templates.js";
 import { getEmailTemplateDetailsTool } from "./email-templates/get-email-template-details.js";
+import { listDocumentTemplatesTool } from "./document-templates/list-document-templates.js";
+import { getDocumentTemplateDetailsTool } from "./document-templates/get-document-template-details.js";
 import { listCustomApisTool } from "./custom-apis/list-custom-apis.js";
 import { getCustomApiDetailsTool } from "./custom-apis/get-custom-api-details.js";
 import { listCloudFlowsTool } from "./flows/list-cloud-flows.js";
@@ -523,6 +525,33 @@ export const TOOL_MANIFEST = [
       "languageCode",
       "solution",
       "includeRawContent",
+    ],
+  },
+  {
+    ...listDocumentTemplatesTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "nameFilter",
+      "associatedEntityTypeCode",
+      "documentType",
+      "status",
+      "languageCode",
+      "limit",
+      "cursor",
+    ],
+  },
+  {
+    ...getDocumentTemplateDetailsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "templateName",
+      "associatedEntityTypeCode",
+      "documentType",
+      "status",
+      "languageCode",
+      "includeContent",
     ],
   },
   {

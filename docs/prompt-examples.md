@@ -416,6 +416,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show details for email template <TEMPLATE>. Include raw content only if needed.`
   `(Required: <TEMPLATE>)`
 
+## Document Templates
+
+- `list_document_templates`
+  `In <ENV>, list Word document templates for table <TABLE> with names that contain 'Quote'.`
+  `(Required: none)`
+
+- `get_document_template_details`
+  `In <ENV>, show details for document template <TEMPLATE>. Include base64 content only if needed.`
+  `(Required: <TEMPLATE>)`
+
 ## Advanced Escape Hatches
 
 - `run_fetchxml`
@@ -572,6 +582,7 @@ This prompt list covers these tools:
 - `get_connection_reference_details`
 - `get_custom_api_details`
 - `get_dashboard_details`
+- `get_document_template_details`
 - `get_email_template_details`
 - `get_environment_variable_details`
 - `get_flow_details`
@@ -602,6 +613,7 @@ This prompt list covers these tools:
 - `list_connection_references`
 - `list_custom_apis`
 - `list_dashboards`
+- `list_document_templates`
 - `list_email_templates`
 - `list_environment_variables`
 - `list_forms`
