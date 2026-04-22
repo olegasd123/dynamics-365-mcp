@@ -1,6 +1,6 @@
 - If you add a new tool:
   - Update `docs/prompt-examples.md`
-  - Add it to `live-fixtures.example.json` and `live-fixtures.json`
+  - Add it to the live tests `live-fixtures.example.json`
 
 - Execute:
   - `npm run format`
