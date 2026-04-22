@@ -237,6 +237,16 @@
         }
       }
     ],
+    "get_sitemap_details": [
+      {
+        "name": "sales hub sitemap",
+        "arguments": {
+          "environment": "dev",
+          "appName": "Sales Hub",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
     "get_connection_reference_details": [
       {
         "name": "office 365 reference",
@@ -565,6 +575,16 @@
         "arguments": {
           "environment": "dev",
           "nameFilter": "Sales Hub",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_sitemaps": [
+      {
+        "name": "sales hub sitemap",
+        "arguments": {
+          "environment": "dev",
+          "appName": "Sales Hub",
           "solution": "Contoso_Core"
         }
       }

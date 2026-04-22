@@ -123,6 +123,19 @@ describe("tool contracts", () => {
         appName: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_sitemaps.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        appName: expect.any(Object),
+      });
+      expect(toolsByName.get_sitemap_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        sitemapName: expect.any(Object),
+        appName: expect.any(Object),
+        solution: expect.any(Object),
+        includeRawXml: expect.any(Object),
+      });
       expect(toolsByName.list_dashboards.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         nameFilter: expect.any(Object),

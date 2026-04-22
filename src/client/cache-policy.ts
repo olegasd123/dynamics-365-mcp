@@ -30,6 +30,7 @@ const SCHEMA_ROOTS = new Set(["entitydefinitions", "savedqueries", "systemforms"
 
 const METADATA_ROOTS = new Set([
   "appmodules",
+  "appmodulecomponents",
   "businessunits",
   "customapirequestparameters",
   "customapiresponseproperties",
@@ -43,6 +44,7 @@ const METADATA_ROOTS = new Set([
   "sdkmessageprocessingsteps",
   "solutioncomponents",
   "solutions",
+  "sitemaps",
   "webresourceset",
 ]);
 

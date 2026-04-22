@@ -115,6 +115,7 @@ Replace these values before you run a prompt:
 - `<ENV_VAR>`: environment variable schema name or display name
 - `<CONNECTION_REFERENCE>`: connection reference display name or logical name
 - `<APP_MODULE>`: app module name or unique name
+- `<SITEMAP>`: sitemap name, unique name, or id
 - `<DASHBOARD>`: dashboard name
 
 Tip:
@@ -244,6 +245,14 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_app_module_details`
   `In <ENV>, show full details for app module <APP_MODULE> from solution <SOLUTION>.`
   `(Required: <APP_MODULE>)`
+
+- `list_sitemaps`
+  `In <ENV>, list sitemaps for app module <APP_MODULE> from solution <SOLUTION>.`
+  `(Required: none)`
+
+- `get_sitemap_details`
+  `In <ENV>, show full navigation details for the sitemap used by app module <APP_MODULE>.`
+  `(Required: <APP_MODULE> or <SITEMAP>)`
 
 - `list_dashboards`
   `In <ENV>, list dashboards from solution <SOLUTION> that match 'Sales'.`
@@ -554,6 +563,7 @@ This prompt list covers these tools:
 - `get_solution_dependencies`
 - `get_solution_layers`
 - `get_solution_details`
+- `get_sitemap_details`
 - `get_table_schema`
 - `get_audit_details`
 - `list_audit_history`
@@ -582,6 +592,7 @@ This prompt list covers these tools:
 - `list_sdk_message_processing_steps`
 - `list_security_roles`
 - `list_field_security_profiles`
+- `list_sitemaps`
 - `list_solutions`
 - `list_table_columns`
 - `list_table_alternate_keys`

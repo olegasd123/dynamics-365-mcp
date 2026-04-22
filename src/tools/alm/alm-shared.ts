@@ -30,6 +30,7 @@ export interface ConnectionReferenceRecord extends Record<string, unknown> {
 
 export interface AppModuleRecord extends Record<string, unknown> {
   appmoduleid: string;
+  appmoduleidunique: string;
   name: string;
   uniquename: string;
   ismanaged: boolean;
@@ -122,6 +123,7 @@ export function normalizeAppModule(record: Record<string, unknown>): AppModuleRe
   return {
     ...record,
     appmoduleid: String(record.appmoduleid || ""),
+    appmoduleidunique: String(record.appmoduleidunique || record.appmoduleid || ""),
     name: String(record.name || ""),
     uniquename: String(record.uniquename || ""),
     ismanaged: Boolean(record.ismanaged),

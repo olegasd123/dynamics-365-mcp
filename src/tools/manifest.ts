@@ -4,6 +4,8 @@ import { listConnectionReferencesTool } from "./alm/list-connection-references.j
 import { getConnectionReferenceDetailsTool } from "./alm/get-connection-reference-details.js";
 import { listAppModulesTool } from "./alm/list-app-modules.js";
 import { getAppModuleDetailsTool } from "./alm/get-app-module-details.js";
+import { listSitemapsTool } from "./sitemaps/list-sitemaps.js";
+import { getSitemapDetailsTool } from "./sitemaps/get-sitemap-details.js";
 import { listDashboardsTool } from "./alm/list-dashboards.js";
 import { getDashboardDetailsTool } from "./alm/get-dashboard-details.js";
 import { findMetadataTool } from "./discovery/find-metadata.js";
@@ -175,6 +177,16 @@ export const TOOL_MANIFEST = [
     ...getAppModuleDetailsTool,
     group: "solutions_alm",
     mainParams: ["environment", "appName", "solution"],
+  },
+  {
+    ...listSitemapsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "nameFilter", "solution", "appName"],
+  },
+  {
+    ...getSitemapDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "sitemapName", "appName", "solution", "includeRawXml"],
   },
   {
     ...listDashboardsTool,
