@@ -1,6 +1,7 @@
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listFormsByIdsQuery } from "../../queries/form-queries.js";
+import { listEmailTemplatesByIdsQuery } from "../../queries/email-template-queries.js";
 import { listPluginAssembliesByIdsQuery } from "../../queries/plugin-queries.js";
 import { listSolutionsQuery, listSolutionComponentsQuery } from "../../queries/solution-queries.js";
 import { listSavedViewsByIdsQuery } from "../../queries/view-queries.js";
@@ -48,6 +49,7 @@ export const SOLUTION_COMPONENT_TYPE = {
   form: 24,
   view: 26,
   workflow: 29,
+  emailTemplate: 36,
   dashboard: 60,
   webResource: 61,
   appModule: 80,
@@ -66,6 +68,7 @@ const COMPONENT_TYPE_LABELS: Record<number, string> = {
   24: "Form",
   26: "View",
   29: "Workflow",
+  36: "Email Template",
   59: "Saved Query Visualization",
   60: "Dashboard",
   61: "Web Resource",
@@ -117,6 +120,7 @@ export interface SolutionComponentSets {
   formIds: Set<string>;
   viewIds: Set<string>;
   workflowIds: Set<string>;
+  emailTemplateIds: Set<string>;
   dashboardIds: Set<string>;
   webResourceIds: Set<string>;
   appModuleIds: Set<string>;
@@ -137,6 +141,7 @@ export interface SolutionInventory extends SolutionComponentSets {
   forms: Record<string, unknown>[];
   views: Record<string, unknown>[];
   workflows: Record<string, unknown>[];
+  emailTemplates: Record<string, unknown>[];
   dashboards: DashboardRecord[];
   webResources: Record<string, unknown>[];
   appModules: AppModuleRecord[];
@@ -245,6 +250,7 @@ export async function fetchSolutionComponentSets(
     formIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.form),
     viewIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.view),
     workflowIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.workflow),
+    emailTemplateIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.emailTemplate),
     dashboardIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.dashboard),
     webResourceIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.webResource),
     appModuleIds: collectObjectIds(components, SOLUTION_COMPONENT_TYPE.appModule),
@@ -295,6 +301,7 @@ export async function fetchSolutionInventory(
     forms,
     views,
     workflows,
+    emailTemplates,
     dashboards,
     webResources,
     appModules,
@@ -334,6 +341,14 @@ export async function fetchSolutionInventory(
       "workflowid",
       [...componentSets.workflowIds],
       listWorkflowsByIdsQuery,
+    ),
+    fetchRecordsByIds(
+      env,
+      client,
+      "templates",
+      "templateid",
+      [...componentSets.emailTemplateIds],
+      listEmailTemplatesByIdsQuery,
     ),
     fetchRecordsByIds(
       env,
@@ -404,6 +419,7 @@ export async function fetchSolutionInventory(
     forms,
     views,
     workflows,
+    emailTemplates,
     dashboards,
     webResources,
     appModules,

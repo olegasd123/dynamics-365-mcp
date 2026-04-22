@@ -283,6 +283,23 @@
         }
       }
     ],
+    "list_email_templates": [
+      {
+        "name": "contact email templates",
+        "arguments": {
+          "environment": "dev",
+          "templateTypeCode": "contact",
+          "scope": "organization",
+          "limit": 25
+        }
+      }
+    ],
+    "get_email_template_details": [
+      {
+        "name": "welcome contact template",
+        "skipReason": "Fill in a real email template title or template id from your environment."
+      }
+    ],
     "get_environment_variable_details": [
       {
         "name": "base url",

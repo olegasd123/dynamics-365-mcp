@@ -65,6 +65,11 @@ describe("solution inventory", () => {
             componenttype: 29,
           },
           {
+            solutioncomponentid: "sc-template",
+            objectid: "template-1",
+            componenttype: 36,
+          },
+          {
             solutioncomponentid: "sc-5",
             objectid: "wr-1",
             componenttype: 61,
@@ -181,6 +186,14 @@ describe("solution inventory", () => {
             returnedtypecode: "account",
           },
         ],
+        templates: [
+          {
+            templateid: "template-1",
+            title: "Welcome Contact",
+            templatetypecode: "contact",
+            ispersonal: false,
+          },
+        ],
         pluginassemblies: [
           {
             pluginassemblyid: "asm-1",
@@ -289,6 +302,7 @@ describe("solution inventory", () => {
     expect(componentSets.formIds).toEqual(new Set(["form-1"]));
     expect(componentSets.viewIds).toEqual(new Set(["view-1"]));
     expect(componentSets.workflowIds).toEqual(new Set(["wf-1"]));
+    expect(componentSets.emailTemplateIds).toEqual(new Set(["template-1"]));
     expect(componentSets.dashboardIds).toEqual(new Set(["dash-1"]));
     expect(componentSets.webResourceIds).toEqual(new Set(["wr-1"]));
     expect(componentSets.appModuleIds).toEqual(new Set(["app-1"]));
@@ -304,6 +318,7 @@ describe("solution inventory", () => {
     expect(inventory.securityRoles).toHaveLength(1);
     expect(inventory.forms).toHaveLength(1);
     expect(inventory.views).toHaveLength(1);
+    expect(inventory.emailTemplates).toHaveLength(1);
     expect(inventory.dashboards).toHaveLength(1);
     expect(inventory.appModules).toHaveLength(1);
     expect(inventory.connectionReferences).toHaveLength(1);

@@ -124,6 +124,19 @@ function createDiscoveryHarness() {
           modifiedon: "2025-01-02T00:00:00Z",
         },
       ],
+      templates: [
+        {
+          templateid: "template-welcome-contact",
+          title: "Welcome Contact",
+          description: "Welcome email",
+          templatetypecode: "contact",
+          subject: "Welcome new contact",
+          ispersonal: false,
+          ismanaged: false,
+          languagecode: 1033,
+          modifiedon: "2025-01-02T00:00:00Z",
+        },
+      ],
       workflows: [
         {
           workflowid: "workflow-sync",
@@ -304,6 +317,14 @@ function createDiscoveryHarness() {
           rootcomponentbehavior: 0,
         },
         {
+          solutioncomponentid: "sc-template-welcome-contact",
+          _solutionid_value: "solution-core",
+          objectid: "template-welcome-contact",
+          componenttype: 36,
+          rootsolutioncomponentid: null,
+          rootcomponentbehavior: 0,
+        },
+        {
           solutioncomponentid: "sc-assembly-account",
           _solutionid_value: "solution-core",
           objectid: "assembly-account",
@@ -460,6 +481,37 @@ describe("find_metadata tool", () => {
     expect(calls.find((call) => call.entitySet === "webresourceset")?.queryParams).toContain(
       "contains(name,'candidateCvViewer')",
     );
+  });
+
+  it("finds email templates and suggests email template tools", async () => {
+    const { server } = createDiscoveryHarness();
+
+    const response = await server.getHandler("find_metadata")({
+      query: "welcome",
+      componentType: "email_template",
+    });
+
+    expect(response.isError).toBeUndefined();
+
+    const payload = response.structuredContent as {
+      data: {
+        count: number;
+        items: Array<{
+          componentType: string;
+          displayName: string;
+          solution: string | null;
+          suggestedNextTools: string[];
+        }>;
+      };
+    };
+
+    expect(payload.data.count).toBe(1);
+    expect(payload.data.items[0]).toMatchObject({
+      componentType: "email_template",
+      displayName: "Welcome Contact",
+      solution: "Core Account",
+      suggestedNextTools: ["get_email_template_details", "list_email_templates"],
+    });
   });
 
   it("returns multiple matches for ambiguous searches instead of failing", async () => {

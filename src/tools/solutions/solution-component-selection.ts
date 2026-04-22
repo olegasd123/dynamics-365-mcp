@@ -15,6 +15,7 @@ export const TOOL_COMPONENT_TYPES = {
   form: SOLUTION_COMPONENT_TYPE.form,
   view: SOLUTION_COMPONENT_TYPE.view,
   workflow: SOLUTION_COMPONENT_TYPE.workflow,
+  email_template: SOLUTION_COMPONENT_TYPE.emailTemplate,
   dashboard: SOLUTION_COMPONENT_TYPE.dashboard,
   web_resource: SOLUTION_COMPONENT_TYPE.webResource,
   app_module: SOLUTION_COMPONENT_TYPE.appModule,
@@ -134,6 +135,16 @@ export function listSupportedComponents(inventory: SolutionInventory): NamedSolu
         String(workflow.workflowid || ""),
         String(workflow.name || workflow.uniquename || ""),
         String(workflow.uniquename || workflow.name || ""),
+      ),
+    ),
+    ...inventory.emailTemplates.map((template) =>
+      createNamedComponent(
+        componentByKey,
+        SOLUTION_COMPONENT_TYPE.emailTemplate,
+        String(template.templateid || ""),
+        String(template.title || ""),
+        String(template.title || ""),
+        String(template.templatetypecode || ""),
       ),
     ),
     ...inventory.dashboards.map((dashboard) =>

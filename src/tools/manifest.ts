@@ -56,6 +56,8 @@ import { getViewDetailsTool } from "./views/get-view-details.js";
 import { getViewFetchXmlTool } from "./views/get-view-fetchxml.js";
 import { listChartsTool } from "./charts/list-charts.js";
 import { getChartDetailsTool } from "./charts/get-chart-details.js";
+import { listEmailTemplatesTool } from "./email-templates/list-email-templates.js";
+import { getEmailTemplateDetailsTool } from "./email-templates/get-email-template-details.js";
 import { listCustomApisTool } from "./custom-apis/list-custom-apis.js";
 import { getCustomApiDetailsTool } from "./custom-apis/get-custom-api-details.js";
 import { listCloudFlowsTool } from "./flows/list-cloud-flows.js";
@@ -495,6 +497,33 @@ export const TOOL_MANIFEST = [
     ...getChartDetailsTool,
     group: "schema_ui",
     mainParams: ["environment", "chartName", "table", "scope", "solution", "includeRawXml"],
+  },
+  {
+    ...listEmailTemplatesTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "nameFilter",
+      "templateTypeCode",
+      "scope",
+      "languageCode",
+      "solution",
+      "limit",
+      "cursor",
+    ],
+  },
+  {
+    ...getEmailTemplateDetailsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "templateName",
+      "templateTypeCode",
+      "scope",
+      "languageCode",
+      "solution",
+      "includeRawContent",
+    ],
   },
   {
     ...runFetchXmlTool,

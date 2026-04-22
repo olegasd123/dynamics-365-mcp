@@ -406,6 +406,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show details for chart <CHART> on table <TABLE> from solution <SOLUTION>. Include raw XML only if needed.`
   `(Required: <CHART>)`
 
+## Email Templates
+
+- `list_email_templates`
+  `In <ENV>, list organization email templates for table <TABLE> from solution <SOLUTION> with titles that contain 'Welcome'.`
+  `(Required: none)`
+
+- `get_email_template_details`
+  `In <ENV>, show details for email template <TEMPLATE>. Include raw content only if needed.`
+  `(Required: <TEMPLATE>)`
+
 ## Advanced Escape Hatches
 
 - `run_fetchxml`
@@ -562,6 +572,7 @@ This prompt list covers these tools:
 - `get_connection_reference_details`
 - `get_custom_api_details`
 - `get_dashboard_details`
+- `get_email_template_details`
 - `get_environment_variable_details`
 - `get_flow_details`
 - `get_form_details`
@@ -591,6 +602,7 @@ This prompt list covers these tools:
 - `list_connection_references`
 - `list_custom_apis`
 - `list_dashboards`
+- `list_email_templates`
 - `list_environment_variables`
 - `list_forms`
 - `list_publishers`

@@ -270,6 +270,25 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.list_email_templates.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        templateTypeCode: expect.any(Object),
+        scope: expect.any(Object),
+        languageCode: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_email_template_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        templateName: expect.any(Object),
+        templateTypeCode: expect.any(Object),
+        scope: expect.any(Object),
+        languageCode: expect.any(Object),
+        solution: expect.any(Object),
+        includeRawContent: expect.any(Object),
+      });
       expect(toolsByName.list_table_ribbons.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         table: expect.any(Object),
