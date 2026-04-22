@@ -91,3 +91,17 @@ export function listDocumentTemplateDetailsByIdsQuery(templateIds: string[]): st
     .orderby("associatedentitytypecode asc,name asc")
     .toString();
 }
+
+export function listDocumentTemplatesWithContentQuery(options?: {
+  nameFilter?: string;
+  associatedEntityTypeCode?: string;
+  documentType?: DocumentTemplateType;
+  status?: DocumentTemplateStatus;
+  languageCode?: number;
+}): string {
+  return query()
+    .select(DOCUMENT_TEMPLATE_DETAILS_SELECT)
+    .filter(buildDocumentTemplateFilter(options))
+    .orderby("associatedentitytypecode asc,name asc")
+    .toString();
+}

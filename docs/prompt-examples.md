@@ -530,6 +530,10 @@ This group needs at least two configured environments.
   `Compare JavaScript web resources with names that contain 'account' between <SOURCE_ENV> and <TARGET_ENV>, and compare content too.`
   `(Required: none)`
 
+- `compare_document_templates`
+  `Compare Word document templates for table <TABLE> between <SOURCE_ENV> and <TARGET_ENV>, and compare content hashes too.`
+  `(Required: none)`
+
 - `compare_environment_matrix`
   `Use <SOURCE_ENV> as the baseline and compare it with <TARGET_ENVS>. Include plugin assemblies, workflows, and web resources, and compare web resource content hashes too.`
   `(Required: none)`
@@ -562,6 +566,7 @@ This prompt list covers these tools:
 - `analyze_create_triggers`
 - `analyze_update_triggers`
 - `compare_custom_apis`
+- `compare_document_templates`
 - `compare_environment_matrix`
 - `compare_forms`
 - `compare_plugin_assemblies`

@@ -8,6 +8,12 @@ import {
   listWebResourcesWithContentQuery,
 } from "../../queries/web-resource-queries.js";
 import type { WebResourceType } from "../../queries/web-resource-queries.js";
+import {
+  listDocumentTemplatesQuery,
+  listDocumentTemplatesWithContentQuery,
+  type DocumentTemplateStatus,
+  type DocumentTemplateType,
+} from "../../queries/document-template-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import type { WorkflowCategory } from "../../queries/workflow-queries.js";
 import { diffCollections, type DiffResult } from "../../utils/diff.js";
@@ -57,6 +63,15 @@ export interface WorkflowComparisonOptions {
 export interface WebResourceComparisonOptions {
   type?: WebResourceType;
   nameFilter?: string;
+  compareContent?: boolean;
+}
+
+export interface DocumentTemplateComparisonOptions {
+  nameFilter?: string;
+  associatedEntityTypeCode?: string;
+  documentType?: DocumentTemplateType;
+  status?: DocumentTemplateStatus;
+  languageCode?: number;
   compareContent?: boolean;
 }
 
@@ -259,6 +274,57 @@ export async function compareWebResourcesData(
     compareFields: options?.compareContent
       ? ["webresourcetype", "ismanaged", "contentHash"]
       : ["webresourcetype", "ismanaged"],
+  });
+}
+
+export async function compareDocumentTemplatesData(
+  config: AppConfig,
+  client: DynamicsClient,
+  sourceEnvironment: string,
+  targetEnvironment: string,
+  options?: DocumentTemplateComparisonOptions,
+): Promise<CollectionComparisonData<Record<string, unknown>>> {
+  const queryOptions = {
+    nameFilter: options?.nameFilter,
+    associatedEntityTypeCode: options?.associatedEntityTypeCode,
+    documentType: options?.documentType,
+    status: options?.status,
+    languageCode: options?.languageCode,
+  };
+  const queryParams = options?.compareContent
+    ? listDocumentTemplatesWithContentQuery(queryOptions)
+    : listDocumentTemplatesQuery(queryOptions);
+
+  return compareSimpleCollectionData(config, sourceEnvironment, targetEnvironment, {
+    fetchSourceItems: (env) =>
+      client.query<Record<string, unknown>>(env, "documenttemplates", queryParams),
+    prepareSourceItems: (items) => {
+      if (options?.compareContent) {
+        addDocumentTemplateContentHashes(items);
+      }
+    },
+    prepareTargetItems: (items) => {
+      if (options?.compareContent) {
+        addDocumentTemplateContentHashes(items);
+      }
+    },
+    keyFn: (template) =>
+      [
+        String(template.associatedentitytypecode || ""),
+        String(template.documenttype || ""),
+        String(template.name || ""),
+      ].join(" | "),
+    compareFields: options?.compareContent
+      ? [
+          "associatedentitytypecode",
+          "documenttype",
+          "status",
+          "languagecode",
+          "description",
+          "contentHash",
+          "clientDataHash",
+        ]
+      : ["associatedentitytypecode", "documenttype", "status", "languagecode", "description"],
   });
 }
 
@@ -589,6 +655,19 @@ function addWebResourceContentHashes(items: Record<string, unknown>[]): void {
     resource.contentHash = resource.content
       ? createHash("sha256").update(String(resource.content)).digest("hex").slice(0, 12)
       : "(empty)";
+  }
+}
+
+function addDocumentTemplateContentHashes(items: Record<string, unknown>[]): void {
+  for (const template of items) {
+    template.contentHash = template.content
+      ? createHash("sha256").update(String(template.content)).digest("hex").slice(0, 12)
+      : "(empty)";
+    template.clientDataHash = template.clientdata
+      ? createHash("sha256").update(String(template.clientdata)).digest("hex").slice(0, 12)
+      : "(empty)";
+    delete template.content;
+    delete template.clientdata;
   }
 }
 

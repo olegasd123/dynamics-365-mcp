@@ -88,6 +88,7 @@ import { compareFormsTool } from "./comparison/compare-forms.js";
 import { compareViewsTool } from "./comparison/compare-views.js";
 import { compareCustomApisTool } from "./comparison/compare-custom-apis.js";
 import { compareSecurityRolesTool } from "./comparison/compare-security-roles.js";
+import { compareDocumentTemplatesTool } from "./comparison/compare-document-templates.js";
 import { runFetchXmlTool, isRunFetchXmlEnabled } from "./data/run-fetchxml.js";
 import type { AppConfig } from "../config/types.js";
 
@@ -703,6 +704,18 @@ export const TOOL_MANIFEST = [
     ...compareCustomApisTool,
     group: "comparison",
     mainParams: ["sourceEnvironment", "targetEnvironment", "apiName"],
+  },
+  {
+    ...compareDocumentTemplatesTool,
+    group: "comparison",
+    mainParams: [
+      "sourceEnvironment",
+      "targetEnvironment",
+      "associatedEntityTypeCode",
+      "documentType",
+      "nameFilter",
+      "compareContent",
+    ],
   },
   {
     ...compareSecurityRolesTool,

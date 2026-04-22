@@ -47,6 +47,18 @@
         }
       }
     ],
+    "compare_document_templates": [
+      {
+        "name": "account word templates",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "associatedEntityTypeCode": "account",
+          "documentType": "word",
+          "compareContent": false
+        }
+      }
+    ],
     "compare_environment_matrix": [
       {
         "name": "plugin matrix",

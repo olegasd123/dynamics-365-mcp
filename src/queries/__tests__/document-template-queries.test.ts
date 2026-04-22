@@ -4,6 +4,7 @@ import {
   listDocumentTemplateDetailsByIdsQuery,
   listDocumentTemplatesByIdsQuery,
   listDocumentTemplatesQuery,
+  listDocumentTemplatesWithContentQuery,
 } from "../document-template-queries.js";
 
 describe("document template queries", () => {
@@ -38,5 +39,19 @@ describe("document template queries", () => {
     expect(detailsQuery).toContain("documenttemplateid eq 'template-1'");
     expect(detailsQuery).toContain("clientdata");
     expect(detailsQuery).toContain("content");
+  });
+
+  it("builds document template content comparison query", () => {
+    const query = listDocumentTemplatesWithContentQuery({
+      associatedEntityTypeCode: "account",
+      documentType: "excel",
+      status: "draft",
+    });
+
+    expect(query).toContain("associatedentitytypecode eq 'account'");
+    expect(query).toContain("documenttype eq 1");
+    expect(query).toContain("status eq true");
+    expect(query).toContain("clientdata");
+    expect(query).toContain("content");
   });
 });
