@@ -101,6 +101,7 @@ Replace these values before you run a prompt:
 - `<WORKFLOW_ID>`: workflow id
 - `<FORM>`: form display name, unique name, or form id
 - `<VIEW>`: view name or view id
+- `<CHART>`: chart name or chart id
 - `<FETCHXML>`: one read-only FetchXML query string
 - `<BUTTON>`: ribbon button label, id, or command name
 - `<API>`: Custom API name or unique name
@@ -395,6 +396,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, return the normalized FetchXML for the system view <VIEW> on table <TABLE> from solution <SOLUTION>.`
   `(Required: <VIEW>)`
 
+## Charts
+
+- `list_charts`
+  `In <ENV>, list system charts for table <TABLE> from solution <SOLUTION> with names that contain 'Sales'.`
+  `(Required: none)`
+
+- `get_chart_details`
+  `In <ENV>, show details for chart <CHART> on table <TABLE> from solution <SOLUTION>. Include raw XML only if needed.`
+  `(Required: <CHART>)`
+
 ## Advanced Escape Hatches
 
 - `run_fetchxml`
@@ -547,6 +558,7 @@ This prompt list covers these tools:
 - `find_web_resource_usage`
 - `get_app_module_details`
 - `get_business_units_details`
+- `get_chart_details`
 - `get_connection_reference_details`
 - `get_custom_api_details`
 - `get_dashboard_details`
@@ -574,6 +586,7 @@ This prompt list covers these tools:
 - `list_actions`
 - `list_app_modules`
 - `list_business_units`
+- `list_charts`
 - `list_cloud_flows`
 - `list_connection_references`
 - `list_custom_apis`

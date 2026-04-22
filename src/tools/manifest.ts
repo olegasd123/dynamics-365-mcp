@@ -54,6 +54,8 @@ import { getRibbonButtonDetailsTool } from "./ribbons/get-ribbon-button-details.
 import { listViewsTool } from "./views/list-views.js";
 import { getViewDetailsTool } from "./views/get-view-details.js";
 import { getViewFetchXmlTool } from "./views/get-view-fetchxml.js";
+import { listChartsTool } from "./charts/list-charts.js";
+import { getChartDetailsTool } from "./charts/get-chart-details.js";
 import { listCustomApisTool } from "./custom-apis/list-custom-apis.js";
 import { getCustomApiDetailsTool } from "./custom-apis/get-custom-api-details.js";
 import { listCloudFlowsTool } from "./flows/list-cloud-flows.js";
@@ -483,6 +485,16 @@ export const TOOL_MANIFEST = [
     ...getViewFetchXmlTool,
     group: "schema_ui",
     mainParams: ["environment", "viewName", "table", "scope"],
+  },
+  {
+    ...listChartsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "table", "scope", "nameFilter", "solution", "limit", "cursor"],
+  },
+  {
+    ...getChartDetailsTool,
+    group: "schema_ui",
+    mainParams: ["environment", "chartName", "table", "scope", "solution", "includeRawXml"],
   },
   {
     ...runFetchXmlTool,

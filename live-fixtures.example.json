@@ -272,6 +272,17 @@
         }
       }
     ],
+    "get_chart_details": [
+      {
+        "name": "accounts by industry",
+        "arguments": {
+          "environment": "dev",
+          "chartName": "Accounts by Industry",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
     "get_environment_variable_details": [
       {
         "name": "base url",
@@ -621,6 +632,17 @@
         "arguments": {
           "environment": "dev",
           "nameFilter": "Sales Dashboard",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_charts": [
+      {
+        "name": "account charts",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "nameFilter": "Industry",
           "solution": "Contoso_Core"
         }
       }

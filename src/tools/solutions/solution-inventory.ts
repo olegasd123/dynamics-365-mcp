@@ -66,6 +66,7 @@ const COMPONENT_TYPE_LABELS: Record<number, string> = {
   24: "Form",
   26: "View",
   29: "Workflow",
+  59: "Saved Query Visualization",
   60: "Dashboard",
   61: "Web Resource",
   80: "App Module",

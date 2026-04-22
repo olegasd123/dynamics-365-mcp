@@ -146,6 +146,23 @@ describe("tool contracts", () => {
         dashboardName: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_charts.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        scope: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_chart_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        chartName: expect.any(Object),
+        table: expect.any(Object),
+        scope: expect.any(Object),
+        solution: expect.any(Object),
+        includeRawXml: expect.any(Object),
+      });
       expect(toolsByName.list_business_units.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         nameFilter: expect.any(Object),

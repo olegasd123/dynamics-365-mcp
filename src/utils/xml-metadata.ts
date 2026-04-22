@@ -24,6 +24,20 @@ export interface ViewXmlSummary {
   rowId: string;
 }
 
+export interface ChartXmlSummary {
+  normalizedDataXml: string;
+  normalizedPresentationXml: string;
+  dataHash: string;
+  presentationHash: string;
+  entityName: string;
+  attributes: string[];
+  groupByAttributes: string[];
+  aggregateAttributes: string[];
+  measureAliases: string[];
+  categoryAliases: string[];
+  chartTypes: string[];
+}
+
 export function summarizeFormXml(formXml: string): FormXmlSummary {
   const normalizedXml = normalizeXml(formXml);
 
@@ -62,12 +76,69 @@ export function summarizeViewXml(fetchXml: string, layoutXml: string): ViewXmlSu
   };
 }
 
+export function summarizeChartXml(dataXml: string, presentationXml: string): ChartXmlSummary {
+  const normalizedDataXml = normalizeXml(dataXml);
+  const normalizedPresentationXml = normalizeXml(presentationXml);
+
+  return {
+    normalizedDataXml,
+    normalizedPresentationXml,
+    dataHash: hashText(normalizedDataXml),
+    presentationHash: hashText(normalizedPresentationXml),
+    entityName: extractFirstAttributeValue(normalizedDataXml, "entity", "name"),
+    attributes: extractOrderedAttributeValues(normalizedDataXml, "attribute", "name"),
+    groupByAttributes: extractAttributeValuesByFlag(normalizedDataXml, "groupby", "true"),
+    aggregateAttributes: extractAggregateAttributeValues(normalizedDataXml),
+    measureAliases: extractOrderedAttributeValues(normalizedDataXml, "measure", "alias"),
+    categoryAliases: extractOrderedAttributeValues(normalizedDataXml, "category", "alias"),
+    chartTypes: extractOrderedAttributeValues(normalizedPresentationXml, "Series", "ChartType"),
+  };
+}
+
 export function normalizeXml(xml: string): string {
   return xml
     .replace(/<\?xml[\s\S]*?\?>/gi, "")
     .replace(/>\s+</g, "><")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractAttributeValuesByFlag(xml: string, flagName: string, flagValue: string): string[] {
+  const tagRegex = /<attribute\b([^>]*)>/gi;
+  const values: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of xml.matchAll(tagRegex)) {
+    const attrs = match[1] || "";
+    const value = extractAttributeFromChunk(attrs, "name");
+    const flag = extractAttributeFromChunk(attrs, flagName);
+    if (value && flag.toLowerCase() === flagValue.toLowerCase() && !seen.has(value)) {
+      seen.add(value);
+      values.push(value);
+    }
+  }
+
+  return values;
+}
+
+function extractAggregateAttributeValues(xml: string): string[] {
+  const tagRegex = /<attribute\b([^>]*)>/gi;
+  const values: string[] = [];
+  const seen = new Set<string>();
+
+  for (const match of xml.matchAll(tagRegex)) {
+    const attrs = match[1] || "";
+    const value = extractAttributeFromChunk(attrs, "name");
+    const aggregate = extractAttributeFromChunk(attrs, "aggregate");
+    if (!value || !aggregate || seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    values.push(`${value} ${aggregate}`);
+  }
+
+  return values;
 }
 
 function hashText(value: string): string {
