@@ -17,7 +17,6 @@ describe("list_global_option_sets", () => {
             IsManaged: false,
             IsCustomOptionSet: true,
             ParentOptionSetName: "",
-            Options: [{ Value: 1 }, { Value: 2 }, { Value: 3 }],
           },
           {
             MetadataId: "00000000-0000-0000-0000-000000000002",
@@ -29,7 +28,6 @@ describe("list_global_option_sets", () => {
             IsManaged: true,
             IsCustomOptionSet: false,
             ParentOptionSetName: "",
-            Options: [{ Value: 1 }, { Value: 2 }],
           },
         ],
       },
@@ -74,7 +72,6 @@ describe("list_global_option_sets", () => {
             name: "contoso_priority",
             displayName: "Priority",
             optionSetType: "Picklist",
-            optionCount: 3,
           },
         ],
       },

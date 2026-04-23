@@ -27,7 +27,7 @@ export interface GlobalOptionSetRecord extends Record<string, unknown> {
   isManaged: boolean;
   isCustomOptionSet: boolean;
   parentOptionSetName: string;
-  optionCount: number;
+  optionCount?: number;
 }
 
 export interface GlobalOptionSetDetails extends GlobalOptionSetRecord {
@@ -201,9 +201,9 @@ function normalizeGlobalOptionSetRecord(record: Record<string, unknown>): Global
   const optionSetType = normalizeEnumValue(record.OptionSetType);
   const options = extractOptions(record);
   const optionCount =
-    options.length > 0 ? options.length : optionSetType.toLowerCase() === "boolean" ? 2 : 0;
+    options.length > 0 ? options.length : optionSetType.toLowerCase() === "boolean" ? 2 : undefined;
 
-  return {
+  const normalizedRecord = {
     metadataId: String(record.MetadataId || ""),
     name: String(record.Name || ""),
     displayName: getLabelText(record.DisplayName),
@@ -213,8 +213,14 @@ function normalizeGlobalOptionSetRecord(record: Record<string, unknown>): Global
     isManaged: getBooleanValue(record.IsManaged),
     isCustomOptionSet: getBooleanValue(record.IsCustomOptionSet),
     parentOptionSetName: String(record.ParentOptionSetName || ""),
-    optionCount,
   };
+
+  return optionCount === undefined
+    ? normalizedRecord
+    : {
+        ...normalizedRecord,
+        optionCount,
+      };
 }
 
 function normalizeGlobalOptionSetDetails(record: Record<string, unknown>): GlobalOptionSetDetails {

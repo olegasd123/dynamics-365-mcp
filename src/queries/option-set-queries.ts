@@ -9,7 +9,6 @@ const GLOBAL_OPTION_SET_LIST_SELECT = [
   "IsGlobal",
   "IsManaged",
   "IsCustomOptionSet",
-  "Options",
 ] as const;
 
 export function globalOptionSetDefinitionsPath(): string {

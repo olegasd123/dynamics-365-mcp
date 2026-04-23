@@ -78,7 +78,7 @@ export async function handleListGlobalOptionSets(
         optionSet.name,
         optionSet.displayName || "-",
         optionSet.optionSetType || "-",
-        String(optionSet.optionCount),
+        optionSet.optionCount === undefined ? "-" : String(optionSet.optionCount),
         optionSet.isManaged ? "Yes" : "No",
         optionSet.isCustomOptionSet ? "Yes" : "No",
       ]),
