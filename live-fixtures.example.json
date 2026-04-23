@@ -71,6 +71,18 @@
         }
       }
     ],
+    "compare_environment_variable_matrix": [
+      {
+        "name": "environment variables matrix",
+        "arguments": {
+          "baselineEnvironment": "dev",
+          "targetEnvironments": ["test"],
+          "compareMode": "all",
+          "nameFilter": "contoso_",
+          "maxRows": 10
+        }
+      }
+    ],
     "compare_forms": [
       {
         "name": "account main form",

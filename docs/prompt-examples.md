@@ -538,6 +538,10 @@ This group needs at least two configured environments.
   `Use <SOURCE_ENV> as the baseline and compare it with <TARGET_ENVS>. Include plugin assemblies, workflows, and web resources, and compare web resource content hashes too.`
   `(Required: none)`
 
+- `compare_environment_variable_matrix`
+  `Use <SOURCE_ENV> as the baseline and compare environment variable definitions, current values, and effective values with <TARGET_ENVS>. Limit the scope to solution <SOLUTION> or variables matching <ENV_VAR> when needed.`
+  `(Required: none)`
+
 - `compare_table_schema`
   `Compare table <TABLE> in <SOURCE_ENV> with table <TARGET_TABLE> in <TARGET_ENV>.`
   `(Required: <TABLE>)`
@@ -568,6 +572,7 @@ This prompt list covers these tools:
 - `compare_custom_apis`
 - `compare_document_templates`
 - `compare_environment_matrix`
+- `compare_environment_variable_matrix`
 - `compare_forms`
 - `compare_plugin_assemblies`
 - `compare_security_roles`

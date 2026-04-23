@@ -83,6 +83,7 @@ import { compareSolutionsTool } from "./comparison/compare-solutions.js";
 import { compareWorkflowsTool } from "./comparison/compare-workflows.js";
 import { compareWebResourcesTool } from "./comparison/compare-web-resources.js";
 import { compareEnvironmentMatrixTool } from "./comparison/compare-environment-matrix.js";
+import { compareEnvironmentVariableMatrixTool } from "./comparison/compare-environment-variable-matrix.js";
 import { compareTableSchemaTool } from "./comparison/compare-table-schema.js";
 import { compareFormsTool } from "./comparison/compare-forms.js";
 import { compareViewsTool } from "./comparison/compare-views.js";
@@ -684,6 +685,11 @@ export const TOOL_MANIFEST = [
     ...compareEnvironmentMatrixTool,
     group: "comparison",
     mainParams: ["baselineEnvironment", "targetEnvironments", "componentType"],
+  },
+  {
+    ...compareEnvironmentVariableMatrixTool,
+    group: "comparison",
+    mainParams: ["baselineEnvironment", "targetEnvironments", "compareMode"],
   },
   {
     ...compareTableSchemaTool,

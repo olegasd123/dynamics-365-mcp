@@ -348,6 +348,14 @@ describe("tool contracts", () => {
         targetEnvironment: expect.any(Object),
         assemblyName: expect.any(Object),
       });
+      expect(toolsByName.compare_environment_variable_matrix.inputSchema.properties).toMatchObject({
+        baselineEnvironment: expect.any(Object),
+        targetEnvironments: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        compareMode: expect.any(Object),
+        maxRows: expect.any(Object),
+      });
       expect(toolsByName.list_plugins.description).toContain("plugin classes");
       expect(toolsByName.list_plugin_steps.description).toContain("plugin class");
       expect(toolsByName.get_plugin_details.description).toContain("plugin class");
