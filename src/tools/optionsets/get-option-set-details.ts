@@ -32,7 +32,6 @@ export async function handleGetOptionSetDetails(
     lines.push(`- Is Global: ${details.isGlobal ? "Yes" : "No"}`);
     lines.push(`- Managed: ${details.isManaged ? "Yes" : "No"}`);
     lines.push(`- Custom: ${details.isCustomOptionSet ? "Yes" : "No"}`);
-    lines.push(`- Parent Option Set: ${details.parentOptionSetName || "-"}`);
     lines.push(`- Option Count: ${details.optionCount}`);
     lines.push(`- Description: ${details.description || "-"}`);
     lines.push("");

@@ -61,7 +61,7 @@ export async function handleListGlobalOptionSets(
       narrowHint: page.hasMore ? "Use nameFilter to narrow the result." : undefined,
     });
     const text = `## Global Option Sets in '${env.name}'${nameFilter ? ` (filter='${nameFilter}')` : ""}\n\n${pageSummary}\n\n${formatTable(
-      ["Name", "Display Name", "Type", "Options", "Managed", "Custom", "Parent"],
+      ["Name", "Display Name", "Type", "Options", "Managed", "Custom"],
       page.items.map((optionSet) => [
         optionSet.name,
         optionSet.displayName || "-",
@@ -69,7 +69,6 @@ export async function handleListGlobalOptionSets(
         String(optionSet.optionCount),
         optionSet.isManaged ? "Yes" : "No",
         optionSet.isCustomOptionSet ? "Yes" : "No",
-        optionSet.parentOptionSetName || "-",
       ]),
     )}`;
 

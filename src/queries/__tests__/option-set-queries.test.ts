@@ -10,7 +10,7 @@ describe("option set queries", () => {
     const query = listGlobalOptionSetsQuery();
 
     expect(query).toContain(
-      "$select=MetadataId,Name,DisplayName,Description,OptionSetType,IsGlobal,IsManaged,IsCustomOptionSet,ParentOptionSetName,Options",
+      "$select=MetadataId,Name,DisplayName,Description,OptionSetType,IsGlobal,IsManaged,IsCustomOptionSet,Options",
     );
     expect(query).toContain("$orderby=Name asc");
   });

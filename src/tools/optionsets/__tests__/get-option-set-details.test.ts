@@ -67,6 +67,7 @@ describe("get_option_set_details", () => {
     expect(response.isError).not.toBe(true);
     expect(response.content[0]?.text).toContain("## Global Option Set: contoso_yesno");
     expect(response.content[0]?.text).toContain("### Options");
+    expect(response.content[0]?.text).not.toContain("Parent Option Set");
     expect(response.structuredContent).toMatchObject({
       version: "1",
       tool: "get_option_set_details",
