@@ -1,9 +1,10 @@
 import {
   and,
   eq,
+  guidEq,
   inList,
+  normalizeGuid,
   odataStringLiteral,
-  or,
   query,
   rawFilter,
 } from "../utils/odata-builder.js";
@@ -213,6 +214,8 @@ export function listSdkMessageProcessingStepsQuery(options: {
   mode?: number;
   statecode?: number;
 }): string {
+  const messageId = normalizeGuid(options.message);
+
   return query()
     .select([
       "sdkmessageprocessingstepid",
@@ -234,12 +237,11 @@ export function listSdkMessageProcessingStepsQuery(options: {
     ])
     .filter(
       and(
-        or(
-          rawFilter(
-            `tolower(sdkmessageid/name) eq ${odataStringLiteral(options.message.toLowerCase())}`,
-          ),
-          eq("_sdkmessageid_value", options.message),
-        ),
+        messageId
+          ? guidEq("_sdkmessageid_value", messageId)
+          : rawFilter(
+              `tolower(sdkmessageid/name) eq ${odataStringLiteral(options.message.toLowerCase())}`,
+            ),
         options.primaryEntity
           ? eq("sdkmessagefilterid/primaryobjecttypecode", options.primaryEntity)
           : undefined,

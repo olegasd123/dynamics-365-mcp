@@ -1,4 +1,13 @@
-import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import {
+  and,
+  contains,
+  eq,
+  guidEq,
+  inList,
+  normalizeGuid,
+  or,
+  query,
+} from "../utils/odata-builder.js";
 
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,
@@ -74,9 +83,11 @@ export function getWebResourceContentQuery(): string {
 }
 
 export function getWebResourceContentByNameQuery(resourceName: string): string {
+  const resourceId = normalizeGuid(resourceName);
+
   return query()
     .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
-    .filter(or(eq("name", resourceName), eq("webresourceid", resourceName)))
+    .filter(resourceId ? guidEq("webresourceid", resourceId) : eq("name", resourceName))
     .toString();
 }
 

@@ -34,8 +34,15 @@ describe("web resource queries", () => {
   });
 
   it("builds the web resource content query by name", () => {
-    expect(getWebResourceContentByNameQuery("new_/O'Hara.js")).toContain(
-      "$filter=name eq 'new_/O''Hara.js'",
+    const query = getWebResourceContentByNameQuery("new_/O'Hara.js");
+
+    expect(query).toContain("$filter=name eq 'new_/O''Hara.js'");
+    expect(query).not.toContain("or webresourceid");
+  });
+
+  it("builds the web resource content query by id", () => {
+    expect(getWebResourceContentByNameQuery("11111111-1111-1111-1111-111111111111")).toContain(
+      "$filter=webresourceid eq 11111111-1111-1111-1111-111111111111",
     );
   });
 

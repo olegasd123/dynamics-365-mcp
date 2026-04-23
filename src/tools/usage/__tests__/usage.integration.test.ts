@@ -301,6 +301,7 @@ describe("usage tools", () => {
   });
 
   it("supports web resource ids when finding usage", async () => {
+    const webResourceId = "11111111-1111-1111-1111-111111111111";
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
     const { client, calls } = createRecordingClient({
@@ -317,7 +318,7 @@ describe("usage tools", () => {
         ],
         webresourceset: [
           {
-            webresourceid: "wr-1",
+            webresourceid: webResourceId,
             name: "contoso_/scripts/app.js",
             webresourcetype: 3,
             content: Buffer.from("console.log('app');").toString("base64"),
@@ -329,13 +330,41 @@ describe("usage tools", () => {
     registerFindWebResourceUsage(server as never, config, client);
 
     const response = await server.getHandler("find_web_resource_usage")({
-      name: "wr-1",
+      name: webResourceId,
     });
 
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("Account Main");
     expect(response.content[0].text).toContain("contoso_/scripts/app.js");
-    expect(calls[0]?.queryParams).toContain("webresourceid eq 'wr-1'");
+    expect(calls[0]?.queryParams).toContain(`webresourceid eq ${webResourceId}`);
+  });
+
+  it("does not compare the id column with a web resource name when finding usage", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        systemforms: [],
+        webresourceset: [
+          {
+            webresourceid: "11111111-1111-1111-1111-111111111111",
+            name: "mso_/facturation/form.js",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('facturation');").toString("base64"),
+          },
+        ],
+      },
+    });
+
+    registerFindWebResourceUsage(server as never, config, client);
+
+    const response = await server.getHandler("find_web_resource_usage")({
+      name: "mso_/facturation/form.js",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(calls[0]?.queryParams).toContain("name eq 'mso_/facturation/form.js'");
+    expect(calls[0]?.queryParams).not.toContain("or webresourceid");
   });
 
   it("returns structured retry options when the web resource name is ambiguous", async () => {

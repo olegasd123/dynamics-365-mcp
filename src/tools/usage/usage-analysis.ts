@@ -26,6 +26,7 @@ import { fetchCustomApiInventory, listCustomApis } from "../custom-apis/custom-a
 import { fetchFlowDetails, listCloudFlows, type CloudFlowDetails } from "../flows/flow-metadata.js";
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
 import { chunkValues } from "../../utils/query-batching.js";
+import { normalizeGuid } from "../../utils/odata-builder.js";
 import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const TEXT_WEB_RESOURCE_TYPES = new Set([1, 2, 3, 4, 9, 12]);
@@ -475,10 +476,8 @@ export async function findWebResourceUsageData(
     listForms(env, client),
     client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery()),
   ]);
-  const matchingResourceRecords = resourceRecords.filter(
-    (resource) =>
-      String(resource.name || "") === resourceName ||
-      String(resource.webresourceid || "") === resourceName,
+  const matchingResourceRecords = resourceRecords.filter((resource) =>
+    matchesWebResourceRef(resource, resourceName),
   );
 
   if (matchingResourceRecords.length === 0) {
@@ -957,6 +956,17 @@ function formatWebResourceUsageMatch(resource: Record<string, unknown>): string 
   }
 
   return `${name} (${identity})`;
+}
+
+function matchesWebResourceRef(resource: Record<string, unknown>, resourceRef: string): boolean {
+  if (String(resource.name || "") === resourceRef) {
+    return true;
+  }
+
+  const expectedId = normalizeGuid(resourceRef);
+  const actualId = normalizeGuid(String(resource.webresourceid || ""));
+
+  return Boolean(expectedId && actualId && expectedId === actualId);
 }
 
 function flowJsonIncludesValue(flow: CloudFlowDetails, value: string): boolean {

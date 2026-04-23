@@ -103,7 +103,7 @@ describe("plugin queries", () => {
     });
 
     expect(query).toContain("tolower(sdkmessageid/name) eq 'update'");
-    expect(query).toContain("_sdkmessageid_value eq 'Update'");
+    expect(query).not.toContain("_sdkmessageid_value eq");
     expect(query).toContain("sdkmessagefilterid/primaryobjecttypecode eq 'account'");
     expect(query).toContain("stage eq 20");
     expect(query).toContain("mode eq 0");
@@ -112,6 +112,16 @@ describe("plugin queries", () => {
     expect(query).toContain("pluginassemblyid($select=pluginassemblyid,name)");
     expect(query).toContain("impersonatinguserid($select=systemuserid,fullname,domainname)");
     expect(query).toContain("$orderby=stage asc,rank asc,name asc");
+  });
+
+  it("builds the org-wide SDK message processing steps query by message id", () => {
+    const query = listSdkMessageProcessingStepsQuery({
+      message: "11111111-1111-1111-1111-111111111111",
+      primaryEntity: "account",
+    });
+
+    expect(query).toContain("_sdkmessageid_value eq 11111111-1111-1111-1111-111111111111");
+    expect(query).not.toContain("tolower(sdkmessageid/name)");
   });
 
   it("builds the plugin trace logs query", () => {

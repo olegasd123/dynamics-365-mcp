@@ -149,5 +149,44 @@ describe("list_sdk_message_processing_steps tool", () => {
     expect(response.content[0]?.text).toContain("No SDK message processing steps found");
     expect(calls).toHaveLength(1);
     expect(calls[0]?.queryParams).toContain("statecode eq 0");
+    expect(calls[0]?.queryParams).toContain("tolower(sdkmessageid/name) eq 'create'");
+    expect(calls[0]?.queryParams).not.toContain("_sdkmessageid_value eq");
+  });
+
+  it("does not compare the message id column with a message name", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "mso_facturation",
+            SchemaName: "mso_Facturation",
+            DisplayName: { UserLocalizedLabel: { Label: "Facturation" } },
+            DisplayCollectionName: { UserLocalizedLabel: { Label: "Facturations" } },
+            EntitySetName: "mso_facturations",
+            PrimaryIdAttribute: "mso_facturationid",
+            PrimaryNameAttribute: "mso_name",
+          },
+        ],
+        sdkmessageprocessingsteps: [],
+      },
+    });
+
+    registerListSdkMessageProcessingSteps(server as never, config, client);
+
+    const response = await server.getHandler("list_sdk_message_processing_steps")({
+      message: "Create",
+      primaryEntity: "mso_facturation",
+      includeImages: false,
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(calls[1]?.queryParams).toContain("tolower(sdkmessageid/name) eq 'create'");
+    expect(calls[1]?.queryParams).toContain(
+      "sdkmessagefilterid/primaryobjecttypecode eq 'mso_facturation'",
+    );
+    expect(calls[1]?.queryParams).not.toContain("_sdkmessageid_value eq");
   });
 });
