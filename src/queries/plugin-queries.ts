@@ -1,13 +1,4 @@
-import {
-  and,
-  eq,
-  guidEq,
-  inList,
-  normalizeGuid,
-  odataStringLiteral,
-  query,
-  rawFilter,
-} from "../utils/odata-builder.js";
+import { and, eq, guidEq, inList, query, rawFilter } from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",
@@ -208,14 +199,12 @@ export function listPluginImagesByIdsQuery(imageIds: string[]): string {
 }
 
 export function listSdkMessageProcessingStepsQuery(options: {
-  message: string;
+  messageId: string;
   primaryEntity?: string;
   stage?: number;
   mode?: number;
   statecode?: number;
 }): string {
-  const messageId = normalizeGuid(options.message);
-
   return query()
     .select([
       "sdkmessageprocessingstepid",
@@ -237,11 +226,7 @@ export function listSdkMessageProcessingStepsQuery(options: {
     ])
     .filter(
       and(
-        messageId
-          ? guidEq("_sdkmessageid_value", messageId)
-          : rawFilter(
-              `tolower(sdkmessageid/name) eq ${odataStringLiteral(options.message.toLowerCase())}`,
-            ),
+        guidEq("_sdkmessageid_value", options.messageId),
         options.primaryEntity
           ? eq("sdkmessagefilterid/primaryobjecttypecode", options.primaryEntity)
           : undefined,

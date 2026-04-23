@@ -6,6 +6,12 @@ const SDK_MESSAGE_FILTER_SELECT = [
   "iscustomprocessingstepallowed",
 ];
 
+const SDK_MESSAGE_SELECT = ["sdkmessageid", "name"];
+
+export function listSdkMessagesQuery(): string {
+  return query().select(SDK_MESSAGE_SELECT).orderby("name asc").toString();
+}
+
 export function listSdkMessageFiltersForTableQuery(tableLogicalName: string): string {
   return query()
     .select(SDK_MESSAGE_FILTER_SELECT)

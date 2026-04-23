@@ -12,6 +12,12 @@ describe("list_sdk_message_processing_steps tool", () => {
     const config = createTestConfig(["dev"]);
     const { client, calls } = createRecordingClient({
       dev: {
+        sdkmessages: [
+          {
+            sdkmessageid: "11111111-1111-1111-1111-111111111111",
+            name: "Update",
+          },
+        ],
         EntityDefinitions: [
           {
             MetadataId: "table-1",
@@ -124,6 +130,7 @@ describe("list_sdk_message_processing_steps tool", () => {
     expect(payload.data.count).toBe(3);
     expect(calls.map((call) => call.entitySet)).toEqual([
       "EntityDefinitions",
+      "sdkmessages",
       "sdkmessageprocessingsteps",
       "sdkmessageprocessingstepimages",
     ]);
@@ -134,6 +141,12 @@ describe("list_sdk_message_processing_steps tool", () => {
     const config = createTestConfig(["dev"]);
     const { client, calls } = createRecordingClient({
       dev: {
+        sdkmessages: [
+          {
+            sdkmessageid: "22222222-2222-2222-2222-222222222222",
+            name: "Create",
+          },
+        ],
         sdkmessageprocessingsteps: [],
       },
     });
@@ -147,10 +160,11 @@ describe("list_sdk_message_processing_steps tool", () => {
 
     expect(response.isError).toBeUndefined();
     expect(response.content[0]?.text).toContain("No SDK message processing steps found");
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.queryParams).toContain("statecode eq 0");
-    expect(calls[0]?.queryParams).toContain("tolower(sdkmessageid/name) eq 'create'");
-    expect(calls[0]?.queryParams).not.toContain("_sdkmessageid_value eq");
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.entitySet).toBe("sdkmessages");
+    expect(calls[1]?.queryParams).toContain("statecode eq 0");
+    expect(calls[1]?.queryParams).toContain("_sdkmessageid_value eq");
+    expect(calls[1]?.queryParams).not.toContain("tolower(sdkmessageid/name)");
   });
 
   it("does not compare the message id column with a message name", async () => {
@@ -170,6 +184,12 @@ describe("list_sdk_message_processing_steps tool", () => {
             PrimaryNameAttribute: "mso_name",
           },
         ],
+        sdkmessages: [
+          {
+            sdkmessageid: "22222222-2222-2222-2222-222222222222",
+            name: "Create",
+          },
+        ],
         sdkmessageprocessingsteps: [],
       },
     });
@@ -183,10 +203,12 @@ describe("list_sdk_message_processing_steps tool", () => {
     });
 
     expect(response.isError).toBeUndefined();
-    expect(calls[1]?.queryParams).toContain("tolower(sdkmessageid/name) eq 'create'");
-    expect(calls[1]?.queryParams).toContain(
+    expect(calls[0]?.entitySet).toBe("EntityDefinitions");
+    expect(calls[1]?.entitySet).toBe("sdkmessages");
+    expect(calls[2]?.queryParams).toContain("_sdkmessageid_value eq");
+    expect(calls[2]?.queryParams).toContain(
       "sdkmessagefilterid/primaryobjecttypecode eq 'mso_facturation'",
     );
-    expect(calls[1]?.queryParams).not.toContain("_sdkmessageid_value eq");
+    expect(calls[2]?.queryParams).not.toContain("tolower(sdkmessageid/name)");
   });
 });

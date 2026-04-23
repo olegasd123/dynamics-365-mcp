@@ -10,7 +10,10 @@ import {
   listPluginImagesForStepsQuery,
   listSdkMessageProcessingStepsQuery,
 } from "../../queries/plugin-queries.js";
+import { listSdkMessagesQuery } from "../../queries/sdk-message-queries.js";
+import { normalizeGuid } from "../../utils/odata-builder.js";
 import { resolveTable } from "../tables/table-metadata.js";
+import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const STAGE_LABELS: Record<number, string> = {
   10: "Pre-Validation",
@@ -85,6 +88,11 @@ interface SdkMessageProcessingStepRecord extends Record<string, unknown> {
   imageCount: number;
 }
 
+interface SdkMessageRecord extends Record<string, unknown> {
+  sdkmessageid: string;
+  name: string;
+}
+
 export async function handleListSdkMessageProcessingSteps(
   {
     environment,
@@ -100,13 +108,14 @@ export async function handleListSdkMessageProcessingSteps(
   try {
     const env = getEnvironment(config, environment);
     const table = primaryEntity ? await resolveTable(env, client, primaryEntity) : null;
+    const messageId = await resolveSdkMessageId(env, client, message);
     const modeValue = mode === "sync" ? 0 : mode === "async" ? 1 : undefined;
     const stateValue = statecode === "all" ? undefined : statecode === "disabled" ? 1 : 0;
     const stepRows = await client.query<Record<string, unknown>>(
       env,
       "sdkmessageprocessingsteps",
       listSdkMessageProcessingStepsQuery({
-        message,
+        messageId,
         primaryEntity: table?.logicalName,
         stage,
         mode: modeValue,
@@ -354,4 +363,113 @@ function getRecord(value: unknown): Record<string, unknown> | undefined {
   }
 
   return value as Record<string, unknown>;
+}
+
+async function resolveSdkMessageId(
+  env: ReturnType<typeof getEnvironment>,
+  client: DynamicsClient,
+  messageRef: string,
+): Promise<string> {
+  const messageId = normalizeGuid(messageRef);
+  if (messageId) {
+    return messageId;
+  }
+
+  const rows = await client.query<Record<string, unknown>>(
+    env,
+    "sdkmessages",
+    listSdkMessagesQuery(),
+  );
+  return resolveSdkMessage(messageRef, rows).sdkmessageid;
+}
+
+function resolveSdkMessage(messageRef: string, rows: Record<string, unknown>[]): SdkMessageRecord {
+  const messages = rows
+    .map((row) => ({
+      sdkmessageid: String(row.sdkmessageid || ""),
+      name: String(row.name || ""),
+    }))
+    .filter((message) => Boolean(message.sdkmessageid || message.name));
+
+  const exactId = messages.filter((message) => message.sdkmessageid === messageRef);
+  if (exactId.length === 1) {
+    return exactId[0];
+  }
+
+  const exactName = messages.filter((message) => message.name === messageRef);
+  if (exactName.length === 1) {
+    return exactName[0];
+  }
+
+  const needle = messageRef.trim().toLowerCase();
+  const caseInsensitiveMatches = uniqueMessages(
+    messages.filter(
+      (message) =>
+        message.sdkmessageid.toLowerCase() === needle || message.name.toLowerCase() === needle,
+    ),
+  );
+  if (caseInsensitiveMatches.length === 1) {
+    return caseInsensitiveMatches[0];
+  }
+
+  const partialMatches = uniqueMessages(
+    messages.filter(
+      (message) =>
+        message.sdkmessageid.toLowerCase().includes(needle) ||
+        message.name.toLowerCase().includes(needle),
+    ),
+  );
+  if (partialMatches.length === 1) {
+    return partialMatches[0];
+  }
+
+  const matches = uniqueMessages([
+    ...exactId,
+    ...exactName,
+    ...caseInsensitiveMatches,
+    ...partialMatches,
+  ]);
+  if (matches.length > 1) {
+    throw createAmbiguousSdkMessageError(messageRef, matches);
+  }
+
+  throw new Error(`SDK message '${messageRef}' not found.`);
+}
+
+function uniqueMessages(messages: SdkMessageRecord[]): SdkMessageRecord[] {
+  const seen = new Set<string>();
+
+  return messages.filter((message) => {
+    const key = message.sdkmessageid || message.name;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function createAmbiguousSdkMessageError(
+  messageRef: string,
+  matches: SdkMessageRecord[],
+): AmbiguousMatchError {
+  return new AmbiguousMatchError(
+    `SDK message '${messageRef}' is ambiguous. Choose a message and try again. Matches: ${matches.map(formatSdkMessageMatch).join(", ")}.`,
+    {
+      parameter: "message",
+      options: matches.map(createSdkMessageOption),
+    },
+  );
+}
+
+function createSdkMessageOption(message: SdkMessageRecord): AmbiguousMatchOption {
+  return {
+    value: message.sdkmessageid || message.name,
+    label: formatSdkMessageMatch(message),
+  };
+}
+
+function formatSdkMessageMatch(message: SdkMessageRecord): string {
+  const idSuffix = message.sdkmessageid ? ` (${message.sdkmessageid})` : "";
+  return `${message.name}${idSuffix}`;
 }
