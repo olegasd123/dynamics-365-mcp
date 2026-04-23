@@ -52,6 +52,10 @@ describe("list_global_option_sets", () => {
     expect(response.content[0]?.text).toContain("## Global Option Sets in 'dev'");
     expect(response.content[0]?.text).toContain("Showing 1 of 2 global option sets.");
     expect(response.content[0]?.text).not.toContain("Parent");
+    expect(response.structuredContent.ok).toBe(true);
+    if (response.structuredContent.ok) {
+      expect(response.structuredContent.data.items[0]).not.toHaveProperty("parentOptionSetName");
+    }
     expect(response.structuredContent).toMatchObject({
       version: "1",
       tool: "list_global_option_sets",

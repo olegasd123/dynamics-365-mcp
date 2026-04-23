@@ -27,6 +27,14 @@ const listGlobalOptionSetsSchema = {
 
 type ListGlobalOptionSetsParams = ToolParams<typeof listGlobalOptionSetsSchema>;
 
+function omitParentOptionSetName<T extends { parentOptionSetName?: string }>(
+  optionSet: T,
+): Omit<T, "parentOptionSetName"> {
+  const structuredOptionSet = { ...optionSet };
+  delete structuredOptionSet.parentOptionSetName;
+  return structuredOptionSet;
+}
+
 export async function handleListGlobalOptionSets(
   { environment, nameFilter, limit, cursor }: ListGlobalOptionSetsParams,
   { config, client }: ToolContext,
@@ -44,10 +52,14 @@ export async function handleListGlobalOptionSets(
       },
       { limit, cursor },
     );
+    const structuredPage = {
+      ...page,
+      items: page.items.map(omitParentOptionSetName),
+    };
 
     if (page.totalCount === 0) {
       const text = `No global option sets found in '${env.name}'${nameFilter ? ` for '${nameFilter}'.` : "."}`;
-      return createToolSuccessResponse("list_global_option_sets", text, text, page);
+      return createToolSuccessResponse("list_global_option_sets", text, text, structuredPage);
     }
 
     const pageSummary = buildPaginatedListSummary({
@@ -76,7 +88,7 @@ export async function handleListGlobalOptionSets(
       "list_global_option_sets",
       text,
       `${pageSummary} Environment: '${env.name}'.`,
-      page,
+      structuredPage,
     );
   } catch (error) {
     return createToolErrorResponse("list_global_option_sets", error);

@@ -68,6 +68,10 @@ describe("get_option_set_details", () => {
     expect(response.content[0]?.text).toContain("## Global Option Set: contoso_yesno");
     expect(response.content[0]?.text).toContain("### Options");
     expect(response.content[0]?.text).not.toContain("Parent Option Set");
+    expect(response.structuredContent.ok).toBe(true);
+    if (response.structuredContent.ok) {
+      expect(response.structuredContent.data.optionSet).not.toHaveProperty("parentOptionSetName");
+    }
     expect(response.structuredContent).toMatchObject({
       version: "1",
       tool: "get_option_set_details",

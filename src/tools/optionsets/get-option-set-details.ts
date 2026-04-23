@@ -15,6 +15,14 @@ const getOptionSetDetailsSchema = {
 
 type GetOptionSetDetailsParams = ToolParams<typeof getOptionSetDetailsSchema>;
 
+function omitParentOptionSetName<T extends { parentOptionSetName?: string }>(
+  optionSet: T,
+): Omit<T, "parentOptionSetName"> {
+  const structuredOptionSet = { ...optionSet };
+  delete structuredOptionSet.parentOptionSetName;
+  return structuredOptionSet;
+}
+
 export async function handleGetOptionSetDetails(
   { environment, optionSet }: GetOptionSetDetailsParams,
   { config, client }: ToolContext,
@@ -22,6 +30,7 @@ export async function handleGetOptionSetDetails(
   try {
     const env = getEnvironment(config, environment);
     const details = await getGlobalOptionSetDetails(env, client, optionSet);
+    const structuredDetails = omitParentOptionSetName(details);
     const lines: string[] = [];
 
     lines.push(`## Global Option Set: ${details.name}`);
@@ -61,7 +70,7 @@ export async function handleGetOptionSetDetails(
       `Loaded global option set '${details.name}' in '${env.name}'.`,
       {
         environment: env.name,
-        optionSet: details,
+        optionSet: structuredDetails,
       },
     );
   } catch (error) {
