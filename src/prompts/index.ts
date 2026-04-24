@@ -111,7 +111,7 @@ export function registerAllPrompts(server: McpServer, config: AppConfig): void {
               "Do not start with `run_fetchxml`.",
               "First choose the best curated tool or prompt path for this goal and explain why it is the safest and highest-signal option.",
               "Only suggest `run_fetchxml` if the curated tools cannot answer the exact question and only if the server has that tool enabled.",
-              "If you do fall back to `run_fetchxml`, keep it read-only, scope it to one table, and ask for the smallest useful result set.",
+              "If you do fall back to `run_fetchxml`, keep it read-only, scope it to one table, ask for the smallest useful result set, and use the tool `limit` argument instead of a FetchXML `top` attribute.",
               "Mention the exact curated tool you would try first, the likely follow-up tool, and the reason an escape hatch is or is not justified.",
             ]
               .filter(Boolean)

@@ -429,7 +429,7 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 ## Advanced Escape Hatches
 
 - `run_fetchxml`
-  `In <ENV>, run this read-only FetchXML against table <TABLE>: <FETCHXML>. Keep the result short and mention the applied row limit.`
+  `In <ENV>, run this read-only FetchXML against table <TABLE>: <FETCHXML>. Keep the result short, mention the applied row limit, and use the tool limit instead of a FetchXML top attribute.`
   `(Required: <TABLE>, <FETCHXML>)`
 
 ## Custom APIs

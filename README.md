@@ -134,6 +134,8 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.jso
 
 Use `allowedEnvironments` when you want the escape hatch available only in lower-risk orgs like `dev` or `test`.
 
+When you call `run_fetchxml`, pass row limits through the tool `limit` argument rather than a FetchXML `top` attribute. The server normalizes the outgoing query to use a FetchXML `count` before sending it to Dataverse.
+
 ### JSON Config File With Interactive Auth
 
 Use this when the user can sign in in a browser and does not have a client secret.

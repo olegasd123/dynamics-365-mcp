@@ -113,7 +113,7 @@ function buildAdvancedQueryGuidanceResource(): string {
     "## Escape Hatch Checklist",
     "1. Confirm the exact table first.",
     "2. Keep the query read-only and focused on one question.",
-    "3. Request the smallest reasonable limit.",
+    "3. Request the smallest reasonable limit and pass it through the tool `limit` argument, not a FetchXML `top` attribute.",
     "4. Prefer a curated follow-up if the first fallback query reveals a clearer next tool.",
   ].join("\n");
 }

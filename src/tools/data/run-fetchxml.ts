@@ -22,9 +22,11 @@ const runFetchXmlSchema = {
   fetchXml: z
     .string()
     .min(1)
-    .describe("FetchXML query. Read-only queries only. The root entity must match the table."),
+    .describe(
+      "FetchXML query. Read-only queries only. The root entity must match the table. Use the tool limit instead of a fetch top attribute.",
+    ),
   limit: LIST_LIMIT_SCHEMA.describe(
-    `Optional row cap for this query. Defaults to ${DEFAULT_FETCHXML_LIMIT} unless the FetchXML already has a smaller top/count.`,
+    `Optional row cap for this query. Defaults to ${DEFAULT_FETCHXML_LIMIT} unless the FetchXML already has a smaller top/count. The tool normalizes the request to a fetch count before calling Dataverse.`,
   ),
 };
 
@@ -79,10 +81,7 @@ export async function handleRunFetchXml(
       );
     }
 
-    const cappedFetchXml =
-      limit !== undefined || existingLimit === null
-        ? applyFetchXmlLimit(normalizedFetchXml, appliedLimit)
-        : normalizedFetchXml;
+    const cappedFetchXml = applyFetchXmlLimit(normalizedFetchXml, appliedLimit);
     const items = await client.queryPath<Record<string, unknown>>(
       env,
       resolvedTable.entitySetName,
@@ -256,12 +255,9 @@ function readFetchAttributeNumber(fetchXml: string, attributeName: string): numb
 }
 
 function applyFetchXmlLimit(fetchXml: string, limit: number): string {
-  let updated = setFetchAttribute(fetchXml, "count", String(limit));
-  if (readFetchAttributeNumber(updated, "top") !== null) {
-    updated = setFetchAttribute(updated, "top", String(limit));
-  }
-
-  return updated;
+  const withoutTop = removeFetchAttribute(fetchXml, "top");
+  const withoutCount = removeFetchAttribute(withoutTop, "count");
+  return setFetchAttribute(withoutCount, "count", String(limit));
 }
 
 function setFetchAttribute(
@@ -279,8 +275,16 @@ function setFetchAttribute(
   });
 }
 
+function removeFetchAttribute(fetchXml: string, attributeName: string): string {
+  return fetchXml.replace(/<fetch\b([^>]*)>/i, (_match, rawAttributes: string) => {
+    const attrRegex = new RegExp(`\\b${escapeRegExp(attributeName)}=(["']).*?\\1`, "ig");
+    const nextAttributes = rawAttributes.replace(attrRegex, " ");
+    return `<fetch${normalizeFetchAttributes(nextAttributes)}>`;
+  });
+}
+
 function normalizeFetchAttributes(attributes: string): string {
-  const trimmed = attributes.trim();
+  const trimmed = attributes.replace(/\s+/g, " ").trim();
   return trimmed ? ` ${trimmed}` : "";
 }
 
