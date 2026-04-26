@@ -94,6 +94,8 @@ function installRequestRecorder(client: DynamicsClient) {
 
   const originalQuery = client.query.bind(client);
   const originalQueryPath = client.queryPath.bind(client);
+  const originalQueryPage = client.queryPage.bind(client);
+  const originalQueryPagePath = client.queryPagePath.bind(client);
   const originalGetPath = client.getPath.bind(client);
 
   client.query = (async (env, entitySet, queryParams, options) => {
@@ -115,6 +117,26 @@ function installRequestRecorder(client: DynamicsClient) {
     });
     return originalQueryPath(env, resourcePath, queryParams, options);
   }) as DynamicsClient["queryPath"];
+
+  client.queryPage = (async (env, entitySet, queryParams, options) => {
+    recordedRequests.push({
+      method: "queryPage",
+      environment: env.name,
+      resourcePath: options?.pageLink || entitySet,
+      queryParams,
+    });
+    return originalQueryPage(env, entitySet, queryParams, options);
+  }) as DynamicsClient["queryPage"];
+
+  client.queryPagePath = (async (env, resourcePath, queryParams, options) => {
+    recordedRequests.push({
+      method: "queryPagePath",
+      environment: env.name,
+      resourcePath: options?.pageLink || resourcePath,
+      queryParams,
+    });
+    return originalQueryPagePath(env, resourcePath, queryParams, options);
+  }) as DynamicsClient["queryPagePath"];
 
   client.getPath = (async (env, resourcePath, queryParams) => {
     recordedRequests.push({
