@@ -1,4 +1,13 @@
-import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import {
+  and,
+  contains,
+  eq,
+  guidEq,
+  inList,
+  normalizeGuid,
+  or,
+  query,
+} from "../utils/odata-builder.js";
 
 const WEB_RESOURCE_TYPE: Record<string, number> = {
   html: 1,
@@ -41,6 +50,32 @@ export function listWebResourcesQuery(options?: {
     .toString();
 }
 
+export function searchWebResourcesQuery(searchText: string): string {
+  const queryText = searchText.trim();
+
+  return query()
+    .select([
+      "webresourceid",
+      "name",
+      "displayname",
+      "webresourcetype",
+      "ismanaged",
+      "description",
+      "modifiedon",
+    ])
+    .filter(
+      queryText
+        ? or(
+            contains("name", queryText),
+            contains("displayname", queryText),
+            contains("description", queryText),
+          )
+        : undefined,
+    )
+    .orderby("name asc")
+    .toString();
+}
+
 export function getWebResourceContentQuery(): string {
   return query()
     .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
@@ -48,9 +83,11 @@ export function getWebResourceContentQuery(): string {
 }
 
 export function getWebResourceContentByNameQuery(resourceName: string): string {
+  const resourceId = normalizeGuid(resourceName);
+
   return query()
     .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
-    .filter(or(eq("name", resourceName), eq("webresourceid", resourceName)))
+    .filter(resourceId ? guidEq("webresourceid", resourceId) : eq("name", resourceName))
     .toString();
 }
 

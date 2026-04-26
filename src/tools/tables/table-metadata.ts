@@ -280,6 +280,18 @@ export async function fetchTableRelationships(
   return { table, relationships };
 }
 
+export async function fetchTableKeys(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  tableRef: string,
+  solution?: string,
+): Promise<{ table: TableRecord; keys: TableKeyRecord[] }> {
+  const table = await resolveTable(env, client, tableRef, solution);
+  const keys = await fetchKeysByLogicalName(env, client, table.logicalName);
+
+  return { table, keys };
+}
+
 export async function fetchTableSchema(
   env: EnvironmentConfig,
   client: DynamicsClient,

@@ -1,5 +1,5 @@
 import type { AppConfig, EnvironmentConfig } from "../../config/types.js";
-export { EXPECTED_TOOL_NAMES } from "../manifest.js";
+export { KNOWN_TOOL_NAMES, getExpectedToolNames } from "../manifest.js";
 
 export const REMOVED_LEGACY_TOOL_NAMES = ["compare_plugins", "list_plugin_images"] as const;
 
@@ -34,7 +34,12 @@ export class FakeServer {
   }
 }
 
-export function createTestConfig(environmentNames: string[]): AppConfig {
+export function createTestConfig(
+  environmentNames: string[],
+  options?: {
+    advancedQueries?: AppConfig["advancedQueries"];
+  },
+): AppConfig {
   return {
     environments: environmentNames.map((name) => ({
       name,
@@ -44,6 +49,7 @@ export function createTestConfig(environmentNames: string[]): AppConfig {
       clientSecret: "secret",
     })),
     defaultEnvironment: environmentNames[0],
+    advancedQueries: options?.advancedQueries,
   };
 }
 

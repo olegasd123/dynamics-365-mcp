@@ -5,10 +5,16 @@ import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
 import { fetchPluginInventory } from "../plugins/plugin-inventory.js";
 import {
+  fetchColumnsByLogicalName,
   fetchTableRelationships,
   resolveTable,
   type TableRelationshipRecord,
 } from "../tables/table-metadata.js";
+import { listFieldSecurityProfilesData } from "../security/field-security-metadata.js";
+import {
+  fetchDuplicateDetectionRules,
+  type DuplicateRuleRecord,
+} from "../tables/list-duplicate-detection-rules.js";
 import {
   fetchFormDetails,
   fetchFormDetailsByIds,
@@ -20,6 +26,7 @@ import { fetchCustomApiInventory, listCustomApis } from "../custom-apis/custom-a
 import { fetchFlowDetails, listCloudFlows, type CloudFlowDetails } from "../flows/flow-metadata.js";
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
 import { chunkValues } from "../../utils/query-batching.js";
+import { normalizeGuid } from "../../utils/odata-builder.js";
 import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
 
 const TEXT_WEB_RESOURCE_TYPES = new Set([1, 2, 3, 4, 9, 12]);
@@ -43,6 +50,17 @@ export interface ColumnUsageData {
   columnName: string;
   tableLogicalName?: string;
   warnings?: string[];
+  fieldSecurity?: {
+    isSecured: boolean;
+    profiles: Array<{
+      name: string;
+      userCount: number;
+      teamCount: number;
+      canRead: string;
+      canCreate: string;
+      canUpdate: string;
+    }>;
+  };
   pluginSteps: Array<{ name: string; assemblyName: string; attributes: string }>;
   pluginImages: Array<{ name: string; stepName: string; assemblyName: string; attributes: string }>;
   workflows: Array<{ name: string; uniqueName: string; triggerAttributes: string }>;
@@ -111,6 +129,7 @@ export interface UpdateTriggerAnalysisData {
     matchedAttributes: string[];
     reason: string;
   }>;
+  duplicateDetectionRules: DuplicateRuleRecord[];
 }
 
 export interface CreateTriggerAnalysisData {
@@ -141,6 +160,7 @@ export interface CreateTriggerAnalysisData {
     matchedAttributes: string[];
     reason: string;
   }>;
+  duplicateDetectionRules: DuplicateRuleRecord[];
 }
 
 const PLUGIN_STAGE_LABELS: Record<number, string> = {
@@ -331,12 +351,16 @@ export async function findColumnUsageData(
       flowCandidates.map((flow) => fetchFlowDetails(env, client, flow.uniquename || flow.name)),
     ),
   ]);
+  const fieldSecurity = table
+    ? await fetchColumnFieldSecuritySummary(env, client, table.logicalName, columnName)
+    : undefined;
   const normalizedColumn = columnName.toLowerCase();
 
   return {
     columnName,
     tableLogicalName: table?.logicalName,
     warnings,
+    fieldSecurity,
     pluginSteps: pluginInventory.steps
       .filter(
         (step) =>
@@ -397,6 +421,46 @@ export async function findColumnUsageData(
   };
 }
 
+async function fetchColumnFieldSecuritySummary(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  tableLogicalName: string,
+  columnName: string,
+): Promise<ColumnUsageData["fieldSecurity"]> {
+  const normalizedColumn = columnName.toLowerCase();
+  const columns = await fetchColumnsByLogicalName(env, client, tableLogicalName);
+  const column = columns.find((item) => item.logicalName.toLowerCase() === normalizedColumn);
+  const isSecured = Boolean(column?.isSecured);
+
+  if (!isSecured) {
+    return {
+      isSecured: false,
+      profiles: [],
+    };
+  }
+
+  const fieldSecurity = await listFieldSecurityProfilesData(env, client, {
+    table: tableLogicalName,
+    column: normalizedColumn,
+  });
+
+  return {
+    isSecured: true,
+    profiles: fieldSecurity.items.map((profile) => {
+      const permission = profile.permissions[0];
+
+      return {
+        name: profile.name,
+        userCount: profile.memberCounts.users,
+        teamCount: profile.memberCounts.teams,
+        canRead: permission?.canRead || "NotAllowed",
+        canCreate: permission?.canCreate || "NotAllowed",
+        canUpdate: permission?.canUpdate || "NotAllowed",
+      };
+    }),
+  };
+}
+
 export async function findWebResourceUsageData(
   env: EnvironmentConfig,
   client: DynamicsClient,
@@ -412,10 +476,8 @@ export async function findWebResourceUsageData(
     listForms(env, client),
     client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery()),
   ]);
-  const matchingResourceRecords = resourceRecords.filter(
-    (resource) =>
-      String(resource.name || "") === resourceName ||
-      String(resource.webresourceid || "") === resourceName,
+  const matchingResourceRecords = resourceRecords.filter((resource) =>
+    matchesWebResourceRef(resource, resourceName),
   );
 
   if (matchingResourceRecords.length === 0) {
@@ -487,10 +549,11 @@ export async function analyzeUpdateTriggersData(
     "Direct matches use exact registered update metadata only.",
     "System-managed columns like modifiedon and modifiedby are not treated as direct matches unless they are part of the input changed attributes.",
     "System-managed column matches are shown separately when update registrations mention modifiedon or modifiedby.",
+    "Published duplicate detection rules are shown when this table is the base table.",
     "The report does not simulate downstream updates done by plugins, workflows, or cloud flows.",
   ];
 
-  const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
+  const [pluginAssemblies, workflows, cloudFlows, duplicateDetectionRules] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
     client.query<Record<string, unknown>>(
       env,
@@ -498,6 +561,11 @@ export async function analyzeUpdateTriggersData(
       listWorkflowsQuery({ status: "activated" }),
     ),
     listCloudFlows(env, client, { status: "activated" }),
+    fetchDuplicateDetectionRules(env, client, {
+      table,
+      status: "published",
+      tableRole: "base",
+    }),
   ]);
 
   const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
@@ -643,6 +711,7 @@ export async function analyzeUpdateTriggersData(
     directWorkflows,
     systemManagedPluginSteps,
     systemManagedWorkflows,
+    duplicateDetectionRules,
     relatedCloudFlows: flowDetails
       .map((flow) => {
         const matchedAttributes = normalizedAttributes.filter((attribute) =>
@@ -678,11 +747,12 @@ export async function analyzeCreateTriggersData(
   const warnings: string[] = [];
   const notes = [
     "Direct create matches are table-level. The provided fields do not narrow plugin Create steps or workflow Create triggers.",
-    "Provided fields are used only for related cloud flow references in this report.",
+    "Provided fields are used for related cloud flow references and duplicate rule field matches in this report.",
+    "Published duplicate detection rules are shown when this table is the base table.",
     "The report does not simulate downstream updates done by plugins, workflows, or cloud flows.",
   ];
 
-  const [pluginAssemblies, workflows, cloudFlows] = await Promise.all([
+  const [pluginAssemblies, workflows, cloudFlows, duplicateDetectionRules] = await Promise.all([
     client.query<Record<string, unknown>>(env, "pluginassemblies", listPluginAssembliesQuery()),
     client.query<Record<string, unknown>>(
       env,
@@ -690,6 +760,11 @@ export async function analyzeCreateTriggersData(
       listWorkflowsQuery({ status: "activated" }),
     ),
     listCloudFlows(env, client, { status: "activated" }),
+    fetchDuplicateDetectionRules(env, client, {
+      table,
+      status: "published",
+      tableRole: "base",
+    }),
   ]);
 
   const flowCandidates = cloudFlows.slice(0, MAX_USAGE_DETAIL_ITEMS);
@@ -712,6 +787,7 @@ export async function analyzeCreateTriggersData(
     providedAttributes: normalizedAttributes,
     warnings,
     notes,
+    duplicateDetectionRules,
     directPluginSteps: pluginInventory.steps
       .filter(
         (step) =>
@@ -880,6 +956,17 @@ function formatWebResourceUsageMatch(resource: Record<string, unknown>): string 
   }
 
   return `${name} (${identity})`;
+}
+
+function matchesWebResourceRef(resource: Record<string, unknown>, resourceRef: string): boolean {
+  if (String(resource.name || "") === resourceRef) {
+    return true;
+  }
+
+  const expectedId = normalizeGuid(resourceRef);
+  const actualId = normalizeGuid(String(resource.webresourceid || ""));
+
+  return Boolean(expectedId && actualId && expectedId === actualId);
 }
 
 function flowJsonIncludesValue(flow: CloudFlowDetails, value: string): boolean {

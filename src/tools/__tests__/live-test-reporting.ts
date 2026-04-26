@@ -4,7 +4,7 @@ export interface LiveRequestLogOptions {
 }
 
 export interface LiveRecordedRequest {
-  method: "query" | "queryPath" | "getPath";
+  method: "query" | "queryPath" | "queryPage" | "queryPagePath" | "getPath";
   environment: string;
   resourcePath: string;
   queryParams?: string;

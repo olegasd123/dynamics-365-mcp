@@ -1,4 +1,4 @@
-import { eq, inList, query } from "../utils/odata-builder.js";
+import { and, eq, guidEq, inList, query, rawFilter } from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",
@@ -198,6 +198,50 @@ export function listPluginImagesByIdsQuery(imageIds: string[]): string {
     .toString();
 }
 
+export function listSdkMessageProcessingStepsQuery(options: {
+  messageId: string;
+  primaryEntity?: string;
+  stage?: number;
+  mode?: number;
+  statecode?: number;
+}): string {
+  return query()
+    .select([
+      "sdkmessageprocessingstepid",
+      "_eventhandler_value",
+      "_sdkmessageid_value",
+      "_sdkmessagefilterid_value",
+      "_impersonatinguserid_value",
+      "name",
+      "stage",
+      "mode",
+      "rank",
+      "statecode",
+      "statuscode",
+      "filteringattributes",
+      "description",
+      "configuration",
+      "asyncautodelete",
+      "supporteddeployment",
+    ])
+    .filter(
+      and(
+        guidEq("_sdkmessageid_value", options.messageId),
+        options.primaryEntity
+          ? eq("sdkmessagefilterid/primaryobjecttypecode", options.primaryEntity)
+          : undefined,
+        options.stage !== undefined ? eq("stage", options.stage) : undefined,
+        options.mode !== undefined ? eq("mode", options.mode) : undefined,
+        options.statecode !== undefined ? eq("statecode", options.statecode) : undefined,
+      ),
+    )
+    .expand(
+      "sdkmessageid($select=sdkmessageid,name),sdkmessagefilterid($select=sdkmessagefilterid,primaryobjecttypecode),eventhandler_plugintype($select=plugintypeid,name,typename,isworkflowactivity,workflowactivitygroupname,customworkflowactivityinfo,_pluginassemblyid_value;$expand=pluginassemblyid($select=pluginassemblyid,name)),impersonatinguserid($select=systemuserid,fullname,domainname)",
+    )
+    .orderby("stage asc,rank asc,name asc")
+    .toString();
+}
+
 export function listStepsForAssemblyQuery(assemblyName: string): string {
   return query()
     .select([
@@ -214,5 +258,71 @@ export function listStepsForAssemblyQuery(assemblyName: string): string {
       "sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode),eventhandler_plugintype($select=name,typename)",
     )
     .orderby("name asc")
+    .toString();
+}
+
+export function listPluginTraceLogsQuery(options?: {
+  pluginTypeName?: string;
+  correlationId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  hasException?: boolean;
+  top?: number;
+}): string {
+  const filter = and(
+    options?.pluginTypeName ? eq("typename", options.pluginTypeName) : undefined,
+    options?.correlationId ? eq("correlationid", options.correlationId) : undefined,
+    options?.createdAfter ? rawFilter(`createdon ge ${options.createdAfter}`) : undefined,
+    options?.createdBefore ? rawFilter(`createdon le ${options.createdBefore}`) : undefined,
+    options?.hasException
+      ? rawFilter("(exceptiondetails ne null and exceptiondetails ne '')")
+      : undefined,
+  );
+
+  return query()
+    .select([
+      "plugintracelogid",
+      "typename",
+      "correlationid",
+      "createdon",
+      "messagename",
+      "primaryentity",
+      "mode",
+      "depth",
+      "performanceexecutionduration",
+      "exceptiondetails",
+      "messageblock",
+    ])
+    .filter(filter)
+    .orderby("createdon desc")
+    .top(options?.top ?? 50)
+    .count(true)
+    .toString();
+}
+
+export function getPluginTraceLogByIdQuery(): string {
+  return query()
+    .select([
+      "plugintracelogid",
+      "typename",
+      "correlationid",
+      "createdon",
+      "messagename",
+      "primaryentity",
+      "mode",
+      "depth",
+      "performanceexecutionduration",
+      "performanceconstructorduration",
+      "exceptiondetails",
+      "messageblock",
+      "configuration",
+      "secureconfiguration",
+      "profile",
+      "requestid",
+      "operationtype",
+      "pluginstepid",
+      "issystemcreated",
+      "persistencekey",
+    ])
     .toString();
 }

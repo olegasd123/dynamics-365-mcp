@@ -102,6 +102,7 @@ export async function handleGetSolutionDetails(
       ["Forms", String(inventory.forms.length)],
       ["Views", String(inventory.views.length)],
       ["Workflows", String(inventory.workflows.length)],
+      ["Email Templates", String(inventory.emailTemplates.length)],
       ["Dashboards", String(inventory.dashboards.length)],
       ["Web Resources", String(inventory.webResources.length)],
       ["App Modules", String(inventory.appModules.length)],
@@ -232,6 +233,26 @@ export async function handleGetSolutionDetails(
                 ? "Suspended"
                 : "Draft",
             String(workflow.primaryentity || "none"),
+          ]),
+        ),
+      );
+    }
+
+    if (inventory.emailTemplates.length > 0) {
+      lines.push("");
+      lines.push("### Email Templates");
+      lines.push(
+        formatTable(
+          ["Title", "Type", "Scope", "Language", "Managed", "Modified"],
+          inventory.emailTemplates.map((template) => [
+            String(template.title || ""),
+            String(template.templatetypecode || ""),
+            template.ispersonal ? "Personal" : "Organization",
+            template.languagecode === undefined || template.languagecode === null
+              ? "-"
+              : String(template.languagecode),
+            template.ismanaged ? "Yes" : "No",
+            String(template.modifiedon || "").slice(0, 10),
           ]),
         ),
       );
@@ -446,6 +467,7 @@ export async function handleGetSolutionDetails(
           forms: inventory.forms.length,
           views: inventory.views.length,
           workflows: inventory.workflows.length,
+          emailTemplates: inventory.emailTemplates.length,
           dashboards: inventory.dashboards.length,
           webResources: inventory.webResources.length,
           appModules: inventory.appModules.length,

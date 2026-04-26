@@ -1,6 +1,11 @@
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listCustomApis, type CustomApiRecord } from "../custom-apis/custom-api-metadata.js";
+import {
+  EMAIL_TEMPLATE_COMPONENT_TYPE,
+  listEmailTemplates,
+  type EmailTemplateRecord,
+} from "../email-templates/email-template-metadata.js";
 import { listCloudFlows, type CloudFlowRecord } from "../flows/flow-metadata.js";
 import { listForms, type FormRecord } from "../forms/form-metadata.js";
 import {
@@ -17,7 +22,7 @@ import {
 } from "../tables/table-metadata.js";
 import { listViews, type ViewRecord } from "../views/view-metadata.js";
 import { listWorkflowsQuery } from "../../queries/workflow-queries.js";
-import { listWebResourcesQuery } from "../../queries/web-resource-queries.js";
+import { searchWebResourcesQuery } from "../../queries/web-resource-queries.js";
 import { listSolutionComponentsByObjectIdsQuery } from "../../queries/solution-queries.js";
 import { queryRecordsByFieldValuesInChunks } from "../../utils/query-batching.js";
 
@@ -32,6 +37,7 @@ export const METADATA_COMPONENT_TYPES = [
   "plugin_assembly",
   "plugin_class",
   "web_resource",
+  "email_template",
   "solution",
   "custom_api",
 ] as const;
@@ -114,7 +120,13 @@ const NEXT_TOOLS: Record<MetadataComponentType, string[]> = {
   ],
   plugin_class: ["get_plugin_details", "list_plugin_steps"],
   web_resource: ["get_web_resource_content", "find_web_resource_usage", "list_web_resources"],
-  solution: ["get_solution_details", "get_solution_dependencies", "list_solutions"],
+  email_template: ["get_email_template_details", "list_email_templates"],
+  solution: [
+    "get_solution_details",
+    "get_solution_dependencies",
+    "get_solution_layers",
+    "list_solutions",
+  ],
   custom_api: ["get_custom_api_details", "list_custom_apis"],
 };
 
@@ -192,6 +204,7 @@ async function loadCandidates(
     views,
     flows,
     webResources,
+    emailTemplates,
     solutions,
     customApis,
   ] = await Promise.all([
@@ -204,8 +217,11 @@ async function loadCandidates(
       ? listCloudFlows(env, client)
       : Promise.resolve<CloudFlowRecord[]>([]),
     shouldLoad("web_resource", componentType)
-      ? client.query<Record<string, unknown>>(env, "webresourceset", listWebResourcesQuery())
+      ? client.query<Record<string, unknown>>(env, "webresourceset", searchWebResourcesQuery(query))
       : Promise.resolve<Record<string, unknown>[]>([]),
+    shouldLoad("email_template", componentType)
+      ? listEmailTemplates(env, client)
+      : Promise.resolve<EmailTemplateRecord[]>([]),
     shouldLoad("solution", componentType)
       ? listSolutions(env, client)
       : Promise.resolve<SolutionRecord[]>([]),
@@ -279,6 +295,10 @@ async function loadCandidates(
 
   if (shouldLoad("web_resource", componentType)) {
     candidates.push(...webResources.map(toWebResourceCandidate));
+  }
+
+  if (shouldLoad("email_template", componentType)) {
+    candidates.push(...emailTemplates.map(toEmailTemplateCandidate));
   }
 
   if (shouldLoad("solution", componentType)) {
@@ -469,6 +489,25 @@ function toWebResourceCandidate(resource: Record<string, unknown>): CandidateMat
       primaryField("resource name", resource.name),
       primaryField("display name", resource.displayname),
       secondaryField("description", resource.description),
+    ],
+  };
+}
+
+function toEmailTemplateCandidate(template: EmailTemplateRecord): CandidateMatch {
+  return {
+    componentType: "email_template",
+    displayName: template.title,
+    uniqueName: template.templatetypecode || null,
+    id: template.templateid || null,
+    parentName: template.templatetypecode || null,
+    solutionObjectId: template.templateid || null,
+    solutionComponentType: EMAIL_TEMPLATE_COMPONENT_TYPE,
+    suggestedNextTools: NEXT_TOOLS.email_template,
+    fields: [
+      primaryField("email template title", template.title),
+      primaryField("email template subject", template.subject),
+      secondaryField("template type", template.templatetypecode),
+      secondaryField("description", template.description),
     ],
   };
 }

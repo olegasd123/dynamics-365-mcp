@@ -47,6 +47,10 @@ Required notes below do not repeat environment placeholders.
   `Run the built-in prompt analyze_environment_drift with baseline <SOURCE_ENV>, targets <TARGET_ENVS>, and component type plugins.`
   `(Required: none)`
 
+- `advanced_query_fallback`
+  `Run the built-in prompt advanced_query_fallback for environment <ENV>, goal <TASK>, and table <TABLE>. Ask whether curated tools are enough or if a gated run_fetchxml fallback is justified.`
+  `(Required: <TASK>)`
+
 - `trace_flow_dependency`
   `Run the built-in prompt trace_flow_dependency for environment <ENV>, flow <FLOW>, and solution <SOLUTION>.`
   `(Required: <FLOW>)`
@@ -76,21 +80,29 @@ Replace these values before you run a prompt:
 - `<TARGET_SOLUTION>`: target solution display name or unique name
 - `<QUERY>`: search text like `account` or `sync`
 - `<TABLE>`: table logical name like `account`
+- `<TASK>`: short goal statement like `check active accounts with a custom filter`
 - `<TARGET_TABLE>`: target table name if it is different
 - `<COLUMN>`: column logical name like `name`
+- `<MESSAGE>`: SDK message name like `Update` or an sdkmessage id
 - `<COLUMNS>`: comma-separated column logical names like `name, accountnumber`
 - `<RECORD_ID>`: Dataverse row id
+- `<AUDIT_ID>`: audit row id
 - `<NAME>`: one full name, primary name, or last name
 - `<FIRST_NAME>`: first name like `Anna`
 - `<LAST_NAME>`: last name like `Smith`
 - `<PLUGIN>`: plugin assembly name
 - `<PLUGIN_CLASS>`: plugin class name or full type name
+- `<CORRELATION_ID>`: plugin trace correlation id
+- `<TRACE_LOG_ID>`: plugin trace log id
+- `<SYSTEM_JOB_ID>`: system job id (`asyncoperationid`)
 - `<STEP>`: plugin step name
 - `<WORKFLOW>`: workflow display name
 - `<WORKFLOW_UNIQUE_NAME>`: workflow unique name
 - `<WORKFLOW_ID>`: workflow id
 - `<FORM>`: form display name, unique name, or form id
 - `<VIEW>`: view name or view id
+- `<CHART>`: chart name or chart id
+- `<FETCHXML>`: one read-only FetchXML query string
 - `<BUTTON>`: ribbon button label, id, or command name
 - `<API>`: Custom API name or unique name
 - `<FLOW>`: cloud flow display name or unique name
@@ -104,6 +116,7 @@ Replace these values before you run a prompt:
 - `<ENV_VAR>`: environment variable schema name or display name
 - `<CONNECTION_REFERENCE>`: connection reference display name or logical name
 - `<APP_MODULE>`: app module name or unique name
+- `<SITEMAP>`: sitemap name, unique name, or id
 - `<DASHBOARD>`: dashboard name
 
 Tip:
@@ -140,9 +153,36 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list plugin images for the plugin assembly <PLUGIN>. Filter to step <STEP> and message Update if possible.`
   `(Required: <PLUGIN>)`
 
+- `list_sdk_message_processing_steps`
+  `In <ENV>, list all enabled SDK message processing steps for message Update on table account. Include assembly, class, rank, filtering attributes, user context, and images.`
+  `In <ENV>, list disabled SDK message processing steps for message Update on table account.`
+  `(Required: <MESSAGE>)`
+
 - `get_plugin_assembly_details`
   `In <ENV>, show full details for the plugin assembly <PLUGIN>, and keep plugin classes and workflow activities in separate sections. Include steps and images.`
   `(Required: <PLUGIN>)`
+
+- `list_plugin_trace_logs`
+  `In <ENV>, list recent plugin trace logs for plugin class <PLUGIN_CLASS>. Show only logs with exceptions from the last 1 day.`
+  `In <ENV>, list recent plugin trace logs for correlation id <CORRELATION_ID>.`
+  `(Required: none)`
+
+- `get_plugin_trace_log_details`
+  `In <ENV>, show full details for plugin trace log <TRACE_LOG_ID>. Include exception details, message block, configuration, and timing fields.`
+  `(Required: <TRACE_LOG_ID>)`
+
+## System Jobs
+
+- `list_system_jobs`
+  `In <ENV>, list failed import system jobs from the last 1 day. Show created time, status, category, and message preview.`
+  `In <ENV>, list failed bulk delete system jobs from the last 7 days.`
+  `In <ENV>, list system jobs for correlation id <CORRELATION_ID>.`
+  `In <ENV>, list in-progress workflow system jobs that were created in the last 2 hours.`
+  `(Required: none)`
+
+- `get_system_job_details`
+  `In <ENV>, show full details for system job <SYSTEM_JOB_ID>. Include message text, timing fields, recurrence data, and related workflow, plug-in step, or bulk delete details when they exist.`
+  `(Required: <SYSTEM_JOB_ID>)`
 
 ## Workflows And Actions
 
@@ -164,6 +204,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 - `get_workflow_details`
   `In <ENV>, show full details for workflow <WORKFLOW_NAME>. If needed, use <WORKFLOW_UNIQUE_NAME> / <WORKFLOW_ID>.`
+  `(Required: none)`
+
+- `get_bpf_details`
+  `In <ENV>, show full details for business process flow <BPF_NAME>. Include fields used, stages, branching, backing table, and runtime-state behavior.`
+  `If needed, use <BPF_UNIQUE_NAME> / <WORKFLOW_ID>.`
   `(Required: none)`
 
 ## Web Resources
@@ -202,6 +247,14 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show full details for app module <APP_MODULE> from solution <SOLUTION>.`
   `(Required: <APP_MODULE>)`
 
+- `list_sitemaps`
+  `In <ENV>, list sitemaps for app module <APP_MODULE> from solution <SOLUTION>.`
+  `(Required: none)`
+
+- `get_sitemap_details`
+  `In <ENV>, show full navigation details for the sitemap used by app module <APP_MODULE>.`
+  `(Required: <APP_MODULE> or <SITEMAP>)`
+
 - `list_dashboards`
   `In <ENV>, list dashboards from solution <SOLUTION> that match 'Sales'.`
   `(Required: none)`
@@ -211,6 +264,14 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: <DASHBOARD>)`
 
 ## Solutions
+
+- `list_publishers`
+  `In <ENV>, list solution publishers whose name contains 'Contoso' or whose prefix contains 'cts'.`
+  `(Required: none)`
+
+- `get_publisher_details`
+  `In <ENV>, show full details for publisher <PUBLISHER>, including its prefix metadata and the solutions that use it.`
+  `(Required: <PUBLISHER>)`
 
 - `list_solutions`
   `In <ENV>, list solutions with names that contain 'Core'.`
@@ -222,6 +283,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 - `get_solution_dependencies`
   `In <ENV>, show both required and dependent links for solution <SOLUTION>. Limit the result to component type web_resource and component name <WEB_RESOURCE>.`
+  `(Required: <SOLUTION>)`
+
+- `get_solution_layers`
+  `In <ENV>, show the active layer stack for solution <SOLUTION>. Limit the result to component type web_resource and component name <WEB_RESOURCE> so I can see whether an unmanaged layer is winning.`
   `(Required: <SOLUTION>)`
 
 ## Tables
@@ -239,9 +304,33 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show the full schema for table <TABLE> from solution <SOLUTION>. Include columns, keys, and relationships.`
   `(Required: <TABLE>)`
 
+- `list_table_alternate_keys`
+  `In <ENV>, list alternate keys for table <TABLE> from solution <SOLUTION>.`
+  `(Required: <TABLE>)`
+
+- `list_duplicate_detection_rules`
+  `In <ENV>, list published duplicate detection rules for table <TABLE>. Include base table, matching table, status, and conditions.`
+  `(Required: none)`
+
+- `list_table_messages`
+  `In <ENV>, list which platform SDK messages are valid for table <TABLE>. Keep platform SDK messages, bound custom actions, and bound Custom APIs in separate sections.`
+  `(Required: <TABLE>)`
+
+- `get_table_message_details`
+  `In <ENV>, show the SDK message details for message <MESSAGE> on table <TABLE>. Include the raw sdkmessagefilter rows behind that table-message combination.`
+  `(Required: <TABLE>, <MESSAGE>)`
+
 - `list_table_columns`
   `In <ENV>, list columns for table <TABLE> from solution <SOLUTION>.`
   `(Required: <TABLE>)`
+
+- `list_global_option_sets`
+  `In <ENV>, list shared global option sets whose name matches 'priority'.`
+  `(Required: none)`
+
+- `get_option_set_details`
+  `In <ENV>, show details for global option set <OPTION_SET>. Include every option value and label.`
+  `(Required: <OPTION_SET>)`
 
 - `list_table_relationships`
   `In <ENV>, list relationships for table <TABLE> from solution <SOLUTION>.`
@@ -262,6 +351,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `If you need every readable field, set includeAllFields to true.`
   `If the record has many fields, ask for the next page with the returned cursor.`
   `(Required: <TABLE> and one lookup value)`
+
+- `list_audit_history`
+  `In <ENV>, list audit history for table <TABLE> from 2026-04-20T08:00:00Z to 2026-04-20T18:00:00Z.`
+  `In <ENV>, list audit history for the record <RECORD_ID> from table <TABLE>.`
+  `In <ENV>, list audit history for the contact with last name <LAST_NAME> from table contact.`
+  `(Required: <TABLE> and a time window or one record lookup)`
+
+- `get_audit_details`
+  `In <ENV>, show full audit details for audit record <AUDIT_ID>. Include the detail type and the full field diff when it exists.`
+  `(Required: <AUDIT_ID>)`
 
 ## Forms
 
@@ -296,6 +395,42 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_view_fetchxml`
   `In <ENV>, return the normalized FetchXML for the system view <VIEW> on table <TABLE> from solution <SOLUTION>.`
   `(Required: <VIEW>)`
+
+## Charts
+
+- `list_charts`
+  `In <ENV>, list system charts for table <TABLE> from solution <SOLUTION> with names that contain 'Sales'.`
+  `(Required: none)`
+
+- `get_chart_details`
+  `In <ENV>, show details for chart <CHART> on table <TABLE> from solution <SOLUTION>. Include raw XML only if needed.`
+  `(Required: <CHART>)`
+
+## Email Templates
+
+- `list_email_templates`
+  `In <ENV>, list organization email templates for table <TABLE> from solution <SOLUTION> with titles that contain 'Welcome'.`
+  `(Required: none)`
+
+- `get_email_template_details`
+  `In <ENV>, show details for email template <TEMPLATE>. Include raw content only if needed.`
+  `(Required: <TEMPLATE>)`
+
+## Document Templates
+
+- `list_document_templates`
+  `In <ENV>, list Word document templates for table <TABLE> with names that contain 'Quote'.`
+  `(Required: none)`
+
+- `get_document_template_details`
+  `In <ENV>, show details for document template <TEMPLATE>. Include base64 content only if needed.`
+  `(Required: <TEMPLATE>)`
+
+## Advanced Escape Hatches
+
+- `run_fetchxml`
+  `In <ENV>, run this read-only FetchXML against table <TABLE>: <FETCHXML>. Keep the result short, mention the applied row limit, and use the tool limit instead of a FetchXML top attribute.`
+  `(Required: <TABLE>, <FETCHXML>)`
 
 ## Custom APIs
 
@@ -334,6 +469,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 - `get_role_privileges`
   `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
+
+- `list_field_security_profiles`
+  `In <ENV>, list field security profiles that grant access to column <COLUMN> on table <TABLE>. Include member names only when needed.`
+  `(Required: none)`
 
 ## Usage And Impact
 
@@ -391,8 +530,16 @@ This group needs at least two configured environments.
   `Compare JavaScript web resources with names that contain 'account' between <SOURCE_ENV> and <TARGET_ENV>, and compare content too.`
   `(Required: none)`
 
+- `compare_document_templates`
+  `Compare Word document templates for table <TABLE> between <SOURCE_ENV> and <TARGET_ENV>, and compare content hashes too.`
+  `(Required: none)`
+
 - `compare_environment_matrix`
   `Use <SOURCE_ENV> as the baseline and compare it with <TARGET_ENVS>. Include plugin assemblies, workflows, and web resources, and compare web resource content hashes too.`
+  `(Required: none)`
+
+- `compare_environment_variable_matrix`
+  `Use <SOURCE_ENV> as the baseline and compare environment variable definitions, current values, and effective values with <TARGET_ENVS>. Limit the scope to solution <SOLUTION> or variables matching <ENV_VAR> when needed.`
   `(Required: none)`
 
 - `compare_table_schema`
@@ -423,7 +570,9 @@ This prompt list covers these tools:
 - `analyze_create_triggers`
 - `analyze_update_triggers`
 - `compare_custom_apis`
+- `compare_document_templates`
 - `compare_environment_matrix`
+- `compare_environment_variable_matrix`
 - `compare_forms`
 - `compare_plugin_assemblies`
 - `compare_security_roles`
@@ -439,19 +588,29 @@ This prompt list covers these tools:
 - `find_web_resource_usage`
 - `get_app_module_details`
 - `get_business_units_details`
+- `get_chart_details`
 - `get_connection_reference_details`
 - `get_custom_api_details`
 - `get_dashboard_details`
+- `get_document_template_details`
+- `get_email_template_details`
 - `get_environment_variable_details`
 - `get_flow_details`
 - `get_form_details`
 - `get_plugin_details`
 - `get_plugin_assembly_details`
+- `get_plugin_trace_log_details`
+- `get_publisher_details`
+- `get_system_job_details`
 - `get_ribbon_button_details`
 - `get_role_privileges`
 - `get_solution_dependencies`
+- `get_solution_layers`
 - `get_solution_details`
+- `get_sitemap_details`
 - `get_table_schema`
+- `get_audit_details`
+- `list_audit_history`
 - `get_view_details`
 - `get_view_fetchxml`
 - `get_web_resource_content`
@@ -459,22 +618,37 @@ This prompt list covers these tools:
 - `list_actions`
 - `list_app_modules`
 - `list_business_units`
+- `list_charts`
 - `list_cloud_flows`
 - `list_connection_references`
 - `list_custom_apis`
 - `list_dashboards`
+- `list_document_templates`
+- `list_email_templates`
 - `list_environment_variables`
 - `list_forms`
+- `list_publishers`
 - `list_table_ribbons`
 - `list_plugin_steps`
+- `list_plugin_trace_logs`
+- `list_system_jobs`
 - `list_plugins`
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`
 - `list_plugin_assemblies`
+- `list_sdk_message_processing_steps`
 - `list_security_roles`
+- `list_field_security_profiles`
+- `list_sitemaps`
 - `list_solutions`
 - `list_table_columns`
+- `list_table_alternate_keys`
+- `list_duplicate_detection_rules`
+- `list_table_messages`
+- `get_table_message_details`
+- `list_table_records`
 - `list_table_relationships`
+- `get_table_record_details`
 - `list_tables`
 - `list_views`
 - `list_web_resources`

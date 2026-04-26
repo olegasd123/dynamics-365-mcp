@@ -5,6 +5,8 @@ type ODataPrimitive = string | number | boolean | null;
 const PRECEDENCE_OR = 1;
 const PRECEDENCE_AND = 2;
 const PRECEDENCE_ATOM = 3;
+const GUID_PATTERN =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 export class ODataFilter {
   constructor(
@@ -123,6 +125,28 @@ export function rawFilter(expression: string): ODataFilter {
 
 export function eq<Field extends string>(field: Field, value: ODataPrimitive): ODataFilter {
   return rawFilter(`${field} eq ${formatODataPrimitive(value)}`);
+}
+
+export function normalizeGuid(value: string): string | null {
+  const trimmed = value.trim();
+  const withoutBraces =
+    trimmed.startsWith("{") && trimmed.endsWith("}") ? trimmed.slice(1, -1) : trimmed;
+
+  if (!GUID_PATTERN.test(withoutBraces)) {
+    return null;
+  }
+
+  return withoutBraces.toLowerCase();
+}
+
+export function guidEq<Field extends string>(field: Field, value: string): ODataFilter {
+  const guid = normalizeGuid(value);
+
+  if (!guid) {
+    throw new Error(`Value '${value}' is not a GUID.`);
+  }
+
+  return rawFilter(`${field} eq ${guid}`);
 }
 
 export function contains<Field extends string>(field: Field, value: string): ODataFilter {

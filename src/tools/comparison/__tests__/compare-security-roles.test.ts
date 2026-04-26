@@ -271,4 +271,94 @@ describe("compare_security_roles", () => {
       },
     });
   });
+
+  it("uses business unit ids to disambiguate duplicate business unit names", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["prod", "dev"]);
+    const { client } = createRecordingClient({
+      prod: {
+        businessunits: [
+          {
+            businessunitid: "prod-root",
+            name: "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "prod-role",
+            name: "Salesperson",
+            _businessunitid_value: "prod-root",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: [],
+        privileges: [],
+      },
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "dev-root",
+            name: "Root",
+          },
+          {
+            businessunitid: "dev-duplicate-1",
+            name: "Duplicate",
+            _parentbusinessunitid_value: "dev-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+          {
+            businessunitid: "dev-duplicate-2",
+            name: "Duplicate",
+            _parentbusinessunitid_value: "dev-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "dev-role-1",
+            name: "Salesperson",
+            _businessunitid_value: "dev-duplicate-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Duplicate",
+            ismanaged: false,
+          },
+          {
+            roleid: "dev-role-2",
+            name: "Salesperson",
+            _businessunitid_value: "dev-duplicate-2",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Duplicate",
+            ismanaged: false,
+          },
+        ],
+        roleprivilegescollection: [],
+        privileges: [],
+      },
+    });
+
+    registerCompareSecurityRoles(server as never, config, client);
+    const response = await server.getHandler("compare_security_roles")({
+      sourceEnvironment: "prod",
+      targetEnvironment: "dev",
+      roleName: "Salesperson",
+      targetBusinessUnit: "dev-duplicate-2",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.structuredContent).toMatchObject({
+      ok: true,
+      data: {
+        targetBusinessUnit: "Duplicate",
+        roleComparison: {
+          differences: [
+            expect.objectContaining({
+              target: expect.objectContaining({
+                roleid: "dev-role-2",
+                businessunitid: "dev-duplicate-2",
+              }),
+            }),
+          ],
+        },
+      },
+    });
+  });
 });

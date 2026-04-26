@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  listFieldPermissionsQuery,
+  listFieldSecurityProfilesQuery,
   listBusinessUnitsQuery,
   listPrivilegesByIdsQuery,
   listRolePrivilegesForRolesQuery,
@@ -47,5 +49,21 @@ describe("security queries", () => {
 
     expect(query).toContain("privilegeid eq 'priv-1' or privilegeid eq 'priv-2'");
     expect(query).toContain("canbeglobal");
+  });
+
+  it("builds field security profile and permission queries", () => {
+    const profileQuery = listFieldSecurityProfilesQuery("Finance");
+    const permissionQuery = listFieldPermissionsQuery(["profile-1"], {
+      tableLogicalName: "account",
+      columnLogicalName: "creditlimit",
+    });
+
+    expect(profileQuery).toContain("fieldsecurityprofileid,name,description,ismanaged");
+    expect(profileQuery).toContain("$filter=contains(name,'Finance')");
+    expect(profileQuery).toContain("systemuserprofiles_association");
+    expect(profileQuery).toContain("teamprofiles_association");
+    expect(permissionQuery).toContain("_fieldsecurityprofileid_value eq 'profile-1'");
+    expect(permissionQuery).toContain("entityname eq 'account'");
+    expect(permissionQuery).toContain("attributelogicalname eq 'creditlimit'");
   });
 });

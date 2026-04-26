@@ -5,22 +5,22 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerAllTools } from "../index.js";
 import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
-  EXPECTED_TOOL_NAMES,
   REMOVED_LEGACY_TOOL_NAMES,
   createRecordingClient,
   createTestConfig,
+  getExpectedToolNames,
   type ToolResponse,
 } from "./tool-test-helpers.js";
 
 async function createConnectedToolClient(
   datasets: Record<string, Record<string, unknown>>,
   environmentNames: string[],
+  config = createTestConfig(environmentNames),
 ) {
   const server = new McpServer({
     name: "tool-contract-test-server",
     version: "1.0.0",
   });
-  const config = createTestConfig(environmentNames);
   const { client: dynamicsClient } = createRecordingClient(datasets);
   registerAllTools(server, config, dynamicsClient);
   installToolCallCompatibility(server);
@@ -52,7 +52,7 @@ describe("tool contracts", () => {
         .sort((left, right) => left.localeCompare(right));
       const toolsByName = Object.fromEntries(result.tools.map((tool) => [tool.name, tool]));
 
-      expect(names).toEqual(EXPECTED_TOOL_NAMES);
+      expect(names).toEqual(getExpectedToolNames(createTestConfig(["dev", "prod"])));
 
       for (const tool of result.tools) {
         expect(tool.inputSchema.type).toBe("object");
@@ -123,6 +123,19 @@ describe("tool contracts", () => {
         appName: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_sitemaps.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        appName: expect.any(Object),
+      });
+      expect(toolsByName.get_sitemap_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        sitemapName: expect.any(Object),
+        appName: expect.any(Object),
+        solution: expect.any(Object),
+        includeRawXml: expect.any(Object),
+      });
       expect(toolsByName.list_dashboards.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         nameFilter: expect.any(Object),
@@ -133,13 +146,51 @@ describe("tool contracts", () => {
         dashboardName: expect.any(Object),
         solution: expect.any(Object),
       });
+      expect(toolsByName.list_charts.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        scope: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_chart_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        chartName: expect.any(Object),
+        table: expect.any(Object),
+        scope: expect.any(Object),
+        solution: expect.any(Object),
+        includeRawXml: expect.any(Object),
+      });
       expect(toolsByName.list_business_units.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         nameFilter: expect.any(Object),
       });
+      expect(toolsByName.list_publishers.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        prefixFilter: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_publisher_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        publisher: expect.any(Object),
+      });
       expect(toolsByName.get_business_units_details.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         businessUnitName: expect.any(Object),
+      });
+      expect(toolsByName.list_field_security_profiles.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        profileName: expect.any(Object),
+        table: expect.any(Object),
+        column: expect.any(Object),
+        solution: expect.any(Object),
+        includeMembers: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
       });
       expect(toolsByName.analyze_create_triggers.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -161,6 +212,48 @@ describe("tool contracts", () => {
         stepName: expect.any(Object),
         message: expect.any(Object),
       });
+      expect(toolsByName.list_sdk_message_processing_steps.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        message: expect.any(Object),
+        primaryEntity: expect.any(Object),
+        stage: expect.any(Object),
+        mode: expect.any(Object),
+        statecode: expect.any(Object),
+        includeImages: expect.any(Object),
+      });
+      expect(toolsByName.list_plugin_trace_logs.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        correlationId: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        hasException: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_plugin_trace_log_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginTraceLogId: expect.any(Object),
+      });
+      expect(toolsByName.list_system_jobs.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        status: expect.any(Object),
+        jobType: expect.any(Object),
+        nameFilter: expect.any(Object),
+        correlationId: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        completedAfter: expect.any(Object),
+        completedBefore: expect.any(Object),
+        failedOnly: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_system_job_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        systemJobId: expect.any(Object),
+      });
       expect(toolsByName.list_plugins.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         filter: expect.any(Object),
@@ -176,6 +269,25 @@ describe("tool contracts", () => {
         solution: expect.any(Object),
         limit: expect.any(Object),
         cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_email_templates.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        templateTypeCode: expect.any(Object),
+        scope: expect.any(Object),
+        languageCode: expect.any(Object),
+        solution: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_email_template_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        templateName: expect.any(Object),
+        templateTypeCode: expect.any(Object),
+        scope: expect.any(Object),
+        languageCode: expect.any(Object),
+        solution: expect.any(Object),
+        includeRawContent: expect.any(Object),
       });
       expect(toolsByName.list_table_ribbons.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -201,6 +313,11 @@ describe("tool contracts", () => {
         solution: expect.any(Object),
         limit: expect.any(Object),
         cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_bpf_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        workflowName: expect.any(Object),
+        uniqueName: expect.any(Object),
       });
       expect(toolsByName.list_web_resources.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
@@ -231,6 +348,14 @@ describe("tool contracts", () => {
         targetEnvironment: expect.any(Object),
         assemblyName: expect.any(Object),
       });
+      expect(toolsByName.compare_environment_variable_matrix.inputSchema.properties).toMatchObject({
+        baselineEnvironment: expect.any(Object),
+        targetEnvironments: expect.any(Object),
+        nameFilter: expect.any(Object),
+        solution: expect.any(Object),
+        compareMode: expect.any(Object),
+        maxRows: expect.any(Object),
+      });
       expect(toolsByName.list_plugins.description).toContain("plugin classes");
       expect(toolsByName.list_plugin_steps.description).toContain("plugin class");
       expect(toolsByName.get_plugin_details.description).toContain("plugin class");
@@ -248,6 +373,43 @@ describe("tool contracts", () => {
         direction: expect.any(Object),
         componentType: expect.any(Object),
       });
+      expect(toolsByName.get_solution_layers.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        solution: expect.any(Object),
+        componentType: expect.any(Object),
+        componentName: expect.any(Object),
+      });
+      expect(toolsByName.list_table_alternate_keys.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        solution: expect.any(Object),
+      });
+      expect(toolsByName.list_duplicate_detection_rules.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        status: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.list_table_messages.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+      });
+      expect(toolsByName.get_table_message_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        messageName: expect.any(Object),
+      });
+      expect(toolsByName.list_global_option_sets.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        nameFilter: expect.any(Object),
+        limit: expect.any(Object),
+        cursor: expect.any(Object),
+      });
+      expect(toolsByName.get_option_set_details.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        optionSet: expect.any(Object),
+      });
       expect(toolsByName.release_gate_report.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         solution: expect.any(Object),
@@ -257,6 +419,34 @@ describe("tool contracts", () => {
       expect(REMOVED_LEGACY_TOOL_NAMES.every((legacyName) => !(legacyName in toolsByName))).toBe(
         true,
       );
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it("publishes the gated run_fetchxml tool only when enabled in config", async () => {
+    const config = createTestConfig(["dev"], {
+      advancedQueries: {
+        fetchXml: {
+          enabled: true,
+          defaultLimit: 25,
+          maxLimit: 100,
+        },
+      },
+    });
+    const harness = await createConnectedToolClient({ dev: {} }, ["dev"], config);
+
+    try {
+      const result = await harness.client.listTools();
+      const tool = result.tools.find((item) => item.name === "run_fetchxml");
+
+      expect(tool).toBeDefined();
+      expect(tool?.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        fetchXml: expect.any(Object),
+        limit: expect.any(Object),
+      });
     } finally {
       await harness.close();
     }

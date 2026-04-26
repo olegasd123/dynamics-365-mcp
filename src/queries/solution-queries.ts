@@ -22,6 +22,22 @@ export function listSolutionsQuery(nameFilter?: string): string {
     .toString();
 }
 
+export function listSolutionsByPublisherQuery(publisherId: string): string {
+  return query()
+    .select(DEFAULT_SOLUTION_SELECT)
+    .filter(eq("_publisherid_value", publisherId))
+    .orderby("friendlyname asc")
+    .toString();
+}
+
+export function listSolutionsByIdsQuery(solutionIds: string[]): string {
+  return query()
+    .select(DEFAULT_SOLUTION_SELECT)
+    .filter(inList("solutionid", solutionIds))
+    .orderby("friendlyname asc")
+    .toString();
+}
+
 export function listSolutionComponentsQuery(solutionId: string): string {
   return query()
     .select([

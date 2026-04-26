@@ -4,6 +4,8 @@ import {
   contains,
   eq,
   escapeODataString,
+  guidEq,
+  normalizeGuid,
   odataContains,
   odataEq,
   odataStringLiteral,
@@ -20,6 +22,16 @@ describe("OData string helpers", () => {
   it("builds safe eq and contains expressions", () => {
     expect(odataEq("name", "O'Hara")).toBe("name eq 'O''Hara'");
     expect(odataContains("name", "Bob's")).toBe("contains(name,'Bob''s')");
+  });
+
+  it("normalizes GUID values for Dataverse filters", () => {
+    expect(normalizeGuid("{11111111-AAAA-bbbb-CCCC-111111111111}")).toBe(
+      "11111111-aaaa-bbbb-cccc-111111111111",
+    );
+    expect(normalizeGuid("not-a-guid")).toBeNull();
+    expect(guidEq("webresourceid", "11111111-1111-1111-1111-111111111111").toString()).toBe(
+      "webresourceid eq 11111111-1111-1111-1111-111111111111",
+    );
   });
 });
 

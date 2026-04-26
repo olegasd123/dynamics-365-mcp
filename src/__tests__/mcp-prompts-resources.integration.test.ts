@@ -51,6 +51,11 @@ describe("MCP prompts and resources", () => {
       const discoverMetadata = prompts.prompts.find(
         (prompt) => prompt.name === "discover_metadata",
       );
+      expect(
+        prompts.prompts
+          .find((prompt) => prompt.name === "advanced_query_fallback")
+          ?.arguments?.map((argument) => argument.name),
+      ).toEqual(["environment", "goal", "table"]);
       expect(discoverMetadata?.arguments?.map((argument) => argument.name)).toEqual([
         "environment",
         "query",
@@ -110,6 +115,21 @@ describe("MCP prompts and resources", () => {
       }
       expect(prompt.messages[0].content.text).toContain("get_solution_details");
       expect(prompt.messages[0].content.text).toContain("dependencies");
+
+      const fallbackPrompt = await harness.client.getPrompt({
+        name: "advanced_query_fallback",
+        arguments: {
+          environment: "dev",
+          goal: "check active accounts with a custom one-off filter",
+          table: "account",
+        },
+      });
+      if (fallbackPrompt.messages[0]?.content.type !== "text") {
+        throw new Error("Expected a text content block");
+      }
+      expect(fallbackPrompt.messages[0].content.text).toContain("Do not start with `run_fetchxml`");
+      expect(fallbackPrompt.messages[0].content.text).toContain("curated tool");
+      expect(fallbackPrompt.messages[0].content.text).toContain("run_fetchxml");
 
       const releasePrompt = await harness.client.getPrompt({
         name: "release_gate_check",
@@ -218,6 +238,19 @@ describe("MCP prompts and resources", () => {
       expect(gettingStarted.contents[0].text).toContain("release_gate_check");
       expect(gettingStarted.contents[0].text).toContain("## By Role");
       expect(gettingStarted.contents[0].text).toContain("`release_gate_report`");
+      expect(gettingStarted.contents[0].text).toContain(
+        "`d365://reference/advanced-query-guidance`",
+      );
+
+      const advancedGuidance = await harness.client.readResource({
+        uri: "d365://reference/advanced-query-guidance",
+      });
+      if (!("text" in advancedGuidance.contents[0])) {
+        throw new Error("Expected text resource content");
+      }
+      expect(advancedGuidance.contents[0].text).toContain("# Advanced Query Guidance");
+      expect(advancedGuidance.contents[0].text).toContain("Prefer curated tools first");
+      expect(advancedGuidance.contents[0].text).toContain("`run_fetchxml`");
 
       const toolGroups = await harness.client.readResource({
         uri: "d365://reference/tool-groups",
@@ -247,6 +280,7 @@ describe("MCP prompts and resources", () => {
       expect(taskRouting.contents[0].text).toContain("## Common Tasks");
       expect(taskRouting.contents[0].text).toContain("`release_gate_check`");
       expect(taskRouting.contents[0].text).toContain("`review_security_role`");
+      expect(taskRouting.contents[0].text).toContain("`advanced_query_fallback`");
 
       const releaseChecklist = await harness.client.readResource({
         uri: "d365://reference/release-checklist",

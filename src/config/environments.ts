@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
-import { DEFAULT_DYNAMICS_API_VERSION, type AppConfig, type EnvironmentConfig } from "./types.js";
+import {
+  DEFAULT_DYNAMICS_API_VERSION,
+  type AdvancedQueriesConfig,
+  type AppConfig,
+  type EnvironmentConfig,
+} from "./types.js";
 
 interface ConnectionStringEnvironmentEntry {
   name?: string;
@@ -23,6 +28,8 @@ interface ConnectionStringsEnvPayload {
   defaultEnvironment?: string;
 }
 
+const DEFAULT_FETCHXML_LIMIT = 50;
+const MAX_FETCHXML_LIMIT = 200;
 const CONFIG_HELP_DOC = "docs/run-mcp.md";
 
 export class EnvironmentNotFoundError extends Error {
@@ -155,6 +162,7 @@ function loadFromJsonFile(filePath: string): AppConfig {
   return {
     environments,
     defaultEnvironment: json.defaultEnvironment || environments[0].name,
+    advancedQueries: normalizeAdvancedQueriesConfig(json.advancedQueries),
   };
 }
 
@@ -202,4 +210,112 @@ export function getEnvironment(config: AppConfig, name?: string): EnvironmentCon
     );
   }
   return env;
+}
+
+function normalizeAdvancedQueriesConfig(raw: unknown): AdvancedQueriesConfig | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("advancedQueries must be an object when provided.");
+  }
+
+  const fetchXml = normalizeFetchXmlConfig((raw as { fetchXml?: unknown }).fetchXml);
+  if (!fetchXml) {
+    return undefined;
+  }
+
+  return { fetchXml };
+}
+
+function normalizeFetchXmlConfig(raw: unknown): AdvancedQueriesConfig["fetchXml"] | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("advancedQueries.fetchXml must be an object when provided.");
+  }
+
+  const value = raw as {
+    enabled?: unknown;
+    allowedEnvironments?: unknown;
+    defaultLimit?: unknown;
+    maxLimit?: unknown;
+  };
+  const enabled =
+    value.enabled === undefined
+      ? undefined
+      : requireBoolean(value.enabled, "advancedQueries.fetchXml.enabled");
+  const allowedEnvironments =
+    value.allowedEnvironments === undefined
+      ? undefined
+      : requireStringArray(
+          value.allowedEnvironments,
+          "advancedQueries.fetchXml.allowedEnvironments",
+        );
+  const defaultLimit =
+    value.defaultLimit === undefined
+      ? undefined
+      : requirePositiveIntegerInRange(
+          value.defaultLimit,
+          "advancedQueries.fetchXml.defaultLimit",
+          1,
+          MAX_FETCHXML_LIMIT,
+        );
+  const maxLimit =
+    value.maxLimit === undefined
+      ? undefined
+      : requirePositiveIntegerInRange(
+          value.maxLimit,
+          "advancedQueries.fetchXml.maxLimit",
+          1,
+          MAX_FETCHXML_LIMIT,
+        );
+
+  const resolvedMaxLimit = maxLimit ?? MAX_FETCHXML_LIMIT;
+  const resolvedDefaultLimit = defaultLimit ?? DEFAULT_FETCHXML_LIMIT;
+  if (resolvedDefaultLimit > resolvedMaxLimit) {
+    throw new Error(
+      "advancedQueries.fetchXml.defaultLimit cannot be greater than advancedQueries.fetchXml.maxLimit.",
+    );
+  }
+
+  return {
+    enabled,
+    allowedEnvironments,
+    defaultLimit,
+    maxLimit,
+  };
+}
+
+function requireBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`${label} must be a boolean.`);
+  }
+
+  return value;
+}
+
+function requireStringArray(value: unknown, label: string): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.some((item) => typeof item !== "string" || item.trim().length === 0)
+  ) {
+    throw new Error(`${label} must be an array of non-empty strings.`);
+  }
+
+  return value.map((item) => item.trim());
+}
+
+function requirePositiveIntegerInRange(
+  value: unknown,
+  label: string,
+  min: number,
+  max: number,
+): number {
+  if (!Number.isInteger(value) || typeof value !== "number" || value < min || value > max) {
+    throw new Error(`${label} must be an integer from ${min} to ${max}.`);
+  }
+
+  return value;
 }

@@ -7,6 +7,7 @@ import { defineTool, registerTool, type ToolContext, type ToolParams } from "../
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { getWebResourceContentByNameQuery } from "../../queries/web-resource-queries.js";
 import { AmbiguousMatchError, type AmbiguousMatchOption } from "../tool-errors.js";
+import { normalizeGuid } from "../../utils/odata-builder.js";
 
 const TEXT_TYPES = new Set([1, 2, 3, 4, 9, 12]); // HTML, CSS, JS, XML, XSL, RESX
 
@@ -29,10 +30,8 @@ export async function handleGetWebResourceContent(
       "webresourceset",
       getWebResourceContentByNameQuery(resourceName),
     );
-    const matchingResources = resources.filter(
-      (resource) =>
-        String(resource.name || "") === resourceName ||
-        String(resource.webresourceid || "") === resourceName,
+    const matchingResources = resources.filter((resource) =>
+      matchesWebResourceRef(resource, resourceName),
     );
 
     if (matchingResources.length === 0) {
@@ -149,4 +148,15 @@ function formatWebResourceMatch(resource: Record<string, unknown>): string {
   }
 
   return `${name} (${identity})`;
+}
+
+function matchesWebResourceRef(resource: Record<string, unknown>, resourceRef: string): boolean {
+  if (String(resource.name || "") === resourceRef) {
+    return true;
+  }
+
+  const expectedId = normalizeGuid(resourceRef);
+  const actualId = normalizeGuid(String(resource.webresourceid || ""));
+
+  return Boolean(expectedId && actualId && expectedId === actualId);
 }

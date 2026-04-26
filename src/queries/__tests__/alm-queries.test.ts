@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   listAppModulesQuery,
+  listAppModuleSitemapComponentsQuery,
   listConnectionReferencesQuery,
   listEnvironmentVariableDefinitionsQuery,
   listEnvironmentVariableValuesForDefinitionsQuery,
+  listSitemapsQuery,
 } from "../alm-queries.js";
 
 describe("alm queries", () => {
@@ -36,5 +38,21 @@ describe("alm queries", () => {
 
     expect(query).toContain("contains(name,'Sales')");
     expect(query).toContain("contains(uniquename,'Sales')");
+  });
+
+  it("builds the sitemap query with a name filter", () => {
+    const query = listSitemapsQuery("Sales");
+
+    expect(query).toContain("contains(sitemapname,'Sales')");
+    expect(query).toContain("contains(sitemapnameunique,'Sales')");
+    expect(query).toContain("$orderby=sitemapname asc");
+  });
+
+  it("builds the app module sitemap component query", () => {
+    const query = listAppModuleSitemapComponentsQuery("app-unique-1");
+
+    expect(query).toContain("_appmoduleidunique_value eq 'app-unique-1'");
+    expect(query).toContain("componenttype eq 62");
+    expect(query).toContain("$orderby=appmodulecomponentid asc");
   });
 });

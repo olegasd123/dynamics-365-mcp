@@ -6,7 +6,7 @@ import { TokenManager } from "../../auth/token-manager.js";
 import { DynamicsClient } from "../../client/dynamics-client.js";
 import { loadConfig } from "../../config/environments.js";
 import { registerAllTools } from "../index.js";
-import type { ToolResponse } from "./tool-test-helpers.js";
+import { getExpectedToolNames, type ToolResponse } from "./tool-test-helpers.js";
 import { installToolCallCompatibility } from "../../tool-call-compatibility.js";
 import {
   countConfiguredLiveCases,
@@ -94,6 +94,8 @@ function installRequestRecorder(client: DynamicsClient) {
 
   const originalQuery = client.query.bind(client);
   const originalQueryPath = client.queryPath.bind(client);
+  const originalQueryPage = client.queryPage.bind(client);
+  const originalQueryPagePath = client.queryPagePath.bind(client);
   const originalGetPath = client.getPath.bind(client);
 
   client.query = (async (env, entitySet, queryParams, options) => {
@@ -115,6 +117,26 @@ function installRequestRecorder(client: DynamicsClient) {
     });
     return originalQueryPath(env, resourcePath, queryParams, options);
   }) as DynamicsClient["queryPath"];
+
+  client.queryPage = (async (env, entitySet, queryParams, options) => {
+    recordedRequests.push({
+      method: "queryPage",
+      environment: env.name,
+      resourcePath: options?.pageLink || entitySet,
+      queryParams,
+    });
+    return originalQueryPage(env, entitySet, queryParams, options);
+  }) as DynamicsClient["queryPage"];
+
+  client.queryPagePath = (async (env, resourcePath, queryParams, options) => {
+    recordedRequests.push({
+      method: "queryPagePath",
+      environment: env.name,
+      resourcePath: options?.pageLink || resourcePath,
+      queryParams,
+    });
+    return originalQueryPagePath(env, resourcePath, queryParams, options);
+  }) as DynamicsClient["queryPagePath"];
 
   client.getPath = (async (env, resourcePath, queryParams) => {
     recordedRequests.push({
@@ -383,8 +405,9 @@ describeLive("live tool smoke tests", () => {
     "calls every tool with real CRM data and records request coverage",
     async () => {
       const fixtures = loadLiveFixtures();
+      const config = loadConfig();
       const tokenManager = new TokenManager();
-      const selectedTools = getSelectedLiveTools();
+      const selectedTools = getSelectedLiveTools(getExpectedToolNames(config) as ToolName[]);
       const selectedCases = getSelectedLiveCases(fixtures, selectedTools, getToolTimeoutMs);
       const configuredCaseCount = countConfiguredLiveCases(fixtures, selectedTools);
       const runnableCaseCount = countRunnableLiveCases(selectedCases);

@@ -47,6 +47,18 @@
         }
       }
     ],
+    "compare_document_templates": [
+      {
+        "name": "account word templates",
+        "arguments": {
+          "sourceEnvironment": "dev",
+          "targetEnvironment": "test",
+          "associatedEntityTypeCode": "account",
+          "documentType": "word",
+          "compareContent": false
+        }
+      }
+    ],
     "compare_environment_matrix": [
       {
         "name": "plugin matrix",
@@ -55,6 +67,18 @@
           "targetEnvironments": ["test"],
           "componentType": "plugins",
           "assemblyName": "Contoso.Plugins",
+          "maxRows": 10
+        }
+      }
+    ],
+    "compare_environment_variable_matrix": [
+      {
+        "name": "environment variables matrix",
+        "arguments": {
+          "baselineEnvironment": "dev",
+          "targetEnvironments": ["test"],
+          "compareMode": "all",
+          "nameFilter": "contoso_",
           "maxRows": 10
         }
       }
@@ -169,6 +193,17 @@
         }
       }
     ],
+    "list_field_security_profiles": [
+      {
+        "name": "account secured column",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "column": "creditlimit",
+          "includeMembers": false
+        }
+      }
+    ],
     "find_metadata": [
       {
         "name": "account search",
@@ -226,6 +261,16 @@
         }
       }
     ],
+    "get_sitemap_details": [
+      {
+        "name": "sales hub sitemap",
+        "arguments": {
+          "environment": "dev",
+          "appName": "Sales Hub",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
     "get_connection_reference_details": [
       {
         "name": "office 365 reference",
@@ -249,6 +294,51 @@
           "dashboardName": "Sales Dashboard",
           "solution": "Contoso_Core"
         }
+      }
+    ],
+    "get_chart_details": [
+      {
+        "name": "accounts by industry",
+        "arguments": {
+          "environment": "dev",
+          "chartName": "Accounts by Industry",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_email_templates": [
+      {
+        "name": "contact email templates",
+        "arguments": {
+          "environment": "dev",
+          "templateTypeCode": "contact",
+          "scope": "organization",
+          "limit": 25
+        }
+      }
+    ],
+    "get_email_template_details": [
+      {
+        "name": "welcome contact template",
+        "skipReason": "Fill in a real email template title or template id from your environment."
+      }
+    ],
+    "list_document_templates": [
+      {
+        "name": "account word document templates",
+        "arguments": {
+          "environment": "dev",
+          "associatedEntityTypeCode": "account",
+          "documentType": "word",
+          "limit": 25
+        }
+      }
+    ],
+    "get_document_template_details": [
+      {
+        "name": "account document template",
+        "skipReason": "Fill in a real document template name or document template id from your environment."
       }
     ],
     "get_environment_variable_details": [
@@ -318,6 +408,15 @@
         }
       }
     ],
+    "get_publisher_details": [
+      {
+        "name": "contoso publisher",
+        "arguments": {
+          "environment": "dev",
+          "publisher": "cts"
+        }
+      }
+    ],
     "get_role_privileges": [
       {
         "name": "salesperson role",
@@ -337,6 +436,16 @@
         }
       }
     ],
+    "list_publishers": [
+      {
+        "name": "contoso publishers",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "Contoso",
+          "prefixFilter": "cts"
+        }
+      }
+    ],
     "get_solution_dependencies": [
       {
         "name": "web resource dependencies",
@@ -347,6 +456,18 @@
           "componentType": "web_resource",
           "componentName": "contoso_/scripts/account.js",
           "maxRows": 20
+        }
+      }
+    ],
+    "get_solution_layers": [
+      {
+        "name": "web resource layers",
+        "arguments": {
+          "environment": "dev",
+          "solution": "Contoso_Core",
+          "componentType": "web_resource",
+          "componentName": "contoso_/scripts/account.js",
+          "maxLayers": 10
         }
       }
     ],
@@ -369,6 +490,51 @@
         }
       }
     ],
+    "list_table_alternate_keys": [
+      {
+        "name": "account alternate keys",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_duplicate_detection_rules": [
+      {
+        "name": "account published duplicate rules",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "status": "published"
+        }
+      }
+    ],
+    "list_table_messages": [
+      {
+        "name": "account table messages",
+        "arguments": {
+          "environment": "dev",
+          "table": "account"
+        }
+      }
+    ],
+    "get_table_message_details": [
+      {
+        "name": "account update message",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "messageName": "Update"
+        }
+      }
+    ],
+    "get_option_set_details": [
+      {
+        "name": "shared priority option set",
+        "skipReason": "Fill in a real global option set name or metadata id from your environment."
+      }
+    ],
     "get_table_record_details": [
       {
         "name": "contact by id",
@@ -377,6 +543,29 @@
           "environment": "dev",
           "table": "contact",
           "recordId": "00000000-0000-0000-0000-000000000001"
+        }
+      }
+    ],
+    "list_audit_history": [
+      {
+        "name": "contact table audit history",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "contact",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "createdBefore": "2026-04-20T18:00:00Z",
+          "limit": 25
+        }
+      }
+    ],
+    "get_audit_details": [
+      {
+        "name": "one contact audit record",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "auditId": "00000000-0000-0000-0000-000000000001"
         }
       }
     ],
@@ -404,6 +593,18 @@
         }
       }
     ],
+    "run_fetchxml": [
+      {
+        "name": "active accounts escape hatch",
+        "enabled": false,
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "limit": 25,
+          "fetchXml": "<fetch><entity name='account'><attribute name='name' /><filter><condition attribute='statecode' operator='eq' value='0' /></filter></entity></fetch>"
+        }
+      }
+    ],
     "get_web_resource_content": [
       {
         "name": "account script",
@@ -422,6 +623,12 @@
         }
       }
     ],
+    "get_bpf_details": [
+      {
+        "name": "opportunity sales process by unique name",
+        "skipReason": "Set a real BPF uniqueName here when the environment has an activated business process flow."
+      }
+    ],
     "list_actions": [
       {
         "name": "contoso core actions",
@@ -437,6 +644,16 @@
         "arguments": {
           "environment": "dev",
           "nameFilter": "Sales Hub",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_sitemaps": [
+      {
+        "name": "sales hub sitemap",
+        "arguments": {
+          "environment": "dev",
+          "appName": "Sales Hub",
           "solution": "Contoso_Core"
         }
       }
@@ -473,6 +690,17 @@
         "arguments": {
           "environment": "dev",
           "nameFilter": "Sales Dashboard",
+          "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_charts": [
+      {
+        "name": "account charts",
+        "arguments": {
+          "environment": "dev",
+          "table": "account",
+          "nameFilter": "Industry",
           "solution": "Contoso_Core"
         }
       }
@@ -524,6 +752,17 @@
         }
       }
     ],
+    "list_sdk_message_processing_steps": [
+      {
+        "name": "account update steps",
+        "arguments": {
+          "environment": "dev",
+          "message": "Update",
+          "primaryEntity": "account",
+          "statecode": "enabled"
+        }
+      }
+    ],
     "list_plugin_steps": [
       {
         "name": "account plugin steps",
@@ -533,6 +772,43 @@
           "assemblyName": "Contoso.Plugins",
           "solution": "Contoso_Core"
         }
+      }
+    ],
+    "list_plugin_trace_logs": [
+      {
+        "name": "recent account plugin errors",
+        "arguments": {
+          "environment": "dev",
+          "pluginName": "Contoso.Plugins.AccountPlugin",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "hasException": true,
+          "limit": 10
+        }
+      }
+    ],
+    "list_system_jobs": [
+      {
+        "name": "recent failed import jobs",
+        "arguments": {
+          "environment": "dev",
+          "status": "failed",
+          "jobType": "import",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "failedOnly": true,
+          "limit": 10
+        }
+      }
+    ],
+    "get_plugin_trace_log_details": [
+      {
+        "name": "one account plugin trace log",
+        "skipReason": "Fill in a real pluginTraceLogId from your environment."
+      }
+    ],
+    "get_system_job_details": [
+      {
+        "name": "one failed system job",
+        "skipReason": "Fill in a real systemJobId from your environment."
       }
     ],
     "list_plugins": [
@@ -569,6 +845,15 @@
           "environment": "dev",
           "table": "account",
           "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "list_global_option_sets": [
+      {
+        "name": "shared option sets",
+        "arguments": {
+          "environment": "dev",
+          "nameFilter": "priority"
         }
       }
     ],

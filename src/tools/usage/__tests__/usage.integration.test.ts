@@ -222,7 +222,86 @@ describe("usage tools", () => {
     );
   });
 
+  it("adds field security context when column usage is checked for a secured column", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+            SchemaName: "Account",
+            DisplayName: { UserLocalizedLabel: { Label: "Account" } },
+            EntitySetName: "accounts",
+            PrimaryIdAttribute: "accountid",
+            PrimaryNameAttribute: "name",
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/Attributes": [
+          {
+            MetadataId: "column-1",
+            LogicalName: "creditlimit",
+            SchemaName: "CreditLimit",
+            AttributeType: "Money",
+            RequiredLevel: { Value: "None" },
+            IsSecured: true,
+          },
+        ],
+        "EntityDefinitions(LogicalName='account')/PicklistAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/MultiSelectPicklistAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/BooleanAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/StateAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/StatusAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/LookupAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/StringAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/MemoAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/DateTimeAttributeMetadata": [],
+        "EntityDefinitions(LogicalName='account')/ManyToOneRelationships": [],
+        "EntityDefinitions(LogicalName='account')/OneToManyRelationships": [],
+        "EntityDefinitions(LogicalName='account')/ManyToManyRelationships": [],
+        pluginassemblies: [],
+        workflows: [],
+        systemforms: [],
+        savedqueries: [],
+        fieldsecurityprofiles: [
+          {
+            fieldsecurityprofileid: "profile-1",
+            name: "Finance",
+            systemuserprofiles_association: [{ systemuserid: "user-1", fullname: "Adele Vance" }],
+            teamprofiles_association: [],
+          },
+        ],
+        fieldpermissions: [
+          {
+            fieldpermissionid: "permission-1",
+            _fieldsecurityprofileid_value: "profile-1",
+            entityname: "account",
+            attributelogicalname: "creditlimit",
+            canread: 4,
+            cancreate: 0,
+            canupdate: 4,
+          },
+        ],
+        solutioncomponents: [],
+        solutions: [],
+      },
+    });
+
+    registerFindColumnUsage(server as never, config, client);
+    const response = await server.getHandler("find_column_usage")({
+      table: "account",
+      column: "creditlimit",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("### Field Security");
+    expect(response.content[0].text).toContain("Finance");
+    expect(response.content[0].text).toContain("AllowedAlways");
+  });
+
   it("supports web resource ids when finding usage", async () => {
+    const webResourceId = "11111111-1111-1111-1111-111111111111";
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
     const { client, calls } = createRecordingClient({
@@ -239,7 +318,7 @@ describe("usage tools", () => {
         ],
         webresourceset: [
           {
-            webresourceid: "wr-1",
+            webresourceid: webResourceId,
             name: "contoso_/scripts/app.js",
             webresourcetype: 3,
             content: Buffer.from("console.log('app');").toString("base64"),
@@ -251,13 +330,41 @@ describe("usage tools", () => {
     registerFindWebResourceUsage(server as never, config, client);
 
     const response = await server.getHandler("find_web_resource_usage")({
-      name: "wr-1",
+      name: webResourceId,
     });
 
     expect(response.isError).toBeUndefined();
     expect(response.content[0].text).toContain("Account Main");
     expect(response.content[0].text).toContain("contoso_/scripts/app.js");
-    expect(calls[0]?.queryParams).toContain("webresourceid eq 'wr-1'");
+    expect(calls[0]?.queryParams).toContain(`webresourceid eq ${webResourceId}`);
+  });
+
+  it("does not compare the id column with a web resource name when finding usage", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        systemforms: [],
+        webresourceset: [
+          {
+            webresourceid: "11111111-1111-1111-1111-111111111111",
+            name: "mso_/facturation/form.js",
+            webresourcetype: 3,
+            content: Buffer.from("console.log('facturation');").toString("base64"),
+          },
+        ],
+      },
+    });
+
+    registerFindWebResourceUsage(server as never, config, client);
+
+    const response = await server.getHandler("find_web_resource_usage")({
+      name: "mso_/facturation/form.js",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(calls[0]?.queryParams).toContain("name eq 'mso_/facturation/form.js'");
+    expect(calls[0]?.queryParams).not.toContain("or webresourceid");
   });
 
   it("returns structured retry options when the web resource name is ambiguous", async () => {
@@ -451,6 +558,34 @@ describe("usage tools", () => {
             connectionreferences: "",
           },
         ],
+        duplicaterules: [
+          {
+            duplicateruleid: "rule-1",
+            name: "Contact same first name",
+            uniquename: "contact_same_firstname",
+            baseentityname: "contact",
+            matchingentityname: "contact",
+            statuscode: 2,
+            statecode: 1,
+            iscasesensitive: false,
+            excludeinactiverecords: true,
+            ismanaged: false,
+            createdon: "2026-04-01T08:00:00Z",
+            modifiedon: "2026-04-20T08:00:00Z",
+          },
+        ],
+        duplicateruleconditions: [
+          {
+            duplicateruleconditionid: "condition-1",
+            baseattributename: "firstname",
+            matchingattributename: "firstname",
+            operatorcode: 0,
+            operatorparam: null,
+            ignoreblankvalues: true,
+            uniquerulename: "contact_same_firstname_firstname",
+            _regardingobjectid_value: "rule-1",
+          },
+        ],
       },
     });
 
@@ -470,6 +605,8 @@ describe("usage tools", () => {
     expect(response.content[0].text).toContain("Plugin3 Step");
     expect(response.content[0].text).toContain("Contact Last Name Sync");
     expect(response.content[0].text).toContain("Contact Flow");
+    expect(response.content[0].text).toContain("Contact same first name");
+    expect(response.content[0].text).toContain("### Published Duplicate Detection Rules");
     expect(response.content[0].text).toContain(
       "System-managed columns like modifiedon and modifiedby are not treated as direct matches",
     );
@@ -501,6 +638,13 @@ describe("usage tools", () => {
           ],
           relatedCloudFlows: [
             expect.objectContaining({ name: "Contact Flow", matchedAttributes: ["firstname"] }),
+          ],
+          duplicateDetectionRules: [
+            expect.objectContaining({
+              name: "Contact same first name",
+              baseTable: "contact",
+              matchingTable: "contact",
+            }),
           ],
         },
       },
@@ -610,6 +754,34 @@ describe("usage tools", () => {
             connectionreferences: "",
           },
         ],
+        duplicaterules: [
+          {
+            duplicateruleid: "rule-1",
+            name: "Contact same first name",
+            uniquename: "contact_same_firstname",
+            baseentityname: "contact",
+            matchingentityname: "contact",
+            statuscode: 2,
+            statecode: 1,
+            iscasesensitive: false,
+            excludeinactiverecords: true,
+            ismanaged: false,
+            createdon: "2026-04-01T08:00:00Z",
+            modifiedon: "2026-04-20T08:00:00Z",
+          },
+        ],
+        duplicateruleconditions: [
+          {
+            duplicateruleconditionid: "condition-1",
+            baseattributename: "firstname",
+            matchingattributename: "firstname",
+            operatorcode: 0,
+            operatorparam: null,
+            ignoreblankvalues: true,
+            uniquerulename: "contact_same_firstname_firstname",
+            _regardingobjectid_value: "rule-1",
+          },
+        ],
       },
     });
 
@@ -624,6 +796,8 @@ describe("usage tools", () => {
     expect(response.content[0].text).toContain("Contact Create Step");
     expect(response.content[0].text).toContain("Contact Create Workflow");
     expect(response.content[0].text).toContain("Contact Create Flow");
+    expect(response.content[0].text).toContain("Contact same first name");
+    expect(response.content[0].text).toContain("### Published Duplicate Detection Rules");
     expect(response.content[0].text).not.toContain("Contact Update Step");
     expect(response.content[0].text).not.toContain("Contact Update Workflow");
     expect(response.content[0].text).toContain(
@@ -640,6 +814,13 @@ describe("usage tools", () => {
             expect.objectContaining({
               name: "Contact Create Flow",
               matchedAttributes: ["firstname"],
+            }),
+          ],
+          duplicateDetectionRules: [
+            expect.objectContaining({
+              name: "Contact same first name",
+              baseTable: "contact",
+              matchingTable: "contact",
             }),
           ],
         },

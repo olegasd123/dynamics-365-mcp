@@ -7,6 +7,10 @@ import { defineTool, registerTool, type ToolContext, type ToolParams } from "../
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
 import { analyzeUpdateTriggersData } from "./usage-analysis.js";
+import {
+  formatDuplicateRuleConditions,
+  getDuplicateRuleMatchedAttributes,
+} from "./duplicate-rule-display.js";
 
 const analyzeUpdateTriggersSchema = {
   environment: z.string().optional().describe("Environment name"),
@@ -36,7 +40,7 @@ export async function handleAnalyzeUpdateTriggers(
       lines.push(`- Warnings: ${analysis.warnings.join(" | ")}`);
     }
     lines.push(
-      `- Summary: Direct Plugin Steps ${analysis.directPluginSteps.length} | Direct Workflows ${analysis.directWorkflows.length} | System-Managed Plugin Steps ${analysis.systemManagedPluginSteps.length} | System-Managed Workflows ${analysis.systemManagedWorkflows.length} | Related Cloud Flows ${analysis.relatedCloudFlows.length}`,
+      `- Summary: Direct Plugin Steps ${analysis.directPluginSteps.length} | Direct Workflows ${analysis.directWorkflows.length} | System-Managed Plugin Steps ${analysis.systemManagedPluginSteps.length} | System-Managed Workflows ${analysis.systemManagedWorkflows.length} | Published Duplicate Rules ${analysis.duplicateDetectionRules.length} | Related Cloud Flows ${analysis.relatedCloudFlows.length}`,
     );
     lines.push(`- Notes: ${analysis.notes.join(" | ")}`);
 
@@ -127,6 +131,22 @@ export async function handleAnalyzeUpdateTriggers(
             workflow.modeLabel || "-",
             workflow.triggerAttributes || "-",
             workflow.systemManagedAttributes.join(", "),
+          ]),
+        ),
+      );
+    }
+
+    if (analysis.duplicateDetectionRules.length > 0) {
+      lines.push("");
+      lines.push("### Published Duplicate Detection Rules");
+      lines.push(
+        formatTable(
+          ["Rule", "Matching Table", "Conditions", "Changed Field Match"],
+          analysis.duplicateDetectionRules.map((rule) => [
+            rule.name || rule.uniqueName || rule.duplicateRuleId,
+            rule.matchingTable || "-",
+            formatDuplicateRuleConditions(rule),
+            getDuplicateRuleMatchedAttributes(rule, analysis.changedAttributes).join(", ") || "-",
           ]),
         ),
       );
