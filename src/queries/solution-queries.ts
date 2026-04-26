@@ -25,7 +25,7 @@ export function listSolutionsQuery(nameFilter?: string): string {
 export function listSolutionsByPublisherQuery(publisherId: string): string {
   return query()
     .select(DEFAULT_SOLUTION_SELECT)
-    .filter(eq("publisherid", publisherId))
+    .filter(eq("_publisherid_value", publisherId))
     .orderby("friendlyname asc")
     .toString();
 }

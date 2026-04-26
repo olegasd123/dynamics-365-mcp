@@ -30,7 +30,7 @@ describe("solution queries", () => {
     expect(query).toContain(
       "$select=solutionid,friendlyname,uniquename,version,ismanaged,publisherid,modifiedon",
     );
-    expect(query).toContain("$filter=publisherid eq 'pub-1'");
+    expect(query).toContain("$filter=_publisherid_value eq 'pub-1'");
   });
 
   it("builds the solutions-by-ids query", () => {
