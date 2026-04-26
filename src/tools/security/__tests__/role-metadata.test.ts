@@ -256,7 +256,13 @@ describe("role metadata", () => {
           },
           {
             businessunitid: "bu-child",
-            name: "Child",
+            name: "Duplicate",
+            _parentbusinessunitid_value: "bu-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+          {
+            businessunitid: "bu-child-2",
+            name: "Duplicate",
             _parentbusinessunitid_value: "bu-root",
             "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
           },
@@ -273,14 +279,21 @@ describe("role metadata", () => {
             roleid: "role-child",
             name: "Salesperson",
             _businessunitid_value: "bu-child",
-            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Child",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Duplicate",
+            ismanaged: false,
+          },
+          {
+            roleid: "role-child-2",
+            name: "Salesperson",
+            _businessunitid_value: "bu-child-2",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Duplicate",
             ismanaged: false,
           },
         ],
         roleprivilegescollection: [
           {
             roleprivilegeid: "rp-1",
-            roleid: "role-child",
+            roleid: "role-child-2",
             privilegeid: "priv-1",
             privilegedepthmask: 8,
             ismanaged: false,
@@ -297,10 +310,10 @@ describe("role metadata", () => {
       },
     });
 
-    const details = await fetchRolePrivileges(env, client, "Salesperson", "bu-child");
+    const details = await fetchRolePrivileges(env, client, "Salesperson", "bu-child-2");
 
-    expect(details.role.roleid).toBe("role-child");
-    expect(details.role.businessUnitName).toBe("Child");
+    expect(details.role.roleid).toBe("role-child-2");
+    expect(details.role.businessUnitName).toBe("Duplicate");
   });
 
   it("returns structured retry options when the role name is ambiguous", async () => {

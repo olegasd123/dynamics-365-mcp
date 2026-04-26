@@ -80,6 +80,11 @@ interface ResolvedRoleMatches {
   ambiguous: SecurityRoleRecord[];
 }
 
+interface ResolvedRoleBusinessUnit {
+  businessunitid: string;
+  name: string;
+}
+
 export interface RolePrivilegeInventory {
   roles: SecurityRoleRecord[];
   privilegesByRoleId: Map<string, RolePrivilegeRecord[]>;
@@ -193,13 +198,28 @@ export async function resolveRoleBusinessUnitName(
   client: DynamicsClient,
   businessUnit?: string,
 ): Promise<string> {
+  const resolvedBusinessUnit = await resolveRoleBusinessUnit(env, client, businessUnit);
+  return resolvedBusinessUnit.name;
+}
+
+export async function resolveRoleBusinessUnit(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  businessUnit?: string,
+): Promise<ResolvedRoleBusinessUnit> {
   const trimmedBusinessUnit = businessUnit?.trim();
   if (trimmedBusinessUnit) {
     const resolvedBusinessUnit = await resolveBusinessUnit(env, client, trimmedBusinessUnit);
-    return resolvedBusinessUnit.name;
+    return {
+      businessunitid: resolvedBusinessUnit.businessunitid,
+      name: resolvedBusinessUnit.name,
+    };
   }
 
-  return fetchDefaultGlobalBusinessUnitName(env, client);
+  return {
+    businessunitid: "",
+    name: await fetchDefaultGlobalBusinessUnitName(env, client),
+  };
 }
 
 async function fetchDefaultGlobalBusinessUnitName(
@@ -215,20 +235,19 @@ async function collectResolvedRoleMatches(
   roleRef: string,
   businessUnit?: string,
 ): Promise<ResolvedRoleMatches> {
-  const resolvedBusinessUnit = await resolveRoleBusinessUnitName(env, client, businessUnit);
+  const resolvedBusinessUnit = await resolveRoleBusinessUnit(env, client, businessUnit);
   const roles = await listSecurityRoles(env, client);
   const exactId = roles.filter((role) => role.roleid === roleRef);
   const exactName = roles.filter((role) => role.name === roleRef);
   const narrowedExact = resolvedBusinessUnit
-    ? exactName.filter((role) => role.businessUnitName === resolvedBusinessUnit)
+    ? exactName.filter((role) => roleMatchesBusinessUnit(role, resolvedBusinessUnit))
     : exactName;
   const needle = roleRef.trim().toLowerCase();
   const matches = uniqueRoles(
     roles.filter(
       (role) =>
         role.name.toLowerCase().includes(needle) &&
-        (!resolvedBusinessUnit ||
-          role.businessUnitName.toLowerCase() === resolvedBusinessUnit.toLowerCase()),
+        (!resolvedBusinessUnit || roleMatchesBusinessUnit(role, resolvedBusinessUnit)),
     ),
   );
 
@@ -238,6 +257,17 @@ async function collectResolvedRoleMatches(
     matches,
     ambiguous: uniqueRoles([...matches, ...narrowedExact]),
   };
+}
+
+function roleMatchesBusinessUnit(
+  role: SecurityRoleRecord,
+  businessUnit: ResolvedRoleBusinessUnit,
+): boolean {
+  if (businessUnit.businessunitid) {
+    return role.businessunitid === businessUnit.businessunitid;
+  }
+
+  return role.businessUnitName.toLowerCase() === businessUnit.name.toLowerCase();
 }
 
 function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {

@@ -6,7 +6,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { defineTool, registerTool, type ToolContext, type ToolParams } from "../tool-definition.js";
 import { createToolErrorResponse, createToolSuccessResponse } from "../response.js";
 import { formatTable } from "../../utils/formatters.js";
-import { listSecurityRoles, resolveRoleBusinessUnitName } from "./role-metadata.js";
+import { listSecurityRoles, resolveRoleBusinessUnit } from "./role-metadata.js";
 import { AmbiguousMatchError } from "../tool-errors.js";
 
 const listSecurityRolesSchema = {
@@ -28,23 +28,25 @@ export async function handleListSecurityRoles(
 ) {
   try {
     const env = getEnvironment(config, environment);
-    const resolvedBusinessUnit = await resolveRoleBusinessUnitName(env, client, businessUnit);
-    const roles = (await listSecurityRoles(env, client, nameFilter)).filter(
-      (role) => role.businessUnitName.toLowerCase() === resolvedBusinessUnit.toLowerCase(),
+    const resolvedBusinessUnit = await resolveRoleBusinessUnit(env, client, businessUnit);
+    const roles = (await listSecurityRoles(env, client, nameFilter)).filter((role) =>
+      resolvedBusinessUnit.businessunitid
+        ? role.businessunitid === resolvedBusinessUnit.businessunitid
+        : role.businessUnitName.toLowerCase() === resolvedBusinessUnit.name.toLowerCase(),
     );
 
     if (roles.length === 0) {
-      const text = `No security roles found in '${env.name}' for business unit '${resolvedBusinessUnit}'.`;
+      const text = `No security roles found in '${env.name}' for business unit '${resolvedBusinessUnit.name}'.`;
       return createToolSuccessResponse("list_security_roles", text, text, {
         environment: env.name,
         nameFilter: nameFilter || null,
-        businessUnit: resolvedBusinessUnit,
+        businessUnit: resolvedBusinessUnit.name,
         count: 0,
         items: [],
       });
     }
 
-    const text = `## Security Roles in '${env.name}'${nameFilter ? ` (filter='${nameFilter}')` : ""}\n\nBusiness Unit: ${resolvedBusinessUnit}\n\nFound ${roles.length} role(s).\n\n${formatTable(
+    const text = `## Security Roles in '${env.name}'${nameFilter ? ` (filter='${nameFilter}')` : ""}\n\nBusiness Unit: ${resolvedBusinessUnit.name}\n\nFound ${roles.length} role(s).\n\n${formatTable(
       ["Name", "Business Unit", "Managed", "Modified"],
       roles.map((role) => [
         role.name,
@@ -61,7 +63,7 @@ export async function handleListSecurityRoles(
       {
         environment: env.name,
         nameFilter: nameFilter || null,
-        businessUnit: resolvedBusinessUnit,
+        businessUnit: resolvedBusinessUnit.name,
         count: roles.length,
         items: roles,
       },

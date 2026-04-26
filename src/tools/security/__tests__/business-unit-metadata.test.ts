@@ -85,6 +85,31 @@ describe("business unit metadata", () => {
     await expect(fetchDefaultGlobalBusinessUnitName(env, client)).resolves.toBe("Root");
   });
 
+  it("uses the single enabled exact match when disabled business units share the name", async () => {
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-enabled",
+            name: "Root",
+            isdisabled: false,
+          },
+          {
+            businessunitid: "bu-disabled",
+            name: "Root",
+            isdisabled: true,
+            _parentbusinessunitid_value: "bu-enabled",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+        ],
+      },
+    });
+
+    const details = await fetchBusinessUnitDetails(env, client, "Root");
+
+    expect(details.businessUnit.businessunitid).toBe("bu-enabled");
+  });
+
   it("returns structured options when the default global business unit is ambiguous", async () => {
     const { client } = createRecordingClient({
       dev: {

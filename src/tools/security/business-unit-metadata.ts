@@ -114,6 +114,13 @@ function resolveBusinessUnitFromRecords(
     return exactName[0];
   }
 
+  if (exactName.length > 1) {
+    const enabledExactName = exactName.filter((unit) => !unit.isdisabled);
+    if (enabledExactName.length === 1) {
+      return enabledExactName[0];
+    }
+  }
+
   const needle = businessUnitRef.trim().toLowerCase();
   const matches = businessUnits.filter((unit) => unit.name.toLowerCase().includes(needle));
   if (matches.length === 1) {

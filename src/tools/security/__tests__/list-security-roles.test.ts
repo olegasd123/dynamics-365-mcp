@@ -109,6 +109,64 @@ describe("list_security_roles", () => {
     ]);
   });
 
+  it("filters by business unit id when display names are duplicated", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client } = createRecordingClient({
+      dev: {
+        businessunits: [
+          {
+            businessunitid: "bu-root",
+            name: "Root",
+          },
+          {
+            businessunitid: "bu-duplicate-1",
+            name: "Duplicate",
+            _parentbusinessunitid_value: "bu-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+          {
+            businessunitid: "bu-duplicate-2",
+            name: "Duplicate",
+            _parentbusinessunitid_value: "bu-root",
+            "_parentbusinessunitid_value@OData.Community.Display.V1.FormattedValue": "Root",
+          },
+        ],
+        roles: [
+          {
+            roleid: "role-1",
+            name: "Salesperson",
+            _businessunitid_value: "bu-duplicate-1",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Duplicate",
+            ismanaged: false,
+          },
+          {
+            roleid: "role-2",
+            name: "Salesperson",
+            _businessunitid_value: "bu-duplicate-2",
+            "_businessunitid_value@OData.Community.Display.V1.FormattedValue": "Duplicate",
+            ismanaged: false,
+          },
+        ],
+      },
+    });
+
+    registerListSecurityRoles(server as never, config, client);
+    const response = await server.getHandler("list_security_roles")({
+      environment: "dev",
+      businessUnit: "bu-duplicate-2",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.structuredContent?.data.count).toBe(1);
+    expect(response.structuredContent?.data.items).toEqual([
+      expect.objectContaining({
+        roleid: "role-2",
+        businessunitid: "bu-duplicate-2",
+      }),
+    ]);
+  });
+
   it("returns structured retry options when the default business unit is ambiguous", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);
