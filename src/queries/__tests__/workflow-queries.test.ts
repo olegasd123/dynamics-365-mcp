@@ -50,8 +50,18 @@ describe("workflow queries", () => {
   it("builds the workflow details query by unique name", () => {
     const query = getWorkflowDetailsByIdentityQuery({ uniqueName: "contoso_O'Hara" });
 
+    expect(query).toContain("$filter=uniquename eq 'contoso_O''Hara' and type eq 1");
+    expect(query).not.toContain("workflowid eq");
+    expect(query).toContain("triggeronupdateattributelist");
+  });
+
+  it("builds the workflow details query by workflow id", () => {
+    const query = getWorkflowDetailsByIdentityQuery({
+      uniqueName: "{11111111-AAAA-bbbb-CCCC-111111111111}",
+    });
+
     expect(query).toContain(
-      "$filter=(uniquename eq 'contoso_O''Hara' or workflowid eq 'contoso_O''Hara') and type eq 1",
+      "$filter=(uniquename eq '{11111111-AAAA-bbbb-CCCC-111111111111}' or workflowid eq 11111111-aaaa-bbbb-cccc-111111111111) and type eq 1",
     );
     expect(query).toContain("triggeronupdateattributelist");
   });
