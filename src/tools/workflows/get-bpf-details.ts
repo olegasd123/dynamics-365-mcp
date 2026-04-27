@@ -16,7 +16,7 @@ import {
   type TableRecord,
 } from "../tables/table-metadata.js";
 import { formatTable } from "../../utils/formatters.js";
-import { odataStringLiteral, query, rawFilter } from "../../utils/odata-builder.js";
+import { guidEq, query } from "../../utils/odata-builder.js";
 
 const FORMATTED_VALUE_SUFFIX = "@OData.Community.Display.V1.FormattedValue";
 
@@ -392,7 +392,7 @@ async function fetchBpfStages(
         "_processid_value",
         "_parentprocessstageid_value",
       ])
-      .filter(rawFilter(`_processid_value eq ${odataStringLiteral(workflowId)}`))
+      .filter(guidEq("_processid_value", workflowId))
       .toString(),
     query()
       .select([
@@ -403,7 +403,7 @@ async function fetchBpfStages(
         "_processid_value",
         "_parentprocessstageid_value",
       ])
-      .filter(rawFilter(`processid/workflowid eq ${odataStringLiteral(workflowId)}`))
+      .filter(guidEq("processid/workflowid", workflowId))
       .toString(),
   ];
 

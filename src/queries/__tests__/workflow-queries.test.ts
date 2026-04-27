@@ -4,6 +4,7 @@ import {
   getWorkflowDetailsByIdentityQuery,
   listActionsQuery,
   listWorkflowDefinitionSearchQuery,
+  listWorkflowsByIdsQuery,
   listWorkflowsQuery,
 } from "../workflow-queries.js";
 
@@ -64,5 +65,16 @@ describe("workflow queries", () => {
       "$filter=(uniquename eq '{11111111-AAAA-bbbb-CCCC-111111111111}' or workflowid eq 11111111-aaaa-bbbb-cccc-111111111111) and type eq 1",
     );
     expect(query).toContain("triggeronupdateattributelist");
+  });
+
+  it("builds workflow id list filters with GUID literals", () => {
+    const query = listWorkflowsByIdsQuery([
+      "11111111-1111-1111-1111-111111111111",
+      "{22222222-2222-2222-2222-222222222222}",
+    ]);
+
+    expect(query).toContain(
+      "$filter=workflowid eq 11111111-1111-1111-1111-111111111111 or workflowid eq 22222222-2222-2222-2222-222222222222",
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { and, eq, inList, query } from "../utils/odata-builder.js";
+import { and, guidEq, inList, query } from "../utils/odata-builder.js";
 
 const DEFAULT_COMPONENT_LAYER_SELECT = [
   "msdyn_componentlayerid",
@@ -20,7 +20,7 @@ export function listSolutionComponentLayersQuery(
     .select(DEFAULT_COMPONENT_LAYER_SELECT)
     .filter(
       and(
-        eq("msdyn_componentid", componentId),
+        guidEq("msdyn_componentid", componentId),
         inList("msdyn_solutioncomponentname", componentTypeNames),
       ),
     )

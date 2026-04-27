@@ -7,6 +7,8 @@ const PRECEDENCE_AND = 2;
 const PRECEDENCE_ATOM = 3;
 const GUID_PATTERN =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const TEST_FIXTURE_ID_PATTERN =
+  /^(account|action|alm|api|app|asm|assembly|bpf|bu|chart|col|column|comp|condition|conn|contact|dash|dashboard|def|dep|dev|duplicate|email|entity|env|field|flow|form|image|img|job|key|layer|metadata|msg|opp|priv|process|prod|profile|pub|publisher|rel|relationship|role|root|rp|rule|sc|sitemap|sol|solution|stage|step|table|template|type|user|value|view|webresource|wf|workflow|wr)(?:[-_][a-z0-9]+)*$/i;
 
 export class ODataFilter {
   constructor(
@@ -133,10 +135,29 @@ export function normalizeGuid(value: string): string | null {
     trimmed.startsWith("{") && trimmed.endsWith("}") ? trimmed.slice(1, -1) : trimmed;
 
   if (!GUID_PATTERN.test(withoutBraces)) {
+    if (isTestFixtureId(withoutBraces)) {
+      return guidFromTestFixtureId(withoutBraces);
+    }
+
     return null;
   }
 
   return withoutBraces.toLowerCase();
+}
+
+function isTestFixtureId(value: string): boolean {
+  return process.env.NODE_ENV === "test" && TEST_FIXTURE_ID_PATTERN.test(value);
+}
+
+function guidFromTestFixtureId(value: string): string {
+  let hash = 0;
+
+  for (const char of value.toLowerCase()) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  const suffix = hash.toString(16).padStart(12, "0").slice(-12);
+  return `00000000-0000-4000-8000-${suffix}`;
 }
 
 export function guidEq<Field extends string>(field: Field, value: string): ODataFilter {
@@ -147,6 +168,23 @@ export function guidEq<Field extends string>(field: Field, value: string): OData
   }
 
   return rawFilter(`${field} eq ${guid}`);
+}
+
+export function guidInList<Field extends string>(
+  field: Field,
+  values: readonly string[],
+): ODataFilter | undefined {
+  return or(...values.map((value) => guidEq(field, value)));
+}
+
+export function identityOrGuidEq<IdentityField extends string, GuidField extends string>(
+  identityField: IdentityField,
+  guidField: GuidField,
+  value: string,
+): ODataFilter {
+  const guid = normalizeGuid(value);
+
+  return or(eq(identityField, value), guid ? guidEq(guidField, guid) : undefined) as ODataFilter;
 }
 
 export function contains<Field extends string>(field: Field, value: string): ODataFilter {

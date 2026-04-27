@@ -9,6 +9,10 @@ import {
 } from "../alm-queries.js";
 
 describe("alm queries", () => {
+  const definitionId1 = "11111111-1111-1111-1111-111111111111";
+  const definitionId2 = "22222222-2222-2222-2222-222222222222";
+  const appModuleIdUnique = "33333333-3333-3333-3333-333333333333";
+
   it("builds the environment variable definition query with a name filter", () => {
     const query = listEnvironmentVariableDefinitionsQuery("Contoso");
 
@@ -18,10 +22,10 @@ describe("alm queries", () => {
   });
 
   it("builds the environment variable values query for definition ids", () => {
-    const query = listEnvironmentVariableValuesForDefinitionsQuery(["def-1", "def-2"]);
+    const query = listEnvironmentVariableValuesForDefinitionsQuery([definitionId1, definitionId2]);
 
-    expect(query).toContain("_environmentvariabledefinitionid_value eq 'def-1'");
-    expect(query).toContain("_environmentvariabledefinitionid_value eq 'def-2'");
+    expect(query).toContain(`_environmentvariabledefinitionid_value eq ${definitionId1}`);
+    expect(query).toContain(`_environmentvariabledefinitionid_value eq ${definitionId2}`);
     expect(query).toContain("$orderby=modifiedon desc");
   });
 
@@ -49,9 +53,9 @@ describe("alm queries", () => {
   });
 
   it("builds the app module sitemap component query", () => {
-    const query = listAppModuleSitemapComponentsQuery("app-unique-1");
+    const query = listAppModuleSitemapComponentsQuery(appModuleIdUnique);
 
-    expect(query).toContain("_appmoduleidunique_value eq 'app-unique-1'");
+    expect(query).toContain(`_appmoduleidunique_value eq ${appModuleIdUnique}`);
     expect(query).toContain("componenttype eq 62");
     expect(query).toContain("$orderby=appmodulecomponentid asc");
   });

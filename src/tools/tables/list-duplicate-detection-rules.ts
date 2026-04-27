@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AppConfig, EnvironmentConfig } from "../../config/types.js";
 import { getEnvironment } from "../../config/environments.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
-import { and, eq, inList, or, query } from "../../utils/odata-builder.js";
+import { and, eq, guidInList, or, query } from "../../utils/odata-builder.js";
 import { formatTable } from "../../utils/formatters.js";
 import {
   LIST_CURSOR_SCHEMA,
@@ -285,7 +285,7 @@ async function fetchConditionsByRuleId(
     "duplicateruleconditions",
     query()
       .select(DUPLICATE_RULE_CONDITION_SELECT)
-      .filter(inList("_regardingobjectid_value", ids))
+      .filter(guidInList("_regardingobjectid_value", ids))
       .orderby("baseattributename asc")
       .toString(),
   );

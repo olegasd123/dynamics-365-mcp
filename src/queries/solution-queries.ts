@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidEq, guidInList, or, query } from "../utils/odata-builder.js";
 
 const DEFAULT_SOLUTION_SELECT = [
   "solutionid",
@@ -25,7 +25,7 @@ export function listSolutionsQuery(nameFilter?: string): string {
 export function listSolutionsByPublisherQuery(publisherId: string): string {
   return query()
     .select(DEFAULT_SOLUTION_SELECT)
-    .filter(eq("_publisherid_value", publisherId))
+    .filter(guidEq("_publisherid_value", publisherId))
     .orderby("friendlyname asc")
     .toString();
 }
@@ -33,7 +33,7 @@ export function listSolutionsByPublisherQuery(publisherId: string): string {
 export function listSolutionsByIdsQuery(solutionIds: string[]): string {
   return query()
     .select(DEFAULT_SOLUTION_SELECT)
-    .filter(inList("solutionid", solutionIds))
+    .filter(guidInList("solutionid", solutionIds))
     .orderby("friendlyname asc")
     .toString();
 }
@@ -48,7 +48,7 @@ export function listSolutionComponentsQuery(solutionId: string): string {
       "rootsolutioncomponentid",
       "rootcomponentbehavior",
     ])
-    .filter(eq("_solutionid_value", solutionId))
+    .filter(guidEq("_solutionid_value", solutionId))
     .orderby("componenttype asc")
     .toString();
 }
@@ -66,7 +66,7 @@ export function listSolutionComponentsByObjectIdsQuery(
       "rootsolutioncomponentid",
       "rootcomponentbehavior",
     ])
-    .filter(and(eq("componenttype", componentType), inList("objectid", objectIds)))
+    .filter(and(eq("componenttype", componentType), guidInList("objectid", objectIds)))
     .orderby("solutioncomponentid asc")
     .toString();
 }

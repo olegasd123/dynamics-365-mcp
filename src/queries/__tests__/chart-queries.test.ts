@@ -8,6 +8,9 @@ import {
 } from "../chart-queries.js";
 
 describe("chart queries", () => {
+  const chartId1 = "11111111-1111-1111-1111-111111111111";
+  const chartId2 = "22222222-2222-2222-2222-222222222222";
+
   it("builds the system chart list query", () => {
     const query = listSystemChartsQuery({ table: "account", nameFilter: "Sales" });
 
@@ -35,10 +38,10 @@ describe("chart queries", () => {
   });
 
   it("builds the bulk system chart query", () => {
-    const query = listSystemChartsByIdsQuery(["chart-1", "chart-2"]);
+    const query = listSystemChartsByIdsQuery([chartId1, chartId2]);
 
     expect(query).toContain(
-      "savedqueryvisualizationid eq 'chart-1' or savedqueryvisualizationid eq 'chart-2'",
+      `savedqueryvisualizationid eq ${chartId1} or savedqueryvisualizationid eq ${chartId2}`,
     );
   });
 });

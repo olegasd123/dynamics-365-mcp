@@ -42,7 +42,7 @@ describe("web resource queries", () => {
 
   it("builds the web resource content query by id", () => {
     expect(getWebResourceContentByNameQuery("11111111-1111-1111-1111-111111111111")).toContain(
-      "$filter=webresourceid eq 11111111-1111-1111-1111-111111111111",
+      "$filter=name eq '11111111-1111-1111-1111-111111111111' or webresourceid eq 11111111-1111-1111-1111-111111111111",
     );
   });
 

@@ -90,7 +90,7 @@ describe("list_plugin_trace_logs tool", () => {
     ]);
     expect(calls[2]?.queryParams).toContain("typename eq 'Core.Plugins.AccountPlugin'");
     expect(calls[2]?.queryParams).toContain(
-      "correlationid eq '00000000-0000-0000-0000-000000000001'",
+      "correlationid eq 00000000-0000-0000-0000-000000000001",
     );
     expect(calls[2]?.queryParams).toContain("createdon ge 2026-04-20T08:00:00.000Z");
     expect(calls[2]?.queryParams).toContain("createdon le 2026-04-20T09:00:00.000Z");

@@ -9,6 +9,9 @@ import {
 } from "../custom-api-queries.js";
 
 describe("custom api queries", () => {
+  const apiId1 = "11111111-1111-1111-1111-111111111111";
+  const apiId2 = "22222222-2222-2222-2222-222222222222";
+
   it("builds the custom api list query", () => {
     const query = listCustomApisQuery("Order");
 
@@ -25,17 +28,17 @@ describe("custom api queries", () => {
   });
 
   it("builds child queries", () => {
-    expect(listCustomApiRequestParametersQuery("api-1")).toContain(
-      "$filter=_customapiid_value eq 'api-1'",
+    expect(listCustomApiRequestParametersQuery(apiId1)).toContain(
+      `$filter=_customapiid_value eq ${apiId1}`,
     );
-    expect(listCustomApiResponsePropertiesQuery("api-1")).toContain(
-      "$filter=_customapiid_value eq 'api-1'",
+    expect(listCustomApiResponsePropertiesQuery(apiId1)).toContain(
+      `$filter=_customapiid_value eq ${apiId1}`,
     );
-    expect(listCustomApiRequestParametersForApisQuery(["api-1", "api-2"])).toContain(
-      "_customapiid_value eq 'api-1' or _customapiid_value eq 'api-2'",
+    expect(listCustomApiRequestParametersForApisQuery([apiId1, apiId2])).toContain(
+      `_customapiid_value eq ${apiId1} or _customapiid_value eq ${apiId2}`,
     );
-    expect(listCustomApiResponsePropertiesForApisQuery(["api-1", "api-2"])).toContain(
-      "_customapiid_value eq 'api-1' or _customapiid_value eq 'api-2'",
+    expect(listCustomApiResponsePropertiesForApisQuery([apiId1, apiId2])).toContain(
+      `_customapiid_value eq ${apiId1} or _customapiid_value eq ${apiId2}`,
     );
   });
 });

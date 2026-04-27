@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidInList, query } from "../utils/odata-builder.js";
 
 export const EMAIL_TEMPLATE_SCOPE = {
   personal: "personal",
@@ -83,7 +83,7 @@ export function getEmailTemplateByIdentityQuery(options: {
 export function listEmailTemplatesByIdsQuery(templateIds: string[]): string {
   return query()
     .select(EMAIL_TEMPLATE_SELECT)
-    .filter(inList("templateid", templateIds))
+    .filter(guidInList("templateid", templateIds))
     .orderby("templatetypecode asc,title asc")
     .toString();
 }
@@ -91,7 +91,7 @@ export function listEmailTemplatesByIdsQuery(templateIds: string[]): string {
 export function listEmailTemplateDetailsByIdsQuery(templateIds: string[]): string {
   return query()
     .select(EMAIL_TEMPLATE_DETAILS_SELECT)
-    .filter(inList("templateid", templateIds))
+    .filter(guidInList("templateid", templateIds))
     .orderby("templatetypecode asc,title asc")
     .toString();
 }

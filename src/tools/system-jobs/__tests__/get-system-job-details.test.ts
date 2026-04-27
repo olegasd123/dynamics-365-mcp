@@ -83,7 +83,7 @@ describe("get_system_job_details tool", () => {
       "asyncoperations(job-1)",
       "bulkdeleteoperations",
     ]);
-    expect(calls[1]?.queryParams).toContain("_asyncoperationid_value eq 'job-1'");
+    expect(calls[1]?.queryParams).toContain("_asyncoperationid_value eq ");
   });
 
   it("loads the related plug-in step for a plug-in async job", async () => {

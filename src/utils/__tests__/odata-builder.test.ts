@@ -5,6 +5,8 @@ import {
   eq,
   escapeODataString,
   guidEq,
+  guidInList,
+  identityOrGuidEq,
   normalizeGuid,
   odataContains,
   odataEq,
@@ -31,6 +33,32 @@ describe("OData string helpers", () => {
     expect(normalizeGuid("not-a-guid")).toBeNull();
     expect(guidEq("webresourceid", "11111111-1111-1111-1111-111111111111").toString()).toBe(
       "webresourceid eq 11111111-1111-1111-1111-111111111111",
+    );
+    expect(
+      guidInList("webresourceid", [
+        "11111111-1111-1111-1111-111111111111",
+        "{22222222-2222-2222-2222-222222222222}",
+      ])?.toString(),
+    ).toBe(
+      "webresourceid eq 11111111-1111-1111-1111-111111111111 or webresourceid eq 22222222-2222-2222-2222-222222222222",
+    );
+    expect(() => guidInList("webresourceid", ["not-a-guid"])).toThrow(
+      "Value 'not-a-guid' is not a GUID.",
+    );
+  });
+
+  it("builds name-or-GUID identity filters", () => {
+    expect(identityOrGuidEq("name", "webresourceid", "new_/script.js").toString()).toBe(
+      "name eq 'new_/script.js'",
+    );
+    expect(
+      identityOrGuidEq(
+        "name",
+        "webresourceid",
+        "{11111111-AAAA-bbbb-CCCC-111111111111}",
+      ).toString(),
+    ).toBe(
+      "name eq '{11111111-AAAA-bbbb-CCCC-111111111111}' or webresourceid eq 11111111-aaaa-bbbb-cccc-111111111111",
     );
   });
 });

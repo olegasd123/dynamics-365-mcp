@@ -8,6 +8,9 @@ import {
 } from "../view-queries.js";
 
 describe("view queries", () => {
+  const viewId1 = "11111111-1111-1111-1111-111111111111";
+  const viewId2 = "22222222-2222-2222-2222-222222222222";
+
   it("builds the saved views query", () => {
     const query = listSavedViewsQuery({ table: "account", nameFilter: "Active" });
 
@@ -32,8 +35,8 @@ describe("view queries", () => {
   });
 
   it("builds the bulk saved views query", () => {
-    const query = listSavedViewsByIdsQuery(["view-1", "view-2"]);
+    const query = listSavedViewsByIdsQuery([viewId1, viewId2]);
 
-    expect(query).toContain("savedqueryid eq 'view-1' or savedqueryid eq 'view-2'");
+    expect(query).toContain(`savedqueryid eq ${viewId1} or savedqueryid eq ${viewId2}`);
   });
 });

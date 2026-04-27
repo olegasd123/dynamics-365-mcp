@@ -1,4 +1,13 @@
-import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import {
+  and,
+  contains,
+  eq,
+  guidEq,
+  guidInList,
+  inList,
+  or,
+  query,
+} from "../utils/odata-builder.js";
 
 export const FORM_TYPE = {
   main: [2, 12],
@@ -50,7 +59,7 @@ export function getFormDetailsByIdentityQuery(options: {
   uniqueName?: string;
 }): string {
   const filter = options.formId
-    ? eq("formid", options.formId)
+    ? guidEq("formid", options.formId)
     : and(
         options.uniqueName
           ? eq("uniquename", options.uniqueName)
@@ -66,7 +75,7 @@ export function getFormDetailsByIdentityQuery(options: {
 export function listFormsByIdsQuery(formIds: string[]): string {
   return query()
     .select(FORM_SELECT)
-    .filter(inList("formid", formIds))
+    .filter(guidInList("formid", formIds))
     .orderby("objecttypecode asc,name asc")
     .toString();
 }
@@ -74,7 +83,7 @@ export function listFormsByIdsQuery(formIds: string[]): string {
 export function listFormDetailsByIdsQuery(formIds: string[]): string {
   return query()
     .select(FORM_DETAILS_SELECT)
-    .filter(inList("formid", formIds))
+    .filter(guidInList("formid", formIds))
     .orderby("objecttypecode asc,name asc")
     .toString();
 }

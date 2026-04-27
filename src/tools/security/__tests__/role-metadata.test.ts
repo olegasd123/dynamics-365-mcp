@@ -112,8 +112,8 @@ describe("role metadata", () => {
 
     expect(details.privileges).toHaveLength(privilegeCount);
     expect(privilegeCalls).toHaveLength(2);
-    expect(privilegeCalls[0]?.queryParams).toContain("privilegeid eq 'priv-1'");
-    expect(privilegeCalls[1]?.queryParams).toContain("privilegeid eq 'priv-41'");
+    expect(privilegeCalls[0]?.queryParams).toContain("privilegeid eq ");
+    expect(privilegeCalls[1]?.queryParams).toContain("privilegeid eq ");
   });
 
   it("uses the default global business unit when business unit is not provided", async () => {

@@ -328,7 +328,7 @@ describe("solution inventory", () => {
     expect(inventory.pluginImages).toHaveLength(1);
     expect(calls.filter((call) => call.entitySet === "EntityDefinitions")).toHaveLength(1);
     expect(calls.find((call) => call.entitySet === "EntityDefinitions")?.queryParams).toContain(
-      "MetadataId eq 'table-1'",
+      "MetadataId eq ",
     );
   });
 

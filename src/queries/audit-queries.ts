@@ -1,4 +1,4 @@
-import { and, eq, query, rawFilter, type ODataFilter } from "../utils/odata-builder.js";
+import { and, eq, guidEq, query, rawFilter, type ODataFilter } from "../utils/odata-builder.js";
 
 export function listAuditHistoryQuery(options: {
   tableLogicalName: string;
@@ -25,7 +25,7 @@ export function listAuditHistoryQuery(options: {
     .filter(
       and(
         eq("objecttypecode", options.tableLogicalName),
-        options.recordId ? eq("_objectid_value", options.recordId) : undefined,
+        options.recordId ? guidEq("_objectid_value", options.recordId) : undefined,
         buildDateFilter("createdon", "ge", options.createdAfter),
         buildDateFilter("createdon", "le", options.createdBefore),
       ),

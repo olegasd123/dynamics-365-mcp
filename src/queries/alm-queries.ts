@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidEq, guidInList, or, query } from "../utils/odata-builder.js";
 
 const ENVIRONMENT_VARIABLE_DEFINITION_SELECT = [
   "environmentvariabledefinitionid",
@@ -82,7 +82,7 @@ export function listEnvironmentVariableDefinitionsQuery(nameFilter?: string): st
 export function listEnvironmentVariableDefinitionsByIdsQuery(ids: string[]): string {
   return query()
     .select(ENVIRONMENT_VARIABLE_DEFINITION_SELECT)
-    .filter(inList("environmentvariabledefinitionid", ids))
+    .filter(guidInList("environmentvariabledefinitionid", ids))
     .orderby("schemaname asc")
     .toString();
 }
@@ -94,7 +94,7 @@ export function listEnvironmentVariableValuesQuery(): string {
 export function listEnvironmentVariableValuesForDefinitionsQuery(definitionIds: string[]): string {
   return query()
     .select(ENVIRONMENT_VARIABLE_VALUE_SELECT)
-    .filter(inList("_environmentvariabledefinitionid_value", definitionIds))
+    .filter(guidInList("_environmentvariabledefinitionid_value", definitionIds))
     .orderby("modifiedon desc")
     .toString();
 }
@@ -102,7 +102,7 @@ export function listEnvironmentVariableValuesForDefinitionsQuery(definitionIds: 
 export function listEnvironmentVariableValuesByIdsQuery(ids: string[]): string {
   return query()
     .select(ENVIRONMENT_VARIABLE_VALUE_SELECT)
-    .filter(inList("environmentvariablevalueid", ids))
+    .filter(guidInList("environmentvariablevalueid", ids))
     .orderby("modifiedon desc")
     .toString();
 }
@@ -125,7 +125,7 @@ export function listConnectionReferencesQuery(nameFilter?: string): string {
 export function listConnectionReferencesByIdsQuery(ids: string[]): string {
   return query()
     .select(CONNECTION_REFERENCE_SELECT)
-    .filter(inList("connectionreferenceid", ids))
+    .filter(guidInList("connectionreferenceid", ids))
     .orderby("connectionreferencedisplayname asc")
     .toString();
 }
@@ -143,7 +143,7 @@ export function listAppModulesQuery(nameFilter?: string): string {
 export function listAppModulesByIdsQuery(ids: string[]): string {
   return query()
     .select(APP_MODULE_SELECT)
-    .filter(inList("appmoduleid", ids))
+    .filter(guidInList("appmoduleid", ids))
     .orderby("name asc")
     .toString();
 }
@@ -163,7 +163,7 @@ export function listSitemapsQuery(nameFilter?: string): string {
 export function listSitemapsByIdsQuery(ids: string[]): string {
   return query()
     .select(SITEMAP_SELECT)
-    .filter(inList("sitemapid", ids))
+    .filter(guidInList("sitemapid", ids))
     .orderby("sitemapname asc")
     .toString();
 }
@@ -171,7 +171,7 @@ export function listSitemapsByIdsQuery(ids: string[]): string {
 export function listAppModuleSitemapComponentsQuery(appModuleIdUnique: string): string {
   return query()
     .select(APP_MODULE_COMPONENT_SELECT)
-    .filter(and(eq("_appmoduleidunique_value", appModuleIdUnique), eq("componenttype", 62)))
+    .filter(and(guidEq("_appmoduleidunique_value", appModuleIdUnique), eq("componenttype", 62)))
     .orderby("appmodulecomponentid asc")
     .toString();
 }

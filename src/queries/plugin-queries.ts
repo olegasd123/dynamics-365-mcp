@@ -1,4 +1,4 @@
-import { and, eq, guidEq, inList, query, rawFilter } from "../utils/odata-builder.js";
+import { and, eq, guidEq, guidInList, query, rawFilter } from "../utils/odata-builder.js";
 
 const DEFAULT_PLUGIN_ASSEMBLY_SELECT = [
   "pluginassemblyid",
@@ -29,7 +29,7 @@ export function getPluginAssemblyByNameQuery(
 export function listPluginAssembliesByIdsQuery(assemblyIds: string[]): string {
   return query()
     .select(DEFAULT_PLUGIN_ASSEMBLY_SELECT)
-    .filter(inList("pluginassemblyid", assemblyIds))
+    .filter(guidInList("pluginassemblyid", assemblyIds))
     .orderby("name asc")
     .toString();
 }
@@ -45,7 +45,7 @@ export function listPluginTypesQuery(assemblyId: string): string {
       "workflowactivitygroupname",
       "customworkflowactivityinfo",
     ])
-    .filter(eq("pluginassemblyid/pluginassemblyid", assemblyId))
+    .filter(guidEq("pluginassemblyid/pluginassemblyid", assemblyId))
     .orderby("name asc")
     .toString();
 }
@@ -62,7 +62,7 @@ export function listPluginTypesForAssembliesQuery(assemblyIds: string[]): string
       "customworkflowactivityinfo",
       "_pluginassemblyid_value",
     ])
-    .filter(inList("_pluginassemblyid_value", assemblyIds))
+    .filter(guidInList("_pluginassemblyid_value", assemblyIds))
     .orderby("name asc")
     .toString();
 }
@@ -79,7 +79,7 @@ export function listPluginTypesByIdsQuery(pluginTypeIds: string[]): string {
       "customworkflowactivityinfo",
       "_pluginassemblyid_value",
     ])
-    .filter(inList("plugintypeid", pluginTypeIds))
+    .filter(guidInList("plugintypeid", pluginTypeIds))
     .orderby("name asc")
     .toString();
 }
@@ -101,7 +101,7 @@ export function listPluginStepsQuery(pluginTypeId: string): string {
       "asyncautodelete",
       "supporteddeployment",
     ])
-    .filter(eq("_eventhandler_value", pluginTypeId))
+    .filter(guidEq("_eventhandler_value", pluginTypeId))
     .expand("sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)")
     .orderby("name asc")
     .toString();
@@ -124,7 +124,7 @@ export function listPluginStepsForPluginTypesQuery(pluginTypeIds: string[]): str
       "asyncautodelete",
       "supporteddeployment",
     ])
-    .filter(inList("_eventhandler_value", pluginTypeIds))
+    .filter(guidInList("_eventhandler_value", pluginTypeIds))
     .expand("sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)")
     .orderby("name asc")
     .toString();
@@ -147,7 +147,7 @@ export function listPluginStepsByIdsQuery(stepIds: string[]): string {
       "asyncautodelete",
       "supporteddeployment",
     ])
-    .filter(inList("sdkmessageprocessingstepid", stepIds))
+    .filter(guidInList("sdkmessageprocessingstepid", stepIds))
     .expand("sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)")
     .orderby("name asc")
     .toString();
@@ -164,7 +164,7 @@ export function listPluginImagesQuery(stepId: string): string {
       "attributes",
       "messagepropertyname",
     ])
-    .filter(eq("_sdkmessageprocessingstepid_value", stepId))
+    .filter(guidEq("_sdkmessageprocessingstepid_value", stepId))
     .toString();
 }
 
@@ -179,7 +179,7 @@ export function listPluginImagesForStepsQuery(stepIds: string[]): string {
       "attributes",
       "messagepropertyname",
     ])
-    .filter(inList("_sdkmessageprocessingstepid_value", stepIds))
+    .filter(guidInList("_sdkmessageprocessingstepid_value", stepIds))
     .toString();
 }
 
@@ -194,7 +194,7 @@ export function listPluginImagesByIdsQuery(imageIds: string[]): string {
       "attributes",
       "messagepropertyname",
     ])
-    .filter(inList("sdkmessageprocessingstepimageid", imageIds))
+    .filter(guidInList("sdkmessageprocessingstepimageid", imageIds))
     .toString();
 }
 
@@ -271,7 +271,7 @@ export function listPluginTraceLogsQuery(options?: {
 }): string {
   const filter = and(
     options?.pluginTypeName ? eq("typename", options.pluginTypeName) : undefined,
-    options?.correlationId ? eq("correlationid", options.correlationId) : undefined,
+    options?.correlationId ? guidEq("correlationid", options.correlationId) : undefined,
     options?.createdAfter ? rawFilter(`createdon ge ${options.createdAfter}`) : undefined,
     options?.createdBefore ? rawFilter(`createdon le ${options.createdBefore}`) : undefined,
     options?.hasException
