@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import {
+  createRecordingClient,
+  createTestConfig,
+  denormalizeFixtureIds,
+} from "../../__tests__/tool-test-helpers.js";
 import { handleListDuplicateDetectionRules } from "../list-duplicate-detection-rules.js";
 
 describe("list duplicate detection rules", () => {
@@ -83,16 +87,18 @@ describe("list duplicate detection rules", () => {
       },
     });
 
-    const response = await handleListDuplicateDetectionRules(
-      {
-        environment: "dev",
-        table: "account",
-        status: "published",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleListDuplicateDetectionRules(
+        {
+          environment: "dev",
+          table: "account",
+          status: "published",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).not.toBe(true);

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import {
+  createRecordingClient,
+  createTestConfig,
+  denormalizeFixtureIds,
+  fixtureGuid,
+} from "../../__tests__/tool-test-helpers.js";
 import { handleGetRolePrivileges } from "../get-role-privileges.js";
 import { fetchRolePrivileges, listSecurityRoles } from "../role-metadata.js";
 
@@ -55,7 +60,7 @@ describe("role metadata", () => {
     });
 
     const roles = await listSecurityRoles(env, client);
-    const details = await fetchRolePrivileges(env, client, "Salesperson");
+    const details = denormalizeFixtureIds(await fetchRolePrivileges(env, client, "Salesperson"));
 
     expect(roles).toEqual([
       expect.objectContaining({
@@ -107,7 +112,7 @@ describe("role metadata", () => {
       },
     });
 
-    const details = await fetchRolePrivileges(env, client, "Salesperson");
+    const details = denormalizeFixtureIds(await fetchRolePrivileges(env, client, "Salesperson"));
     const privilegeCalls = calls.filter((call) => call.entitySet === "privileges");
 
     expect(details.privileges).toHaveLength(privilegeCount);
@@ -161,7 +166,7 @@ describe("role metadata", () => {
       },
     });
 
-    const details = await fetchRolePrivileges(env, client, "Salesperson");
+    const details = denormalizeFixtureIds(await fetchRolePrivileges(env, client, "Salesperson"));
 
     expect(details.role.roleid).toBe("role-root");
     expect(details.role.businessUnitName).toBe("Root");
@@ -218,15 +223,17 @@ describe("role metadata", () => {
       },
     });
 
-    const response = await handleGetRolePrivileges(
-      {
-        environment: "dev",
-        roleName: "Managers",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleGetRolePrivileges(
+        {
+          environment: "dev",
+          roleName: "Managers",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).toBeUndefined();
@@ -310,7 +317,9 @@ describe("role metadata", () => {
       },
     });
 
-    const details = await fetchRolePrivileges(env, client, "Salesperson", "bu-child-2");
+    const details = denormalizeFixtureIds(
+      await fetchRolePrivileges(env, client, "Salesperson", fixtureGuid("bu-child-2")),
+    );
 
     expect(details.role.roleid).toBe("role-child-2");
     expect(details.role.businessUnitName).toBe("Duplicate");
@@ -344,15 +353,17 @@ describe("role metadata", () => {
       },
     });
 
-    const response = await handleGetRolePrivileges(
-      {
-        environment: "dev",
-        roleName: "Salesperson",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleGetRolePrivileges(
+        {
+          environment: "dev",
+          roleName: "Salesperson",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).toBe(true);
@@ -391,15 +402,17 @@ describe("role metadata", () => {
       },
     });
 
-    const response = await handleGetRolePrivileges(
-      {
-        environment: "dev",
-        roleName: "Salesperson",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleGetRolePrivileges(
+        {
+          environment: "dev",
+          roleName: "Salesperson",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).toBe(true);

@@ -14,11 +14,141 @@ export type ToolHandler = (
   extra?: Record<string, unknown>,
 ) => Promise<ToolResponse>;
 
+const FIXTURE_ID_PATTERN =
+  /^(account|action|alm|api|app|asm|assembly|bpf|bu|chart|col|column|comp|condition|conn|contact|dash|dashboard|def|dep|dev|duplicate|email|entity|env|field|flow|form|image|img|job|key|layer|metadata|msg|opp|priv|process|prod|profile|pub|publisher|rel|relationship|role|root|rp|rule|sc|sitemap|sol|solution|stage|step|table|template|trace|type|user|value|view|webresource|wf|workflow|wr)(?:[-_][a-z0-9]+)+$/i;
+const fixtureIdsByGuid = new Map<string, string>();
+
+export function fixtureGuid(value: string): string {
+  let hash = 0;
+
+  for (const char of value.toLowerCase()) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  const suffix = hash.toString(16).padStart(12, "0").slice(-12);
+  return `00000000-0000-4000-8000-${suffix}`;
+}
+
+function isFixtureId(value: string): boolean {
+  return FIXTURE_ID_PATTERN.test(value);
+}
+
+function isIdField(key: string): boolean {
+  const normalizedKey = key.toLowerCase();
+
+  return (
+    normalizedKey === "id" ||
+    normalizedKey === "objectid" ||
+    normalizedKey === "appmoduleidunique" ||
+    normalizedKey === "_appmoduleidunique_value" ||
+    normalizedKey.endsWith("id") ||
+    normalizedKey.endsWith("_value") ||
+    normalizedKey.includes("id_value") ||
+    key === "MetadataId" ||
+    key === "ObjectId"
+  );
+}
+
+function normalizeFixtureString(value: string): string {
+  if (!isFixtureId(value)) {
+    return value;
+  }
+
+  const guid = fixtureGuid(value);
+  fixtureIdsByGuid.set(guid, value);
+  return guid;
+}
+
+function normalizeFixturePath(value: string): string {
+  return value.replace(/[a-z][a-z0-9]*(?:[-_][a-z0-9]+)+/gi, (match) =>
+    isFixtureId(match) ? normalizeFixtureString(match) : match,
+  );
+}
+
+function denormalizeFixtureString(value: string): string {
+  let result = value;
+
+  for (const [guid, fixtureId] of fixtureIdsByGuid) {
+    result = result.replaceAll(guid, fixtureId);
+  }
+
+  return result;
+}
+
+export function denormalizeFixtureIds<T>(value: T): T {
+  if (typeof value === "string") {
+    return denormalizeFixtureString(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => denormalizeFixtureIds(item)) as T;
+  }
+
+  if (value instanceof Set) {
+    return new Set([...value].map((item) => denormalizeFixtureIds(item))) as T;
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      denormalizeFixtureString(key),
+      denormalizeFixtureIds(item),
+    ]),
+  ) as T;
+}
+
+function normalizeFixtureIds(value: unknown, parentKey?: string): unknown {
+  if (typeof value === "string") {
+    return parentKey && isIdField(parentKey) ? normalizeFixtureString(value) : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeFixtureIds(item, parentKey));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      normalizeFixturePath(key),
+      normalizeFixtureIds(item, key),
+    ]),
+  );
+}
+
+function normalizeFixtureArgs(value: unknown, parentKey?: string): unknown {
+  if (typeof value === "string") {
+    if (parentKey === "componentType") {
+      return value;
+    }
+    return normalizeFixtureString(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeFixtureArgs(item, parentKey));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, normalizeFixtureArgs(item, key)]),
+  );
+}
+
 export class FakeServer {
   private readonly handlers = new Map<string, ToolHandler>();
 
   tool(name: string, _description: string, _schema: unknown, handler: ToolHandler): void {
-    this.handlers.set(name, handler);
+    this.handlers.set(name, async (args, extra) =>
+      denormalizeFixtureIds(await handler(normalizeFixtureArgs(args) as never, extra)),
+    );
   }
 
   getHandler(name: string): ToolHandler {
@@ -54,10 +184,14 @@ export function createTestConfig(
 }
 
 export function createRecordingClient(datasets: Record<string, Record<string, unknown>>) {
+  const normalizedDatasets = normalizeFixtureIds(datasets) as Record<
+    string,
+    Record<string, unknown>
+  >;
   const calls: Array<{ environment: string; entitySet: string; queryParams?: string }> = [];
 
   function getDatasetValue(envName: string, key: string): unknown {
-    return (datasets[envName] || {})[key];
+    return (normalizedDatasets[envName] || {})[normalizeFixturePath(key)];
   }
 
   function getDatasetArray<T>(value: unknown): T[] {
@@ -112,8 +246,8 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
     async query<T>(env: EnvironmentConfig, entitySet: string, queryParams?: string): Promise<T[]> {
       calls.push({
         environment: env.name,
-        entitySet,
-        queryParams,
+        entitySet: denormalizeFixtureString(entitySet),
+        queryParams: queryParams ? denormalizeFixtureString(queryParams) : undefined,
       });
       const value = getDatasetValue(env.name, entitySet);
       return getDatasetArray<T>(value);
@@ -125,8 +259,8 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
     ): Promise<T[]> {
       calls.push({
         environment: env.name,
-        entitySet: resourcePath,
-        queryParams,
+        entitySet: denormalizeFixtureString(resourcePath),
+        queryParams: queryParams ? denormalizeFixtureString(queryParams) : undefined,
       });
       const value = getDatasetValue(env.name, resourcePath);
       return getDatasetArray<T>(value);
@@ -140,8 +274,8 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
       const datasetKey = options?.pageLink || entitySet;
       calls.push({
         environment: env.name,
-        entitySet: datasetKey,
-        queryParams,
+        entitySet: denormalizeFixtureString(datasetKey),
+        queryParams: queryParams ? denormalizeFixtureString(queryParams) : undefined,
       });
       return getDatasetPage<T>(getDatasetValue(env.name, datasetKey));
     },
@@ -154,8 +288,8 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
       const datasetKey = options?.pageLink || resourcePath;
       calls.push({
         environment: env.name,
-        entitySet: datasetKey,
-        queryParams,
+        entitySet: denormalizeFixtureString(datasetKey),
+        queryParams: queryParams ? denormalizeFixtureString(queryParams) : undefined,
       });
       return getDatasetPage<T>(getDatasetValue(env.name, datasetKey));
     },
@@ -166,8 +300,8 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
     ): Promise<T | null> {
       calls.push({
         environment: env.name,
-        entitySet: resourcePath,
-        queryParams,
+        entitySet: denormalizeFixtureString(resourcePath),
+        queryParams: queryParams ? denormalizeFixtureString(queryParams) : undefined,
       });
       const value = getDatasetValue(env.name, resourcePath);
       if (value === undefined) {
@@ -193,8 +327,8 @@ export function createRecordingClient(datasets: Record<string, Record<string, un
     ): Promise<T> {
       calls.push({
         environment: env.name,
-        entitySet: actionPath,
-        queryParams: body ? JSON.stringify(body) : undefined,
+        entitySet: denormalizeFixtureString(actionPath),
+        queryParams: body ? denormalizeFixtureString(JSON.stringify(body)) : undefined,
       });
       const value = getDatasetValue(env.name, actionPath);
       return (value || {}) as T;

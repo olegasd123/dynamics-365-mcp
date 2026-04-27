@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import {
+  createRecordingClient,
+  createTestConfig,
+  denormalizeFixtureIds,
+} from "../../__tests__/tool-test-helpers.js";
 import { handleGetViewDetails } from "../get-view-details.js";
 import { fetchViewDetails, listViews } from "../view-metadata.js";
 
@@ -91,15 +95,17 @@ describe("view metadata", () => {
       },
     });
 
-    const response = await handleGetViewDetails(
-      {
-        environment: "dev",
-        viewName: "Active Records",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleGetViewDetails(
+        {
+          environment: "dev",
+          viewName: "Active Records",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).toBe(true);

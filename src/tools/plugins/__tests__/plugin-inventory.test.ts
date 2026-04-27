@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { fetchPluginClasses, fetchPluginInventory, fetchPluginSteps } from "../plugin-inventory.js";
 import type { EnvironmentConfig } from "../../../config/types.js";
+import { fixtureGuid } from "../../__tests__/tool-test-helpers.js";
 
 describe("plugin inventory", () => {
+  const assemblyId1 = fixtureGuid("asm-1");
+  const assemblyId2 = fixtureGuid("asm-2");
+  const typeId1 = fixtureGuid("type-1");
+  const typeId2 = fixtureGuid("type-2");
+  const stepId1 = fixtureGuid("step-1");
+  const stepId2 = fixtureGuid("step-2");
+  const imageId1 = fixtureGuid("img-1");
+
   const env: EnvironmentConfig = {
     name: "dev",
     url: "https://dev.crm.dynamics.com",
@@ -20,16 +29,16 @@ describe("plugin inventory", () => {
         if (entitySet === "plugintypes") {
           return [
             {
-              plugintypeid: "type-1",
+              plugintypeid: typeId1,
               name: "Type1",
               typename: "Plugins.Type1",
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId1,
             },
             {
-              plugintypeid: "type-2",
+              plugintypeid: typeId2,
               name: "Type2",
               typename: "Plugins.Type2",
-              _pluginassemblyid_value: "asm-2",
+              _pluginassemblyid_value: assemblyId2,
             },
           ] as T[];
         }
@@ -37,8 +46,8 @@ describe("plugin inventory", () => {
         if (entitySet === "sdkmessageprocessingsteps") {
           return [
             {
-              sdkmessageprocessingstepid: "step-1",
-              _eventhandler_value: "type-1",
+              sdkmessageprocessingstepid: stepId1,
+              _eventhandler_value: typeId1,
               name: "Step 1",
               stage: 20,
               mode: 0,
@@ -48,8 +57,8 @@ describe("plugin inventory", () => {
               sdkmessagefilterid: { primaryobjecttypecode: "account" },
             },
             {
-              sdkmessageprocessingstepid: "step-2",
-              _eventhandler_value: "type-2",
+              sdkmessageprocessingstepid: stepId2,
+              _eventhandler_value: typeId2,
               name: "Step 2",
               stage: 40,
               mode: 1,
@@ -66,8 +75,8 @@ describe("plugin inventory", () => {
     } as never;
 
     const steps = await fetchPluginSteps(env, client, [
-      { pluginassemblyid: "asm-1", name: "Assembly.One" },
-      { pluginassemblyid: "asm-2", name: "Assembly.Two" },
+      { pluginassemblyid: assemblyId1, name: "Assembly.One" },
+      { pluginassemblyid: assemblyId2, name: "Assembly.Two" },
     ]);
 
     expect(steps).toHaveLength(2);
@@ -83,10 +92,10 @@ describe("plugin inventory", () => {
         if (entitySet === "plugintypes") {
           return [
             {
-              plugintypeid: "type-1",
+              plugintypeid: typeId1,
               name: "Type1",
               typename: "Plugins.Type1",
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId1,
             },
           ] as T[];
         }
@@ -94,8 +103,8 @@ describe("plugin inventory", () => {
         if (entitySet === "sdkmessageprocessingsteps") {
           return [
             {
-              sdkmessageprocessingstepid: "step-1",
-              _eventhandler_value: "type-1",
+              sdkmessageprocessingstepid: stepId1,
+              _eventhandler_value: typeId1,
               name: "Step 1",
               stage: 20,
               mode: 0,
@@ -110,8 +119,8 @@ describe("plugin inventory", () => {
         if (entitySet === "sdkmessageprocessingstepimages") {
           return [
             {
-              sdkmessageprocessingstepimageid: "img-1",
-              _sdkmessageprocessingstepid_value: "step-1",
+              sdkmessageprocessingstepimageid: imageId1,
+              _sdkmessageprocessingstepid_value: stepId1,
               name: "PreImage",
               entityalias: "pre",
               imagetype: 0,
@@ -126,7 +135,7 @@ describe("plugin inventory", () => {
     } as never;
 
     const inventory = await fetchPluginInventory(env, client, [
-      { pluginassemblyid: "asm-1", name: "Assembly.One" },
+      { pluginassemblyid: assemblyId1, name: "Assembly.One" },
     ]);
 
     expect(inventory.steps).toHaveLength(1);
@@ -144,18 +153,18 @@ describe("plugin inventory", () => {
         if (entitySet === "plugintypes") {
           return [
             {
-              plugintypeid: "type-1",
+              plugintypeid: typeId1,
               name: "AccountPlugin",
               typename: "Plugins.AccountPlugin",
               isworkflowactivity: false,
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId1,
             },
             {
-              plugintypeid: "type-2",
+              plugintypeid: typeId2,
               name: "AccountActivity",
               typename: "Plugins.AccountActivity",
               isworkflowactivity: true,
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId1,
             },
           ] as T[];
         }
@@ -165,7 +174,7 @@ describe("plugin inventory", () => {
     } as never;
 
     const plugins = await fetchPluginClasses(env, client, [
-      { pluginassemblyid: "asm-1", name: "Assembly.One" },
+      { pluginassemblyid: assemblyId1, name: "Assembly.One" },
     ]);
 
     expect(plugins).toHaveLength(1);
@@ -178,20 +187,20 @@ describe("plugin inventory", () => {
         if (entitySet === "plugintypes") {
           return [
             {
-              plugintypeid: "type-1",
+              plugintypeid: typeId1,
               name: "AccountPlugin",
               typename: "Plugins.AccountPlugin",
               isworkflowactivity: false,
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId1,
             },
             {
-              plugintypeid: "type-2",
+              plugintypeid: typeId2,
               name: "PostVacancyToSap",
               typename: "Masao.Workflows.PostVacancyToSap",
               isworkflowactivity: false,
               workflowactivitygroupname: "Masao Workflows",
               customworkflowactivityinfo: '{"arguments":[]}',
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId1,
             },
           ] as T[];
         }
@@ -201,7 +210,7 @@ describe("plugin inventory", () => {
     } as never;
 
     const plugins = await fetchPluginClasses(env, client, [
-      { pluginassemblyid: "asm-1", name: "Assembly.One" },
+      { pluginassemblyid: assemblyId1, name: "Assembly.One" },
     ]);
 
     expect(plugins).toHaveLength(1);

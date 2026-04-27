@@ -6,8 +6,16 @@ import {
   filterPluginClassesByRegistration,
 } from "../plugin-class-metadata.js";
 import type { EnvironmentConfig } from "../../../config/types.js";
+import { fixtureGuid } from "../../__tests__/tool-test-helpers.js";
 
 describe("plugin shared metadata", () => {
+  const assemblyId = fixtureGuid("asm-1");
+  const typeId1 = fixtureGuid("type-1");
+  const typeId2 = fixtureGuid("type-2");
+  const stepId1 = fixtureGuid("step-1");
+  const stepId2 = fixtureGuid("step-2");
+  const imageId1 = fixtureGuid("img-1");
+
   const env: EnvironmentConfig = {
     name: "dev",
     url: "https://dev.crm.dynamics.com",
@@ -23,24 +31,24 @@ describe("plugin shared metadata", () => {
         calls.push(entitySet);
 
         if (entitySet === "pluginassemblies") {
-          return [{ pluginassemblyid: "asm-1", name: "Core.Plugins" }] as T[];
+          return [{ pluginassemblyid: assemblyId, name: "Core.Plugins" }] as T[];
         }
 
         if (entitySet === "plugintypes") {
           return [
             {
-              plugintypeid: "type-1",
+              plugintypeid: typeId1,
               name: "AccountPlugin",
               typename: "Core.Plugins.AccountPlugin",
               isworkflowactivity: false,
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId,
             },
             {
-              plugintypeid: "type-2",
+              plugintypeid: typeId2,
               name: "AccountActivity",
               typename: "Core.Plugins.AccountActivity",
               isworkflowactivity: true,
-              _pluginassemblyid_value: "asm-1",
+              _pluginassemblyid_value: assemblyId,
             },
           ] as T[];
         }
@@ -48,8 +56,8 @@ describe("plugin shared metadata", () => {
         if (entitySet === "sdkmessageprocessingsteps") {
           return [
             {
-              sdkmessageprocessingstepid: "step-1",
-              _eventhandler_value: "type-1",
+              sdkmessageprocessingstepid: stepId1,
+              _eventhandler_value: typeId1,
               name: "Plugin Step",
               stage: 20,
               mode: 0,
@@ -59,8 +67,8 @@ describe("plugin shared metadata", () => {
               sdkmessagefilterid: { primaryobjecttypecode: "account" },
             },
             {
-              sdkmessageprocessingstepid: "step-2",
-              _eventhandler_value: "type-2",
+              sdkmessageprocessingstepid: stepId2,
+              _eventhandler_value: typeId2,
               name: "Activity Step",
               stage: 40,
               mode: 0,
@@ -75,8 +83,8 @@ describe("plugin shared metadata", () => {
         if (entitySet === "sdkmessageprocessingstepimages") {
           return [
             {
-              sdkmessageprocessingstepimageid: "img-1",
-              _sdkmessageprocessingstepid_value: "step-1",
+              sdkmessageprocessingstepimageid: imageId1,
+              _sdkmessageprocessingstepid_value: stepId1,
               name: "PreImage",
               entityalias: "pre",
               imagetype: 0,
