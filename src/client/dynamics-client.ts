@@ -195,6 +195,7 @@ export class DynamicsClient {
     queryParams?: string,
     options?: RequestOptions,
   ): Promise<T | null> {
+    const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
     const cacheKey = this.buildCacheKey(env, resourcePath, queryParams, "single");
     const cachePolicy = this.getCachePolicy(resourcePath, options);
 
@@ -204,7 +205,7 @@ export class DynamicsClient {
         const url = this.buildUrl(env, resourcePath, queryParams);
         const { response, callId } = await this.retryPolicy.send({
           env,
-          timeoutMs: DEFAULT_TIMEOUT,
+          timeoutMs: timeout,
           url,
         });
 

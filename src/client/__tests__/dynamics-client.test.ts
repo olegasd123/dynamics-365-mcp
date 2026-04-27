@@ -320,6 +320,35 @@ describe("DynamicsClient", () => {
     });
   });
 
+  it("passes explicit timeouts to single-record reads", async () => {
+    const retryPolicy = {
+      send: vi.fn().mockResolvedValue({
+        response: new Response(JSON.stringify({ accountid: "1", name: "Account" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+        callId: 1,
+      }),
+    };
+    const tokenManager: TokenManagerStub = {
+      getToken: vi.fn().mockResolvedValue("token-1"),
+      clearCache: vi.fn(),
+    };
+    const client = new DynamicsClient(tokenManager as TokenManager, {
+      retryPolicy,
+    });
+
+    await expect(
+      client.getPath(env, "accounts(1)", "$select=name", { timeout: 45_000 }),
+    ).resolves.toEqual({ accountid: "1", name: "Account" });
+
+    expect(retryPolicy.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeoutMs: 45_000,
+      }),
+    );
+  });
+
   it("invokes bound actions with a POST body", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ ExportTranslationFile: "UEsDBA==" }), {
