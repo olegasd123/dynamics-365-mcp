@@ -786,6 +786,20 @@
         }
       }
     ],
+    "summarize_plugin_trace_logs": [
+      {
+        "name": "recent plugin trace summary",
+        "arguments": {
+          "environment": "dev",
+          "pluginName": "Contoso.Plugins.AccountPlugin",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "createdBefore": "2026-04-20T09:00:00Z",
+          "groupBy": "plugin_step",
+          "maxRecords": 1000,
+          "topExceptions": 5
+        }
+      }
+    ],
     "list_system_jobs": [
       {
         "name": "recent failed import jobs",

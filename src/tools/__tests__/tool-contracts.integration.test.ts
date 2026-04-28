@@ -232,6 +232,16 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.summarize_plugin_trace_logs.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        pluginName: expect.any(Object),
+        assemblyName: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        groupBy: expect.any(Object),
+        maxRecords: expect.any(Object),
+        topExceptions: expect.any(Object),
+      });
       expect(toolsByName.get_plugin_trace_log_details.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         pluginTraceLogId: expect.any(Object),

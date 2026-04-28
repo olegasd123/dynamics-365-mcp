@@ -167,6 +167,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list recent plugin trace logs for correlation id <CORRELATION_ID>.`
   `(Required: none)`
 
+- `summarize_plugin_trace_logs`
+  `In <ENV>, summarize plugin trace logs for the last 24 hours. Group by plugin step and show failure rate, p95 duration, and top exceptions.`
+  `In <ENV>, summarize recent trace logs for plugin class <PLUGIN_CLASS> from <START_TIME> to <END_TIME>.`
+  `(Required: none)`
+
 - `get_plugin_trace_log_details`
   `In <ENV>, show full details for plugin trace log <TRACE_LOG_ID>. Include exception details, message block, configuration, and timing fields.`
   `(Required: <TRACE_LOG_ID>)`
@@ -631,6 +636,7 @@ This prompt list covers these tools:
 - `list_table_ribbons`
 - `list_plugin_steps`
 - `list_plugin_trace_logs`
+- `summarize_plugin_trace_logs`
 - `list_system_jobs`
 - `list_plugins`
 - `list_plugin_assembly_images`

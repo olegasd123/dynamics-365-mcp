@@ -19,6 +19,7 @@ import { listSdkMessageProcessingStepsTool } from "./plugins/list-sdk-message-pr
 import { getPluginAssemblyDetailsTool } from "./plugins/get-plugin-assembly-details.js";
 import { getPluginTraceLogDetailsTool } from "./plugins/get-plugin-trace-log-details.js";
 import { listPluginTraceLogsTool } from "./plugins/list-plugin-trace-logs.js";
+import { summarizePluginTraceLogsTool } from "./plugins/summarize-plugin-trace-logs.js";
 import { getSystemJobDetailsTool } from "./system-jobs/get-system-job-details.js";
 import { listSystemJobsTool } from "./system-jobs/list-system-jobs.js";
 import { listWorkflowsTool } from "./workflows/list-workflows.js";
@@ -271,6 +272,19 @@ export const TOOL_MANIFEST = [
       "hasException",
       "limit",
       "cursor",
+    ],
+  },
+  {
+    ...summarizePluginTraceLogsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "pluginName",
+      "createdAfter",
+      "createdBefore",
+      "groupBy",
+      "maxRecords",
+      "topExceptions",
     ],
   },
   {

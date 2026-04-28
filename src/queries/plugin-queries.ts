@@ -300,6 +300,37 @@ export function listPluginTraceLogsQuery(options?: {
     .toString();
 }
 
+export function summarizePluginTraceLogsQuery(options: {
+  pluginTypeName?: string;
+  createdAfter: string;
+  createdBefore: string;
+  top: number;
+}): string {
+  const filter = and(
+    options.pluginTypeName ? eq("typename", options.pluginTypeName) : undefined,
+    rawFilter(`createdon ge ${options.createdAfter}`),
+    rawFilter(`createdon le ${options.createdBefore}`),
+  );
+
+  return query()
+    .select([
+      "plugintracelogid",
+      "typename",
+      "createdon",
+      "messagename",
+      "primaryentity",
+      "mode",
+      "performanceexecutionduration",
+      "exceptiondetails",
+      "pluginstepid",
+    ])
+    .filter(filter)
+    .orderby("createdon desc")
+    .top(options.top)
+    .count(true)
+    .toString();
+}
+
 export function getPluginTraceLogByIdQuery(): string {
   return query()
     .select([

@@ -352,6 +352,7 @@ Priority order:
 | `list_sdk_message_processing_steps` | List SDK message processing steps org-wide for a Dataverse message and optional table.                                                                                                                                               | `environment`, `message`, `primaryEntity`, `stage`, `mode`, `statecode`, `includeImages`                                |
 | `get_plugin_assembly_details`       | Get detailed information about a plugin assembly. Output separates plugin classes and workflow activities.                                                                                                                           | `environment`, `assemblyName`                                                                                           |
 | `list_plugin_trace_logs`            | List Dataverse plug-in trace logs with filters for plugin class, correlation id, time range, and exception presence.                                                                                                                 | `environment`, `pluginName`, `correlationId`, `createdAfter`, `createdBefore`, `hasException`, `limit`, `cursor`        |
+| `summarize_plugin_trace_logs`       | Summarize Dataverse plug-in trace logs over a time window with counts, duration percentiles, failure rate, and top exception messages.                                                                                               | `environment`, `pluginName`, `createdAfter`, `createdBefore`, `groupBy`, `maxRecords`, `topExceptions`                  |
 | `get_plugin_trace_log_details`      | Show one Dataverse plug-in trace log with full runtime details.                                                                                                                                                                      | `environment`, `pluginTraceLogId`                                                                                       |
 | `list_system_jobs`                  | List Dataverse system jobs with filters for runtime status, job type, time range, and failures.                                                                                                                                      | `environment`, `status`, `jobType`, `correlationId`, `createdAfter`, `completedAfter`, `failedOnly`, `limit`, `cursor`  |
 | `get_system_job_details`            | Show one Dataverse system job with runtime status, message details, and related workflow, plug-in, or bulk delete context.                                                                                                           | `environment`, `systemJobId`                                                                                            |
@@ -633,6 +634,25 @@ Use this when metadata looks correct but the runtime still fails and you need re
     "createdAfter": "2026-04-20T08:00:00Z",
     "hasException": true,
     "limit": 10
+  }
+}
+```
+
+### Summarize Plugin Trace Logs
+
+Use this to find busy, slow, or failing plugin steps over a recent time window.
+
+```json
+{
+  "tool": "summarize_plugin_trace_logs",
+  "arguments": {
+    "environment": "dev",
+    "pluginName": "Contoso.Plugins.AccountPlugin",
+    "createdAfter": "2026-04-20T08:00:00Z",
+    "createdBefore": "2026-04-20T09:00:00Z",
+    "groupBy": "plugin_step",
+    "maxRecords": 1000,
+    "topExceptions": 5
   }
 }
 ```
