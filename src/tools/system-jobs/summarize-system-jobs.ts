@@ -23,6 +23,7 @@ const DEFAULT_TOP_MESSAGES = 5;
 const MAX_TOP_MESSAGES = 20;
 const TEXT_GROUP_LIMIT = 25;
 const TEXT_BUCKET_LIMIT = 24;
+const TOP_SLOWEST_JOBS_LIMIT = 10;
 
 const summarizeSystemJobsSchema = {
   environment: z.string().optional().describe("Environment name"),
@@ -97,6 +98,10 @@ interface SystemJobSummaryRecord {
   name: string;
   category: string;
   operationLabel: string;
+  statusLabel: string;
+  createdOn: string;
+  startedOn: string;
+  completedOn: string;
   statusKey: StatusKey;
   createdMs: number | null;
   startedMs: number | null;
@@ -143,6 +148,19 @@ interface QueueBucket {
   estimatedOpenCount: number;
 }
 
+interface SlowSystemJob {
+  asyncOperationId: string;
+  name: string;
+  category: string;
+  operationLabel: string;
+  statusLabel: string;
+  createdOn: string;
+  startedOn: string;
+  completedOn: string;
+  runtimeMs: number;
+  runtimeSeconds: number;
+}
+
 export async function handleSummarizeSystemJobs(
   {
     environment,
@@ -187,6 +205,7 @@ export async function handleSummarizeSystemJobs(
     const runtimeStats = buildDurationStats(records.map((record) => record.runtimeMs));
     const waitStats = buildDurationStats(records.map((record) => record.waitMs));
     const groups = buildSummaryGroups(records, resolvedGroupBy, resolvedTopMessages);
+    const topSlowestJobs = getTopSlowestJobs(records, TOP_SLOWEST_JOBS_LIMIT);
     const queueBuckets = buildQueueBuckets(records, {
       createdAfter: timeWindow.createdAfter,
       createdBefore: timeWindow.createdBefore,
@@ -221,6 +240,7 @@ export async function handleSummarizeSystemJobs(
       runtime: runtimeStats,
       wait: waitStats,
       topMessages: topProblemMessages,
+      topSlowestJobs,
       groupCount: groups.length,
       groups,
       queueBuckets,
@@ -284,6 +304,17 @@ export async function handleSummarizeSystemJobs(
     )}, max ${formatDuration(runtimeStats.maxMs)}\n\n${formatTable(
       ["Group", "Count", "OK", "Failed", "Canceled", "Fail %", "Avg", "p95", "Top message"],
       groupRows,
+    )}\n\n### Slowest Jobs\n\n${formatTable(
+      ["Runtime", "Created", "Name", "Category", "Operation", "Status", "Job Id"],
+      topSlowestJobs.map((job) => [
+        formatDuration(job.runtimeMs),
+        job.createdOn.slice(0, 19).replace("T", " "),
+        job.name || "(no name)",
+        job.category,
+        job.operationLabel,
+        job.statusLabel,
+        job.asyncOperationId,
+      ]),
     )}\n\n### Estimated Queue Buckets\n\n${formatTable(
       ["Bucket", "Created", "Completed", "Failed", "Canceled", "Open"],
       bucketRows,
@@ -381,27 +412,27 @@ function normalizeSummaryRecord(record: Record<string, unknown>): SystemJobSumma
   const createdMs = parseDateMs(job.createdOn);
   const startedMs = parseDateMs(job.startedOn);
   const completedMs = parseDateMs(job.completedOn);
+  const statusKey = getStatusKey(job.state, job.status);
 
   return {
     asyncOperationId: job.asyncOperationId,
     name: job.name,
     category: job.category,
     operationLabel: job.operationLabel,
-    statusKey: getStatusKey(job.state, job.status),
+    statusLabel: job.statusLabel,
+    createdOn: job.createdOn,
+    startedOn: job.startedOn,
+    completedOn: job.completedOn,
+    statusKey,
     createdMs,
     startedMs,
     completedMs,
-    runtimeMs:
-      startedMs !== null && completedMs !== null && completedMs >= startedMs
-        ? completedMs - startedMs
-        : null,
+    runtimeMs: getRuntimeMs(job.executionTimeSpan, startedMs, completedMs),
     waitMs:
       createdMs !== null && startedMs !== null && startedMs >= createdMs
         ? startedMs - createdMs
         : null,
-    problemMessage: isProblemStatus(getStatusKey(job.state, job.status))
-      ? normalizeMessage(job.effectiveMessage)
-      : null,
+    problemMessage: isProblemStatus(statusKey) ? normalizeMessage(job.effectiveMessage) : null,
   };
 }
 
@@ -523,6 +554,32 @@ function buildQueueBuckets(
   }
 
   return buckets;
+}
+
+function getTopSlowestJobs(records: SystemJobSummaryRecord[], limit: number): SlowSystemJob[] {
+  return records
+    .filter((record): record is SystemJobSummaryRecord & { runtimeMs: number } => {
+      return record.runtimeMs !== null;
+    })
+    .sort(
+      (left, right) =>
+        right.runtimeMs - left.runtimeMs ||
+        right.createdOn.localeCompare(left.createdOn) ||
+        left.asyncOperationId.localeCompare(right.asyncOperationId),
+    )
+    .slice(0, limit)
+    .map((record) => ({
+      asyncOperationId: record.asyncOperationId,
+      name: record.name,
+      category: record.category,
+      operationLabel: record.operationLabel,
+      statusLabel: record.statusLabel,
+      createdOn: record.createdOn,
+      startedOn: record.startedOn,
+      completedOn: record.completedOn,
+      runtimeMs: record.runtimeMs,
+      runtimeSeconds: roundNumber(record.runtimeMs / 1000),
+    }));
 }
 
 function countStatuses(records: SystemJobSummaryRecord[]): StatusCounts {
@@ -665,6 +722,20 @@ function parseDateMs(value: string): number | null {
 
   const parsed = new Date(value).getTime();
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getRuntimeMs(
+  executionTimeSpanSeconds: number | null,
+  startedMs: number | null,
+  completedMs: number | null,
+): number | null {
+  if (executionTimeSpanSeconds !== null) {
+    return roundNumber(executionTimeSpanSeconds * 1000);
+  }
+
+  return startedMs !== null && completedMs !== null && completedMs >= startedMs
+    ? completedMs - startedMs
+    : null;
 }
 
 function percentile(sortedValues: number[], percentileValue: number): number | null {

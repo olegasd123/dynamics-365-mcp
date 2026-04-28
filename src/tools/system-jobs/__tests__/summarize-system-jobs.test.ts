@@ -108,6 +108,26 @@ describe("summarize_system_jobs tool", () => {
             count: 1,
           },
         ],
+        topSlowestJobs: [
+          {
+            asyncOperationId: "job-3",
+            name: "Bulk Cleanup",
+            runtimeMs: 900000,
+            runtimeSeconds: 900,
+          },
+          {
+            asyncOperationId: "job-1",
+            name: "Workflow A",
+            runtimeMs: 600000,
+            runtimeSeconds: 600,
+          },
+          {
+            asyncOperationId: "job-2",
+            name: "Workflow A",
+            runtimeMs: 300000,
+            runtimeSeconds: 300,
+          },
+        ],
         groups: expect.arrayContaining([
           expect.objectContaining({
             label: "Workflow A",
