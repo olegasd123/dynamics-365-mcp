@@ -2,6 +2,7 @@ import {
   and,
   contains,
   eq,
+  guidEq,
   inList,
   or,
   query,
@@ -61,7 +62,7 @@ export function listSystemJobsQuery(options?: {
         buildSystemJobTypeFilter(options?.jobType),
         buildSystemJobStatusFilter(options?.status),
         options?.nameFilter ? contains("name", options.nameFilter) : undefined,
-        options?.correlationId ? eq("correlationid", options.correlationId) : undefined,
+        options?.correlationId ? guidEq("correlationid", options.correlationId) : undefined,
         options?.createdAfter ? rawFilter(`createdon ge ${options.createdAfter}`) : undefined,
         options?.createdBefore ? rawFilter(`createdon le ${options.createdBefore}`) : undefined,
         options?.completedAfter
@@ -152,7 +153,7 @@ export function listBulkDeleteOperationsForSystemJobQuery(systemJobId: string): 
       "nextrun",
       "processingqeindex",
     ])
-    .filter(eq("_asyncoperationid_value", systemJobId))
+    .filter(guidEq("_asyncoperationid_value", systemJobId))
     .toString();
 }
 

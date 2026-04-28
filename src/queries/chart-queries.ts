@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidInList, query } from "../utils/odata-builder.js";
 
 export const CHART_SCOPE = {
   system: "system",
@@ -98,7 +98,7 @@ export function getPersonalChartByIdentityQuery(options: {
 export function listSystemChartsByIdsQuery(chartIds: string[]): string {
   return query()
     .select(SYSTEM_CHART_SELECT)
-    .filter(inList("savedqueryvisualizationid", chartIds))
+    .filter(guidInList("savedqueryvisualizationid", chartIds))
     .orderby("primaryentitytypecode asc,name asc")
     .toString();
 }

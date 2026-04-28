@@ -149,6 +149,23 @@ export function guidEq<Field extends string>(field: Field, value: string): OData
   return rawFilter(`${field} eq ${guid}`);
 }
 
+export function guidInList<Field extends string>(
+  field: Field,
+  values: readonly string[],
+): ODataFilter | undefined {
+  return or(...values.map((value) => guidEq(field, value)));
+}
+
+export function identityOrGuidEq<IdentityField extends string, GuidField extends string>(
+  identityField: IdentityField,
+  guidField: GuidField,
+  value: string,
+): ODataFilter {
+  const guid = normalizeGuid(value);
+
+  return or(eq(identityField, value), guid ? guidEq(guidField, guid) : undefined) as ODataFilter;
+}
+
 export function contains<Field extends string>(field: Field, value: string): ODataFilter {
   return rawFilter(`contains(${field},${odataStringLiteral(value)})`);
 }

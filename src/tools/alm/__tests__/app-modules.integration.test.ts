@@ -71,6 +71,66 @@ describe("app module tools", () => {
     });
   });
 
+  it("uses solution components directly when listing app modules in a solution", async () => {
+    const server = new FakeServer();
+    const config = createTestConfig(["dev"]);
+    const { client, calls } = createRecordingClient({
+      dev: {
+        solutions: [
+          {
+            solutionid: "solution-1",
+            friendlyname: "Contoso Core",
+            uniquename: "Contoso_Core",
+          },
+        ],
+        solutioncomponents: [
+          {
+            solutioncomponentid: "component-app-1",
+            _solutionid_value: "solution-1",
+            objectid: "app-1",
+            componenttype: 80,
+          },
+          {
+            solutioncomponentid: "component-table-1",
+            _solutionid_value: "solution-1",
+            objectid: "table-1",
+            componenttype: 1,
+          },
+        ],
+        appmodules: [
+          {
+            appmoduleid: "app-1",
+            name: "Sales Hub",
+            uniquename: "contoso_SalesHub",
+            ismanaged: false,
+            modifiedon: "2025-01-02T00:00:00Z",
+            statecode: 0,
+          },
+        ],
+        EntityDefinitions: [
+          {
+            MetadataId: "table-1",
+            LogicalName: "account",
+          },
+        ],
+      },
+    });
+
+    registerListAppModules(server as never, config, client);
+
+    const response = await server.getHandler("list_app_modules")({
+      solution: "Contoso_Core",
+    });
+
+    expect(response.isError).toBeUndefined();
+    expect(response.content[0].text).toContain("Sales Hub");
+    expect(calls.map((call) => call.entitySet)).toEqual([
+      "solutions",
+      "solutioncomponents",
+      "appmodules",
+    ]);
+  });
+
   it("returns structured retry options when the app module is ambiguous", async () => {
     const server = new FakeServer();
     const config = createTestConfig(["dev"]);

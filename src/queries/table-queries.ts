@@ -1,4 +1,4 @@
-import { eq, inList, isNull, query, odataStringLiteral } from "../utils/odata-builder.js";
+import { eq, guidInList, isNull, query, odataStringLiteral } from "../utils/odata-builder.js";
 
 const TABLE_SELECT = [
   "MetadataId",
@@ -203,5 +203,5 @@ export function getTableByLogicalNameQuery(logicalName: string): string {
 }
 
 export function listTablesByMetadataIdsQuery(metadataIds: string[]): string {
-  return query().select(TABLE_SELECT).filter(inList("MetadataId", metadataIds)).toString();
+  return query().select(TABLE_SELECT).filter(guidInList("MetadataId", metadataIds)).toString();
 }

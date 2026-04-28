@@ -7,6 +7,9 @@ import {
 } from "../email-template-queries.js";
 
 describe("email template queries", () => {
+  const templateId1 = "11111111-1111-1111-1111-111111111111";
+  const templateId2 = "22222222-2222-2222-2222-222222222222";
+
   it("builds the email template list query", () => {
     const query = listEmailTemplatesQuery({
       nameFilter: "Welcome",
@@ -37,11 +40,11 @@ describe("email template queries", () => {
   });
 
   it("builds bulk email template queries", () => {
-    const listQuery = listEmailTemplatesByIdsQuery(["template-1", "template-2"]);
-    const detailsQuery = listEmailTemplateDetailsByIdsQuery(["template-1"]);
+    const listQuery = listEmailTemplatesByIdsQuery([templateId1, templateId2]);
+    const detailsQuery = listEmailTemplateDetailsByIdsQuery([templateId1]);
 
-    expect(listQuery).toContain("templateid eq 'template-1' or templateid eq 'template-2'");
-    expect(detailsQuery).toContain("templateid eq 'template-1'");
+    expect(listQuery).toContain(`templateid eq ${templateId1} or templateid eq ${templateId2}`);
+    expect(detailsQuery).toContain(`templateid eq ${templateId1}`);
     expect(detailsQuery).toContain("presentationxml");
   });
 });

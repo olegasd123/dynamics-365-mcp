@@ -7,6 +7,7 @@ import {
   FakeServer,
   createRecordingClient,
   createTestConfig,
+  denormalizeFixtureIds,
 } from "../../__tests__/tool-test-helpers.js";
 
 const CONTACT_TABLE = {
@@ -141,12 +142,14 @@ describe("get_table_record_details tool", () => {
       },
     });
 
-    const response = await handleGetTableRecordDetails(
-      {
-        lastName: "Smith",
-        table: "contact",
-      },
-      { config, client },
+    const response = denormalizeFixtureIds(
+      await handleGetTableRecordDetails(
+        {
+          lastName: "Smith",
+          table: "contact",
+        },
+        { config, client },
+      ),
     );
 
     expect(response.isError).toBe(true);

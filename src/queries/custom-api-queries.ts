@@ -1,4 +1,4 @@
-import { contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import { contains, eq, guidEq, guidInList, or, query } from "../utils/odata-builder.js";
 
 const CUSTOM_API_SELECT = [
   "customapiid",
@@ -83,7 +83,7 @@ export function getCustomApiByIdentityQuery(options: {
 export function listCustomApiRequestParametersQuery(customApiId: string): string {
   return query()
     .select(CUSTOM_API_PARAMETER_SELECT)
-    .filter(eq("_customapiid_value", customApiId))
+    .filter(guidEq("_customapiid_value", customApiId))
     .orderby("name asc")
     .toString();
 }
@@ -91,7 +91,7 @@ export function listCustomApiRequestParametersQuery(customApiId: string): string
 export function listCustomApiRequestParametersForApisQuery(customApiIds: string[]): string {
   return query()
     .select(CUSTOM_API_PARAMETER_SELECT)
-    .filter(inList("_customapiid_value", customApiIds))
+    .filter(guidInList("_customapiid_value", customApiIds))
     .orderby("name asc")
     .toString();
 }
@@ -99,7 +99,7 @@ export function listCustomApiRequestParametersForApisQuery(customApiIds: string[
 export function listCustomApiResponsePropertiesQuery(customApiId: string): string {
   return query()
     .select(CUSTOM_API_RESPONSE_SELECT)
-    .filter(eq("_customapiid_value", customApiId))
+    .filter(guidEq("_customapiid_value", customApiId))
     .orderby("name asc")
     .toString();
 }
@@ -107,7 +107,7 @@ export function listCustomApiResponsePropertiesQuery(customApiId: string): strin
 export function listCustomApiResponsePropertiesForApisQuery(customApiIds: string[]): string {
   return query()
     .select(CUSTOM_API_RESPONSE_SELECT)
-    .filter(inList("_customapiid_value", customApiIds))
+    .filter(guidInList("_customapiid_value", customApiIds))
     .orderby("name asc")
     .toString();
 }

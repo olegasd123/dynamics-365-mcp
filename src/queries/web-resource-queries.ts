@@ -2,9 +2,8 @@ import {
   and,
   contains,
   eq,
-  guidEq,
-  inList,
-  normalizeGuid,
+  guidInList,
+  identityOrGuidEq,
   or,
   query,
 } from "../utils/odata-builder.js";
@@ -83,11 +82,9 @@ export function getWebResourceContentQuery(): string {
 }
 
 export function getWebResourceContentByNameQuery(resourceName: string): string {
-  const resourceId = normalizeGuid(resourceName);
-
   return query()
     .select(["webresourceid", "name", "displayname", "webresourcetype", "content"])
-    .filter(resourceId ? guidEq("webresourceid", resourceId) : eq("name", resourceName))
+    .filter(identityOrGuidEq("name", "webresourceid", resourceName))
     .toString();
 }
 
@@ -102,7 +99,7 @@ export function listWebResourcesByIdsQuery(resourceIds: string[]): string {
       "description",
       "modifiedon",
     ])
-    .filter(inList("webresourceid", resourceIds))
+    .filter(guidInList("webresourceid", resourceIds))
     .orderby("name asc")
     .toString();
 }

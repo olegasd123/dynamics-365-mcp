@@ -38,10 +38,13 @@ describe("table queries", () => {
   });
 
   it("builds a metadata id filter for targeted table queries", () => {
-    const query = listTablesByMetadataIdsQuery(["table-1", "table-2"]);
+    const query = listTablesByMetadataIdsQuery([
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+    ]);
 
-    expect(query).toContain("MetadataId eq 'table-1'");
-    expect(query).toContain("MetadataId eq 'table-2'");
+    expect(query).toContain("MetadataId eq 11111111-1111-1111-1111-111111111111");
+    expect(query).toContain("MetadataId eq 22222222-2222-2222-2222-222222222222");
     expect(query).not.toContain("$orderby=");
   });
 

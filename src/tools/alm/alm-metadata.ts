@@ -3,6 +3,7 @@ import type { DynamicsClient } from "../../client/dynamics-client.js";
 import { listDashboardsQuery } from "../../queries/dashboard-queries.js";
 import { listFormsByIdsQuery } from "../../queries/form-queries.js";
 import {
+  listAppModulesByIdsQuery,
   listAppModulesQuery,
   listConnectionReferencesQuery,
   listEnvironmentVariableDefinitionsQuery,
@@ -187,7 +188,7 @@ export async function listAppModules(
   },
 ): Promise<AppModuleSummaryRecord[]> {
   const records = options?.solution
-    ? (await fetchSolutionInventory(env, client, options.solution)).appModules
+    ? await fetchSolutionAppModules(env, client, options.solution)
     : (
         await client.query<Record<string, unknown>>(
           env,
@@ -361,6 +362,30 @@ async function fetchSolutionDashboards(
   );
 
   return records.filter((record) => Number(record.type || 0) === 0).map(normalizeDashboard);
+}
+
+async function fetchSolutionAppModules(
+  env: EnvironmentConfig,
+  client: DynamicsClient,
+  solutionRef: string,
+): Promise<AppModuleRecord[]> {
+  const componentSets = await fetchSolutionComponentSets(env, client, solutionRef);
+  const appModuleIds = [...componentSets.appModuleIds];
+
+  if (appModuleIds.length === 0) {
+    return [];
+  }
+
+  return (
+    await queryRecordsByIdsInChunks<Record<string, unknown>>(
+      env,
+      client,
+      "appmodules",
+      appModuleIds,
+      "appmoduleid",
+      listAppModulesByIdsQuery,
+    )
+  ).map(normalizeAppModule);
 }
 
 function filterEnvironmentVariableDefinitions(

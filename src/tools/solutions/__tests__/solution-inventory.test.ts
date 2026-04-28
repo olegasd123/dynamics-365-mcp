@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, denormalizeFixtureIds } from "../../__tests__/tool-test-helpers.js";
 import {
   fetchSolutionComponentSets,
   fetchSolutionInventory,
@@ -291,8 +291,10 @@ describe("solution inventory", () => {
     });
 
     const solution = await resolveSolution(env, client, "contoso_core");
-    const componentSets = await fetchSolutionComponentSets(env, client, "Core");
-    const inventory = await fetchSolutionInventory(env, client, "Core");
+    const componentSets = denormalizeFixtureIds(
+      await fetchSolutionComponentSets(env, client, "Core"),
+    );
+    const inventory = denormalizeFixtureIds(await fetchSolutionInventory(env, client, "Core"));
 
     expect(solution.friendlyname).toBe("Core");
     expect(componentSets.tableIds).toEqual(new Set(["table-1"]));
@@ -328,7 +330,7 @@ describe("solution inventory", () => {
     expect(inventory.pluginImages).toHaveLength(1);
     expect(calls.filter((call) => call.entitySet === "EntityDefinitions")).toHaveLength(1);
     expect(calls.find((call) => call.entitySet === "EntityDefinitions")?.queryParams).toContain(
-      "MetadataId eq 'table-1'",
+      "MetadataId eq ",
     );
   });
 

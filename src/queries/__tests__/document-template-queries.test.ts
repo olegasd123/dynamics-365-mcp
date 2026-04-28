@@ -28,15 +28,20 @@ describe("document template queries", () => {
 
   it("builds identity and bulk detail queries", () => {
     const identityQuery = getDocumentTemplateByIdentityQuery("Quote Template");
-    const listQuery = listDocumentTemplatesByIdsQuery(["template-1", "template-2"]);
-    const detailsQuery = listDocumentTemplateDetailsByIdsQuery(["template-1"]);
+    const listQuery = listDocumentTemplatesByIdsQuery([
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+    ]);
+    const detailsQuery = listDocumentTemplateDetailsByIdsQuery([
+      "11111111-1111-1111-1111-111111111111",
+    ]);
 
     expect(identityQuery).toContain("name eq 'Quote Template'");
-    expect(identityQuery).toContain("documenttemplateid eq 'Quote Template'");
+    expect(identityQuery).not.toContain("documenttemplateid eq");
     expect(identityQuery).toContain("content");
-    expect(listQuery).toContain("documenttemplateid eq 'template-1'");
-    expect(listQuery).toContain("documenttemplateid eq 'template-2'");
-    expect(detailsQuery).toContain("documenttemplateid eq 'template-1'");
+    expect(listQuery).toContain("documenttemplateid eq 11111111-1111-1111-1111-111111111111");
+    expect(listQuery).toContain("documenttemplateid eq 22222222-2222-2222-2222-222222222222");
+    expect(detailsQuery).toContain("documenttemplateid eq 11111111-1111-1111-1111-111111111111");
     expect(detailsQuery).toContain("clientdata");
     expect(detailsQuery).toContain("content");
   });

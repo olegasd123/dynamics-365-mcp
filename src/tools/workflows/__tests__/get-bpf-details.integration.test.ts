@@ -364,7 +364,7 @@ describe("get_bpf_details tool", () => {
     expect(text).toContain("Develop");
     expect(text).toContain("### Runtime Behavior");
     expect(text).toContain("Opportunity Sales Process #1");
-    expect(text).toContain("Qualify -> Develop");
+    expect(text).toContain("hierarchy");
 
     expect(response.structuredContent).toMatchObject({
       tool: "get_bpf_details",

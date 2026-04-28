@@ -15,6 +15,13 @@ import {
 } from "../plugin-queries.js";
 
 describe("plugin queries", () => {
+  const assemblyId1 = "11111111-1111-1111-1111-111111111111";
+  const assemblyId2 = "22222222-2222-2222-2222-222222222222";
+  const typeId1 = "33333333-3333-3333-3333-333333333333";
+  const typeId2 = "44444444-4444-4444-4444-444444444444";
+  const stepId1 = "55555555-5555-5555-5555-555555555555";
+  const stepId2 = "66666666-6666-6666-6666-666666666666";
+
   it("builds the plugin assemblies query", () => {
     const query = listPluginAssembliesQuery();
 
@@ -33,18 +40,18 @@ describe("plugin queries", () => {
   });
 
   it("builds the plugin types query", () => {
-    const query = listPluginTypesQuery("assembly-1");
+    const query = listPluginTypesQuery(assemblyId1);
 
-    expect(query).toContain("$filter=pluginassemblyid/pluginassemblyid eq 'assembly-1'");
+    expect(query).toContain(`$filter=pluginassemblyid/pluginassemblyid eq ${assemblyId1}`);
     expect(query).toContain("workflowactivitygroupname");
     expect(query).toContain("customworkflowactivityinfo");
   });
 
   it("builds the bulk plugin types query", () => {
-    const query = listPluginTypesForAssembliesQuery(["assembly-1", "assembly-2"]);
+    const query = listPluginTypesForAssembliesQuery([assemblyId1, assemblyId2]);
 
     expect(query).toContain(
-      "$filter=_pluginassemblyid_value eq 'assembly-1' or _pluginassemblyid_value eq 'assembly-2'",
+      `$filter=_pluginassemblyid_value eq ${assemblyId1} or _pluginassemblyid_value eq ${assemblyId2}`,
     );
     expect(query).toContain("_pluginassemblyid_value");
     expect(query).toContain("workflowactivitygroupname");
@@ -52,34 +59,34 @@ describe("plugin queries", () => {
   });
 
   it("builds the plugin steps query", () => {
-    const query = listPluginStepsQuery("type-1");
+    const query = listPluginStepsQuery(typeId1);
 
-    expect(query).toContain("$filter=_eventhandler_value eq 'type-1'");
+    expect(query).toContain(`$filter=_eventhandler_value eq ${typeId1}`);
     expect(query).toContain(
       "$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)",
     );
   });
 
   it("builds the bulk plugin steps query", () => {
-    const query = listPluginStepsForPluginTypesQuery(["type-1", "type-2"]);
+    const query = listPluginStepsForPluginTypesQuery([typeId1, typeId2]);
 
     expect(query).toContain(
-      "$filter=_eventhandler_value eq 'type-1' or _eventhandler_value eq 'type-2'",
+      `$filter=_eventhandler_value eq ${typeId1} or _eventhandler_value eq ${typeId2}`,
     );
     expect(query).toContain("_eventhandler_value");
   });
 
   it("builds the plugin images query", () => {
-    expect(listPluginImagesQuery("step-1")).toContain(
-      "$filter=_sdkmessageprocessingstepid_value eq 'step-1'",
+    expect(listPluginImagesQuery(stepId1)).toContain(
+      `$filter=_sdkmessageprocessingstepid_value eq ${stepId1}`,
     );
   });
 
   it("builds the bulk plugin images query", () => {
-    const query = listPluginImagesForStepsQuery(["step-1", "step-2"]);
+    const query = listPluginImagesForStepsQuery([stepId1, stepId2]);
 
     expect(query).toContain(
-      "$filter=_sdkmessageprocessingstepid_value eq 'step-1' or _sdkmessageprocessingstepid_value eq 'step-2'",
+      `$filter=_sdkmessageprocessingstepid_value eq ${stepId1} or _sdkmessageprocessingstepid_value eq ${stepId2}`,
     );
     expect(query).toContain("_sdkmessageprocessingstepid_value");
   });
@@ -136,7 +143,7 @@ describe("plugin queries", () => {
       "$select=plugintracelogid,typename,correlationid,createdon,messagename,primaryentity,mode,depth,performanceexecutionduration,exceptiondetails,messageblock",
     );
     expect(query).toContain("typename eq 'Contoso.Plugins.AccountPlugin'");
-    expect(query).toContain("correlationid eq '00000000-0000-0000-0000-000000000001'");
+    expect(query).toContain("correlationid eq 00000000-0000-0000-0000-000000000001");
     expect(query).toContain("createdon ge 2026-04-20T08:00:00.000Z");
     expect(query).toContain("createdon le 2026-04-20T09:00:00.000Z");
     expect(query).toContain("(exceptiondetails ne null and exceptiondetails ne '')");

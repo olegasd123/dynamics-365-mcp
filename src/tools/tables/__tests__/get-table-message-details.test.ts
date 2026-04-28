@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import {
+  createRecordingClient,
+  createTestConfig,
+  denormalizeFixtureIds,
+} from "../../__tests__/tool-test-helpers.js";
 import { handleGetTableMessageDetails } from "../get-table-message-details.js";
 
 describe("get table message details", () => {
@@ -50,16 +54,18 @@ describe("get table message details", () => {
       },
     });
 
-    const response = await handleGetTableMessageDetails(
-      {
-        environment: "dev",
-        table: "account",
-        messageName: "Update",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleGetTableMessageDetails(
+        {
+          environment: "dev",
+          table: "account",
+          messageName: "Update",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).not.toBe(true);
@@ -138,16 +144,18 @@ describe("get table message details", () => {
       },
     });
 
-    const response = await handleGetTableMessageDetails(
-      {
-        environment: "dev",
-        table: "account",
-        messageName: "Associate",
-      },
-      {
-        config: createTestConfig(["dev"]),
-        client,
-      },
+    const response = denormalizeFixtureIds(
+      await handleGetTableMessageDetails(
+        {
+          environment: "dev",
+          table: "account",
+          messageName: "Associate",
+        },
+        {
+          config: createTestConfig(["dev"]),
+          client,
+        },
+      ),
     );
 
     expect(response.isError).toBe(true);

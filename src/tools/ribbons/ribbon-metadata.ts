@@ -139,6 +139,7 @@ const GENERIC_RIBBON_NAME_PARTS = new Set([
 ]);
 const TABLE_SOLUTION_COMPONENT_TYPE = 1;
 const RIBBON_TRANSLATION_ACTION_PATH = "solutions/Microsoft.Dynamics.CRM.ExportTranslation";
+const RIBBON_METADATA_TIMEOUT_MS = 120_000;
 const ribbonTranslationCache = new Map<string, Promise<Record<string, string>>>();
 
 export async function fetchTableRibbonMetadata(
@@ -154,6 +155,8 @@ export async function fetchTableRibbonMetadata(
   const response = await client.getPath<RetrieveEntityRibbonResponse>(
     env,
     buildRetrieveEntityRibbonPath(table.logicalName, location),
+    undefined,
+    { timeout: RIBBON_METADATA_TIMEOUT_MS },
   );
 
   const compressedXml = String(response?.CompressedEntityXml || "");

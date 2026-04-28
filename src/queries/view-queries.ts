@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidInList, query } from "../utils/odata-builder.js";
 
 export const VIEW_SCOPE = {
   system: "system",
@@ -93,7 +93,7 @@ export function getPersonalViewByIdentityQuery(options: {
 export function listSavedViewsByIdsQuery(viewIds: string[]): string {
   return query()
     .select(VIEW_SELECT)
-    .filter(inList("savedqueryid", viewIds))
+    .filter(guidInList("savedqueryid", viewIds))
     .orderby("returnedtypecode asc,name asc")
     .toString();
 }

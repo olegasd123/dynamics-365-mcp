@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, or, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidInList, identityOrGuidEq, query } from "../utils/odata-builder.js";
 
 export const DOCUMENT_TEMPLATE_TYPE = {
   excel: 1,
@@ -72,14 +72,14 @@ export function listDocumentTemplatesQuery(options?: {
 export function getDocumentTemplateByIdentityQuery(templateRef: string): string {
   return query()
     .select(DOCUMENT_TEMPLATE_DETAILS_SELECT)
-    .filter(or(eq("name", templateRef), eq("documenttemplateid", templateRef)))
+    .filter(identityOrGuidEq("name", "documenttemplateid", templateRef))
     .toString();
 }
 
 export function listDocumentTemplatesByIdsQuery(templateIds: string[]): string {
   return query()
     .select(DOCUMENT_TEMPLATE_SELECT)
-    .filter(inList("documenttemplateid", templateIds))
+    .filter(guidInList("documenttemplateid", templateIds))
     .orderby("associatedentitytypecode asc,name asc")
     .toString();
 }
@@ -87,7 +87,7 @@ export function listDocumentTemplatesByIdsQuery(templateIds: string[]): string {
 export function listDocumentTemplateDetailsByIdsQuery(templateIds: string[]): string {
   return query()
     .select(DOCUMENT_TEMPLATE_DETAILS_SELECT)
-    .filter(inList("documenttemplateid", templateIds))
+    .filter(guidInList("documenttemplateid", templateIds))
     .orderby("associatedentitytypecode asc,name asc")
     .toString();
 }

@@ -1,4 +1,4 @@
-import { and, eq, inList, or, query } from "../utils/odata-builder.js";
+import { and, eq, guidInList, identityOrGuidEq, query } from "../utils/odata-builder.js";
 
 const WORKFLOW_CATEGORY = {
   workflow: 0,
@@ -123,7 +123,7 @@ export function listWorkflowsByIdsQuery(workflowIds: string[]): string {
       "createdon",
       "modifiedon",
     ])
-    .filter(inList("workflowid", workflowIds))
+    .filter(guidInList("workflowid", workflowIds))
     .orderby("name asc")
     .toString();
 }
@@ -183,7 +183,7 @@ export function getWorkflowDetailsByIdentityQuery(options: {
     .filter(
       and(
         options.uniqueName
-          ? or(eq("uniquename", options.uniqueName), eq("workflowid", options.uniqueName))
+          ? identityOrGuidEq("uniquename", "workflowid", options.uniqueName)
           : eq("name", options.workflowName as string),
         eq("type", 1),
       ),

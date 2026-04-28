@@ -5,6 +5,7 @@ import {
   compareWorkflowsData,
 } from "../comparison-data.js";
 import type { AppConfig } from "../../../config/types.js";
+import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
 
 describe("comparePluginAssembliesData", () => {
   it("compares plugin assemblies, steps, and images when child components are enabled", async () => {
@@ -123,11 +124,7 @@ describe("comparePluginAssembliesData", () => {
       },
     };
 
-    const client = {
-      async query<T>(env: { name: string }, entitySet: string): Promise<T[]> {
-        return (datasets[env.name]?.[entitySet] || []) as T[];
-      },
-    } as never;
+    const client = createComparisonClient(datasets);
 
     const result = await comparePluginAssembliesData(config, client, "prod", "dev", {
       assemblyName: "Core.Plugins",
@@ -287,9 +284,5 @@ function createComparisonConfig(): AppConfig {
 function createComparisonClient(
   datasets: Record<string, Record<string, Record<string, unknown>[]>>,
 ): never {
-  return {
-    async query<T>(env: { name: string }, entitySet: string): Promise<T[]> {
-      return (datasets[env.name]?.[entitySet] || []) as T[];
-    },
-  } as never;
+  return createRecordingClient(datasets).client;
 }

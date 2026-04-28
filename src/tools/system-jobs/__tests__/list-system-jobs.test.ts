@@ -76,7 +76,7 @@ describe("list_system_jobs tool", () => {
     expect(calls.map((call) => call.entitySet)).toEqual(["asyncoperations"]);
     expect(calls[0]?.queryParams).toContain("statuscode eq 31");
     expect(calls[0]?.queryParams).toContain(
-      "correlationid eq '00000000-0000-0000-0000-000000000001'",
+      "correlationid eq 00000000-0000-0000-0000-000000000001",
     );
     expect(calls[0]?.queryParams).toContain("createdon ge 2026-04-20T08:00:00.000Z");
     expect(calls[0]?.queryParams).toContain("createdon le 2026-04-20T09:00:00.000Z");

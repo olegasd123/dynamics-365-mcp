@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient } from "../../__tests__/tool-test-helpers.js";
+import { createRecordingClient, denormalizeFixtureIds } from "../../__tests__/tool-test-helpers.js";
 import {
   fetchBusinessUnitDetails,
   fetchDefaultGlobalBusinessUnitName,
@@ -56,7 +56,7 @@ describe("business unit metadata", () => {
     });
 
     const businessUnits = await listBusinessUnits(env, client);
-    const details = await fetchBusinessUnitDetails(env, client, "Sales");
+    const details = denormalizeFixtureIds(await fetchBusinessUnitDetails(env, client, "Sales"));
 
     expect(businessUnits).toHaveLength(3);
     expect(details.businessUnit.name).toBe("Sales");
@@ -105,7 +105,7 @@ describe("business unit metadata", () => {
       },
     });
 
-    const details = await fetchBusinessUnitDetails(env, client, "Root");
+    const details = denormalizeFixtureIds(await fetchBusinessUnitDetails(env, client, "Root"));
 
     expect(details.businessUnit.businessunitid).toBe("bu-enabled");
   });
@@ -126,7 +126,11 @@ describe("business unit metadata", () => {
       },
     });
 
-    await expect(fetchDefaultGlobalBusinessUnitName(env, client)).rejects.toMatchObject({
+    const error = await fetchDefaultGlobalBusinessUnitName(env, client).catch((caught: unknown) =>
+      denormalizeFixtureIds(caught),
+    );
+
+    expect(error).toMatchObject({
       name: "AmbiguousMatchError",
       parameter: "businessUnitName",
       options: [

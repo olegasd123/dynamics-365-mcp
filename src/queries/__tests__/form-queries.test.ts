@@ -34,24 +34,34 @@ describe("form queries", () => {
 
   it("builds the form details query by form id", () => {
     const query = getFormDetailsByIdentityQuery({
-      formId: "form-1",
+      formId: "11111111-1111-1111-1111-111111111111",
       table: "account",
     });
 
-    expect(query).toContain("$filter=formid eq 'form-1'");
+    expect(query).toContain("$filter=formid eq 11111111-1111-1111-1111-111111111111");
     expect(query).not.toContain("objecttypecode eq 'account'");
   });
 
   it("builds the bulk form query", () => {
-    const query = listFormsByIdsQuery(["id-1", "id-2"]);
+    const query = listFormsByIdsQuery([
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+    ]);
 
-    expect(query).toContain("formid eq 'id-1' or formid eq 'id-2'");
+    expect(query).toContain(
+      "formid eq 11111111-1111-1111-1111-111111111111 or formid eq 22222222-2222-2222-2222-222222222222",
+    );
   });
 
   it("builds the bulk form details query", () => {
-    const query = listFormDetailsByIdsQuery(["id-1", "id-2"]);
+    const query = listFormDetailsByIdsQuery([
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+    ]);
 
-    expect(query).toContain("formid eq 'id-1' or formid eq 'id-2'");
+    expect(query).toContain(
+      "formid eq 11111111-1111-1111-1111-111111111111 or formid eq 22222222-2222-2222-2222-222222222222",
+    );
     expect(query).toContain("formxml");
   });
 });

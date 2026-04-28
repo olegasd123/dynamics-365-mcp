@@ -11,6 +11,12 @@ import {
 } from "../security-queries.js";
 
 describe("security queries", () => {
+  const roleId1 = "11111111-1111-1111-1111-111111111111";
+  const roleId2 = "22222222-2222-2222-2222-222222222222";
+  const privilegeId1 = "33333333-3333-3333-3333-333333333333";
+  const privilegeId2 = "44444444-4444-4444-4444-444444444444";
+  const profileId = "55555555-5555-5555-5555-555555555555";
+
   it("builds the roles query", () => {
     const query = listSecurityRolesQuery("Admin");
 
@@ -21,9 +27,9 @@ describe("security queries", () => {
   });
 
   it("builds role privilege queries", () => {
-    expect(listRolePrivilegesQuery("role-1")).toContain("$filter=roleid eq 'role-1'");
-    expect(listRolePrivilegesForRolesQuery(["role-1", "role-2"])).toContain(
-      "roleid eq 'role-1' or roleid eq 'role-2'",
+    expect(listRolePrivilegesQuery(roleId1)).toContain(`$filter=roleid eq ${roleId1}`);
+    expect(listRolePrivilegesForRolesQuery([roleId1, roleId2])).toContain(
+      `roleid eq ${roleId1} or roleid eq ${roleId2}`,
     );
   });
 
@@ -45,15 +51,15 @@ describe("security queries", () => {
   });
 
   it("builds the privileges query", () => {
-    const query = listPrivilegesByIdsQuery(["priv-1", "priv-2"]);
+    const query = listPrivilegesByIdsQuery([privilegeId1, privilegeId2]);
 
-    expect(query).toContain("privilegeid eq 'priv-1' or privilegeid eq 'priv-2'");
+    expect(query).toContain(`privilegeid eq ${privilegeId1} or privilegeid eq ${privilegeId2}`);
     expect(query).toContain("canbeglobal");
   });
 
   it("builds field security profile and permission queries", () => {
     const profileQuery = listFieldSecurityProfilesQuery("Finance");
-    const permissionQuery = listFieldPermissionsQuery(["profile-1"], {
+    const permissionQuery = listFieldPermissionsQuery([profileId], {
       tableLogicalName: "account",
       columnLogicalName: "creditlimit",
     });
@@ -62,7 +68,7 @@ describe("security queries", () => {
     expect(profileQuery).toContain("$filter=contains(name,'Finance')");
     expect(profileQuery).toContain("systemuserprofiles_association");
     expect(profileQuery).toContain("teamprofiles_association");
-    expect(permissionQuery).toContain("_fieldsecurityprofileid_value eq 'profile-1'");
+    expect(permissionQuery).toContain(`_fieldsecurityprofileid_value eq ${profileId}`);
     expect(permissionQuery).toContain("entityname eq 'account'");
     expect(permissionQuery).toContain("attributelogicalname eq 'creditlimit'");
   });

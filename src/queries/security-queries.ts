@@ -1,4 +1,4 @@
-import { and, contains, eq, inList, isNull, query } from "../utils/odata-builder.js";
+import { and, contains, eq, guidEq, guidInList, isNull, query } from "../utils/odata-builder.js";
 
 const SECURITY_ROLE_SELECT = [
   "roleid",
@@ -78,7 +78,7 @@ export function listSecurityRolesQuery(nameFilter?: string): string {
 export function listSecurityRolesByIdsQuery(roleIds: string[]): string {
   return query()
     .select(SECURITY_ROLE_SELECT)
-    .filter(inList("roleid", roleIds))
+    .filter(guidInList("roleid", roleIds))
     .orderby("name asc")
     .toString();
 }
@@ -103,7 +103,7 @@ export function listBusinessUnitsQuery(nameFilter?: string): string {
 export function listRolePrivilegesQuery(roleId: string): string {
   return query()
     .select(ROLE_PRIVILEGE_SELECT)
-    .filter(eq("roleid", roleId))
+    .filter(guidEq("roleid", roleId))
     .orderby("privilegeid asc")
     .toString();
 }
@@ -111,7 +111,7 @@ export function listRolePrivilegesQuery(roleId: string): string {
 export function listRolePrivilegesForRolesQuery(roleIds: string[]): string {
   return query()
     .select(ROLE_PRIVILEGE_SELECT)
-    .filter(inList("roleid", roleIds))
+    .filter(guidInList("roleid", roleIds))
     .orderby("roleid asc")
     .toString();
 }
@@ -119,7 +119,7 @@ export function listRolePrivilegesForRolesQuery(roleIds: string[]): string {
 export function listPrivilegesByIdsQuery(privilegeIds: string[]): string {
   return query()
     .select(PRIVILEGE_SELECT)
-    .filter(inList("privilegeid", privilegeIds))
+    .filter(guidInList("privilegeid", privilegeIds))
     .orderby("name asc")
     .toString();
 }
@@ -144,7 +144,7 @@ export function listFieldPermissionsQuery(
     .select(FIELD_PERMISSION_SELECT)
     .filter(
       and(
-        inList("_fieldsecurityprofileid_value", profileIds),
+        guidInList("_fieldsecurityprofileid_value", profileIds),
         options?.tableLogicalName ? eq("entityname", options.tableLogicalName) : undefined,
         options?.columnLogicalName
           ? eq("attributelogicalname", options.columnLogicalName)

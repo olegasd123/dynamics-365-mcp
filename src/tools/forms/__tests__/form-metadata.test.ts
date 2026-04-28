@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentConfig } from "../../../config/types.js";
-import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
+import {
+  createRecordingClient,
+  createTestConfig,
+  fixtureGuid,
+} from "../../__tests__/tool-test-helpers.js";
 import { handleGetFormDetails } from "../get-form-details.js";
 import { fetchFormDetails, listForms, resolveForm } from "../form-metadata.js";
 
@@ -87,9 +91,9 @@ describe("form metadata", () => {
       },
     });
 
-    const details = await fetchFormDetails(env, client, "form-1");
+    const details = await fetchFormDetails(env, client, fixtureGuid("form-1"));
 
-    expect(details.formid).toBe("form-1");
+    expect(details.formid).toBe(fixtureGuid("form-1"));
     expect(details.objecttypecode).toBe("account");
   });
 
@@ -145,13 +149,23 @@ describe("form metadata", () => {
         queryParams?: string,
       ): Promise<T[]> {
         if (entitySet === "solutions") {
-          return [{ solutionid: "sol-1", friendlyname: "Core", uniquename: "core" }] as T[];
+          return [
+            { solutionid: fixtureGuid("sol-1"), friendlyname: "Core", uniquename: "core" },
+          ] as T[];
         }
 
         if (entitySet === "solutioncomponents") {
           return [
-            { solutioncomponentid: "sc-1", objectid: "form-old", componenttype: 60 },
-            { solutioncomponentid: "sc-2", objectid: "form-old-2", componenttype: 60 },
+            {
+              solutioncomponentid: fixtureGuid("sc-1"),
+              objectid: fixtureGuid("form-old"),
+              componenttype: 60,
+            },
+            {
+              solutioncomponentid: fixtureGuid("sc-2"),
+              objectid: fixtureGuid("form-old-2"),
+              componenttype: 60,
+            },
           ] as T[];
         }
 
@@ -159,7 +173,7 @@ describe("form metadata", () => {
           if (queryParams?.includes("formid eq")) {
             return [
               {
-                formid: "form-old",
+                formid: fixtureGuid("form-old"),
                 name: "Old_Candidat",
                 objecttypecode: "mso_candidat",
                 type: 2,
@@ -169,7 +183,7 @@ describe("form metadata", () => {
                 ismanaged: false,
               },
               {
-                formid: "form-old-2",
+                formid: fixtureGuid("form-old-2"),
                 name: "Archive Candidat",
                 objecttypecode: "mso_candidat",
                 type: 2,

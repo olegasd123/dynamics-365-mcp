@@ -91,7 +91,7 @@ describe("custom api metadata", () => {
 
   it("chunks child metadata queries for many custom apis", async () => {
     const apis = Array.from({ length: 30 }, (_, index) => ({
-      customapiid: `api-${index + 1}`,
+      customapiid: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
       name: `API ${index + 1}`,
       uniquename: `contoso_Api${index + 1}`,
     })) as CustomApiRecord[];
@@ -204,7 +204,9 @@ describe("custom api metadata", () => {
 });
 
 function extractQuotedIds(queryParams?: string): string[] {
-  return [...String(queryParams || "").matchAll(/'([^']+)'/g)].map((match) => match[1]);
+  return [...String(queryParams || "").matchAll(/_customapiid_value eq ([0-9a-f-]+)/g)].map(
+    (match) => match[1],
+  );
 }
 
 function countFilterTerms(queryParams: string): number {
