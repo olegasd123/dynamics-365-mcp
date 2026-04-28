@@ -185,6 +185,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list in-progress workflow system jobs that were created in the last 2 hours.`
   `(Required: none)`
 
+- `summarize_system_jobs`
+  `In <ENV>, summarize system jobs from the last 24 hours. Show success, failure, canceled counts, p95 runtime, and estimated queue depth by hour.`
+  `In <ENV>, summarize workflow system jobs from <START_TIME> to <END_TIME>. Group by name and show top failure messages.`
+  `(Required: none)`
+
 - `get_system_job_details`
   `In <ENV>, show full details for system job <SYSTEM_JOB_ID>. Include message text, timing fields, recurrence data, and related workflow, plug-in step, or bulk delete details when they exist.`
   `(Required: <SYSTEM_JOB_ID>)`
@@ -638,6 +643,7 @@ This prompt list covers these tools:
 - `list_plugin_trace_logs`
 - `summarize_plugin_trace_logs`
 - `list_system_jobs`
+- `summarize_system_jobs`
 - `list_plugins`
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`

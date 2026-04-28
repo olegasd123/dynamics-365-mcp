@@ -22,6 +22,7 @@ import { listPluginTraceLogsTool } from "./plugins/list-plugin-trace-logs.js";
 import { summarizePluginTraceLogsTool } from "./plugins/summarize-plugin-trace-logs.js";
 import { getSystemJobDetailsTool } from "./system-jobs/get-system-job-details.js";
 import { listSystemJobsTool } from "./system-jobs/list-system-jobs.js";
+import { summarizeSystemJobsTool } from "./system-jobs/summarize-system-jobs.js";
 import { listWorkflowsTool } from "./workflows/list-workflows.js";
 import { listActionsTool } from "./workflows/list-actions.js";
 import { getWorkflowDetailsTool } from "./workflows/get-workflow-details.js";
@@ -305,6 +306,21 @@ export const TOOL_MANIFEST = [
       "failedOnly",
       "limit",
       "cursor",
+    ],
+  },
+  {
+    ...summarizeSystemJobsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "createdAfter",
+      "createdBefore",
+      "jobType",
+      "status",
+      "groupBy",
+      "bucketMinutes",
+      "maxRecords",
+      "topMessages",
     ],
   },
   {

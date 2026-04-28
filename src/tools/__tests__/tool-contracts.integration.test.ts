@@ -260,6 +260,17 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.summarize_system_jobs.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        jobType: expect.any(Object),
+        status: expect.any(Object),
+        groupBy: expect.any(Object),
+        bucketMinutes: expect.any(Object),
+        maxRecords: expect.any(Object),
+        topMessages: expect.any(Object),
+      });
       expect(toolsByName.get_system_job_details.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         systemJobId: expect.any(Object),

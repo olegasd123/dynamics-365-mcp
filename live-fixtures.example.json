@@ -813,6 +813,20 @@
         }
       }
     ],
+    "summarize_system_jobs": [
+      {
+        "name": "recent system job summary",
+        "arguments": {
+          "environment": "dev",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "createdBefore": "2026-04-20T09:00:00Z",
+          "groupBy": "category",
+          "bucketMinutes": 60,
+          "maxRecords": 1000,
+          "topMessages": 5
+        }
+      }
+    ],
     "get_plugin_trace_log_details": [
       {
         "name": "one account plugin trace log",
