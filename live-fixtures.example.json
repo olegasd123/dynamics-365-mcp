@@ -5,10 +5,20 @@
     "maxLoggedRequestChars": 240
   },
   "tools": {
+    "access_utilization_report": [
+      {
+        "name": "salesperson access",
+        "arguments": {
+          "environment": "dev",
+          "roleName": "Salesperson",
+          "activeWithinDays": 90,
+          "includeTeams": true
+        }
+      }
+    ],
     "analyze_create_triggers": [
       {
         "name": "account name",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "account",

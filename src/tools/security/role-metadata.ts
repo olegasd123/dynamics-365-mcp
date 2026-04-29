@@ -270,7 +270,7 @@ function roleMatchesBusinessUnit(
   return role.businessUnitName.toLowerCase() === businessUnit.name.toLowerCase();
 }
 
-function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
+export function normalizeRole(record: Record<string, unknown>): SecurityRoleRecord {
   return {
     ...record,
     roleid: String(record.roleid || ""),

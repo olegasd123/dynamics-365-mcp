@@ -480,6 +480,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
 
+- `access_utilization_report`
+  `In <ENV>, build an access utilization report for security role <ROLE> or app module <APP_MODULE>. Show assigned users, audit-active users, and note that user activity depends on Dataverse audit data.`
+  `(Required: <ROLE> or <APP_MODULE>)`
+
 - `list_field_security_profiles`
   `In <ENV>, list field security profiles that grant access to column <COLUMN> on table <TABLE>. Include member names only when needed.`
   `(Required: none)`
@@ -580,6 +584,7 @@ This group needs at least two configured environments.
 
 This prompt list covers these tools:
 
+- `access_utilization_report`
 - `analyze_impact`
 - `analyze_create_triggers`
 - `analyze_update_triggers`
