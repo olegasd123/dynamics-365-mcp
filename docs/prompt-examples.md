@@ -368,6 +368,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list audit history for the contact with last name <LAST_NAME> from table contact.`
   `(Required: <TABLE> and a time window or one record lookup)`
 
+- `record_activity_trends`
+  `In <ENV>, show audit-based record activity trends for tables contact and account from 2026-04-01T00:00:00Z to 2026-04-30T23:59:59Z. Include created, modified, and deleted counts per day.`
+  `In <ENV>, check if table <TABLE> still has record write activity in the last 30 days. Report mostly depends on audit data and audit can be disabled.`
+  `(Required: one or more <TABLE> values)`
+
 - `get_audit_details`
   `In <ENV>, show full audit details for audit record <AUDIT_ID>. Include the detail type and the full field diff when it exists.`
   `(Required: <AUDIT_ID>)`

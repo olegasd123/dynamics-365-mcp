@@ -1,4 +1,12 @@
-import { and, eq, guidEq, query, rawFilter, type ODataFilter } from "../utils/odata-builder.js";
+import {
+  and,
+  eq,
+  guidEq,
+  inList,
+  query,
+  rawFilter,
+  type ODataFilter,
+} from "../utils/odata-builder.js";
 
 export function listAuditHistoryQuery(options: {
   tableLogicalName: string;
@@ -52,6 +60,27 @@ export function getAuditByIdQuery(): string {
       "useradditionalinfo",
       "transactionid",
     ])
+    .toString();
+}
+
+export function listAuditActivityTrendQuery(options: {
+  tableLogicalNames: string[];
+  createdAfter: string;
+  createdBefore: string;
+  top: number;
+}): string {
+  return query()
+    .select(["auditid", "createdon", "action", "operation", "objecttypecode"])
+    .filter(
+      and(
+        inList("objecttypecode", options.tableLogicalNames),
+        buildDateFilter("createdon", "ge", options.createdAfter),
+        buildDateFilter("createdon", "le", options.createdBefore),
+      ),
+    )
+    .orderby("createdon asc,auditid asc")
+    .top(options.top)
+    .count(true)
     .toString();
 }
 

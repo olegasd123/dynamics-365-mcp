@@ -87,6 +87,14 @@ describe("tool contracts", () => {
         limit: expect.any(Object),
         cursor: expect.any(Object),
       });
+      expect(toolsByName.record_activity_trends.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        tables: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        maxRecords: expect.any(Object),
+        includeEmptyDays: expect.any(Object),
+      });
       expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         query: expect.any(Object),
