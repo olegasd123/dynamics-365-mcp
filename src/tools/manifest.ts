@@ -78,6 +78,7 @@ import { findWorkflowActivityUsageTool } from "./usage/find-workflow-activity-us
 import { analyzeCreateTriggersTool } from "./usage/analyze-create-triggers.js";
 import { analyzeUpdateTriggersTool } from "./usage/analyze-update-triggers.js";
 import { analyzeImpactTool } from "./impact/analyze-impact.js";
+import { storageBreakdownTool } from "./storage/storage-breakdown.js";
 import { environmentHealthReportTool } from "./health/environment-health-report.js";
 import { releaseGateReportTool } from "./health/release-gate-report.js";
 import { comparePluginAssembliesTool } from "./comparison/compare-plugin-assemblies.js";
@@ -680,6 +681,11 @@ export const TOOL_MANIFEST = [
     ...analyzeImpactTool,
     group: "usage_analysis",
     mainParams: ["environment", "componentType", "name"],
+  },
+  {
+    ...storageBreakdownTool,
+    group: "health",
+    mainParams: ["environment", "tables", "limit", "includeColumns", "columnScanLimit"],
   },
   {
     ...environmentHealthReportTool,

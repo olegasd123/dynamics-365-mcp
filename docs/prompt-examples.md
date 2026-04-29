@@ -512,6 +512,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
 
 ## Health
 
+- `storage_breakdown`
+  `In <ENV>, estimate storage drivers by table. Show database, file and database, and log signals. Include row counts and scan file columns for account, annotation, plugintracelog, and <TABLE>.`
+  `(Required: none)`
+
 - `environment_health_report`
   `Build an environment health report for <ENV> and focus on solution <SOLUTION>.`
   `(Required: none)`

@@ -965,6 +965,17 @@
           "solution": "Contoso_Core"
         }
       }
+    ],
+    "storage_breakdown": [
+      {
+        "name": "core storage signals",
+        "arguments": {
+          "environment": "dev",
+          "tables": ["account", "annotation", "plugintracelog"],
+          "includeColumns": true,
+          "limit": 25
+        }
+      }
     ]
   }
 }
