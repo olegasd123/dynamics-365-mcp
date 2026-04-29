@@ -95,6 +95,15 @@ describe("tool contracts", () => {
         maxRecords: expect.any(Object),
         includeEmptyDays: expect.any(Object),
       });
+      expect(toolsByName.field_change_frequency.inputSchema.properties).toMatchObject({
+        environment: expect.any(Object),
+        table: expect.any(Object),
+        createdAfter: expect.any(Object),
+        createdBefore: expect.any(Object),
+        maxRecords: expect.any(Object),
+        topFields: expect.any(Object),
+        includeSystemUsers: expect.any(Object),
+      });
       expect(toolsByName.find_metadata.inputSchema.properties).toMatchObject({
         environment: expect.any(Object),
         query: expect.any(Object),

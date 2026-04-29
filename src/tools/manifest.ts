@@ -50,6 +50,7 @@ import { getTableRecordDetailsTool } from "./data/get-table-record-details.js";
 import { listAuditHistoryTool } from "./auditing/list-audit-history.js";
 import { getAuditDetailsTool } from "./auditing/get-audit-details.js";
 import { recordActivityTrendsTool } from "./auditing/record-activity-trends.js";
+import { fieldChangeFrequencyTool } from "./auditing/field-change-frequency.js";
 import { listFormsTool } from "./forms/list-forms.js";
 import { getFormDetailsTool } from "./forms/get-form-details.js";
 import { listTableRibbonsTool } from "./ribbons/list-table-ribbons.js";
@@ -495,6 +496,19 @@ export const TOOL_MANIFEST = [
       "createdBefore",
       "maxRecords",
       "includeEmptyDays",
+    ],
+  },
+  {
+    ...fieldChangeFrequencyTool,
+    group: "schema_ui",
+    mainParams: [
+      "environment",
+      "table",
+      "createdAfter",
+      "createdBefore",
+      "maxRecords",
+      "topFields",
+      "includeSystemUsers",
     ],
   },
   {

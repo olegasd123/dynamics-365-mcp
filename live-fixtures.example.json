@@ -548,7 +548,6 @@
     "get_table_record_details": [
       {
         "name": "contact by id",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "contact",
@@ -559,7 +558,6 @@
     "list_audit_history": [
       {
         "name": "contact table audit history",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "contact",
@@ -572,7 +570,6 @@
     "record_activity_trends": [
       {
         "name": "contact activity trends",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "tables": ["contact"],
@@ -583,10 +580,23 @@
         }
       }
     ],
+    "field_change_frequency": [
+      {
+        "name": "contact field change frequency",
+        "arguments": {
+          "environment": "dev",
+          "table": "contact",
+          "createdAfter": "2026-04-01T00:00:00Z",
+          "createdBefore": "2026-04-30T23:59:59Z",
+          "maxRecords": 500,
+          "topFields": 25,
+          "includeSystemUsers": true
+        }
+      }
+    ],
     "get_audit_details": [
       {
         "name": "one contact audit record",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "auditId": "00000000-0000-0000-0000-000000000001"
@@ -620,7 +630,6 @@
     "run_fetchxml": [
       {
         "name": "active accounts escape hatch",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "account",

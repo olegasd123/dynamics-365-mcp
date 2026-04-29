@@ -373,6 +373,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, check if table <TABLE> still has record write activity in the last 30 days. Report mostly depends on audit data and audit can be disabled.`
   `(Required: one or more <TABLE> values)`
 
+- `field_change_frequency`
+  `In <ENV>, show which fields on table <TABLE> were edited most from 2026-04-01T00:00:00Z to 2026-04-30T23:59:59Z. Include distinct records, users, and audit coverage warnings.`
+  `In <ENV>, rank the top 20 changed fields on table contact in the last 30 days, excluding likely system users.`
+  `(Required: <TABLE>)`
+
 - `get_audit_details`
   `In <ENV>, show full audit details for audit record <AUDIT_ID>. Include the detail type and the full field diff when it exists.`
   `(Required: <AUDIT_ID>)`
@@ -634,6 +639,7 @@ This prompt list covers these tools:
 - `get_sitemap_details`
 - `get_table_schema`
 - `get_audit_details`
+- `field_change_frequency`
 - `list_audit_history`
 - `get_view_details`
 - `get_view_fetchxml`
