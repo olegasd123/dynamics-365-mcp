@@ -1,11 +1,17 @@
-import { spawn } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { execFile, spawn } from "node:child_process";
+import { constants, createHash, createSign, randomBytes, X509Certificate } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
+import { homedir } from "node:os";
+import { isAbsolute, resolve } from "node:path";
+import { promisify } from "node:util";
 import type { EnvironmentConfig } from "../config/types.js";
 import { requestLogger } from "../logging/request-logger.js";
 import {
+  createOsKeychainSecretReader,
   createOsKeychainSecretStore,
   type DeviceCodeSecretStore,
+  type OsSecretReader,
   type StoredDeviceCodeToken,
 } from "./os-keychain.js";
 
@@ -33,13 +39,27 @@ interface TokenRequestOptions {
   forceRefresh?: boolean;
 }
 
+interface CertificateStoreSignature {
+  x5tS256: string;
+}
+
+interface CertificateStoreClient {
+  getCertificateThumbprint(env: EnvironmentConfig): Promise<CertificateStoreSignature>;
+  sign(env: EnvironmentConfig, signingInput: string): Promise<Buffer>;
+}
+
 const DEFAULT_DEVICE_CODE_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 const DEFAULT_INTERACTIVE_BROWSER_REDIRECT_URI = "http://localhost:8400/callback";
 const EXPIRY_BUFFER_SECONDS = 300;
 const DEFAULT_INTERACTIVE_BROWSER_TIMEOUT_MS = 5 * 60 * 1000;
+const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+const DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE = "dynamics-365-mcp-client-certificates";
+const execFileAsync = promisify(execFile);
 
 interface TokenManagerOptions {
   secretStore?: DeviceCodeSecretStore;
+  privateKeySecretStore?: OsSecretReader;
+  certificateStoreClient?: CertificateStoreClient;
   openBrowser?: (url: string) => Promise<void> | void;
   interactiveBrowserTimeoutMs?: number;
 }
@@ -61,11 +81,17 @@ export class TokenManager {
   private persistedDeviceCodeTokens = new Map<string, StoredDeviceCodeToken>();
   private loadedPersistedDeviceCodeEnvironments = new Set<string>();
   private readonly secretStore: DeviceCodeSecretStore;
+  private readonly privateKeySecretStore: OsSecretReader;
+  private readonly certificateStoreClient: CertificateStoreClient;
   private readonly openBrowser: (url: string) => Promise<void> | void;
   private readonly interactiveBrowserTimeoutMs: number;
 
   constructor(options: TokenManagerOptions = {}) {
     this.secretStore = options.secretStore || createOsKeychainSecretStore();
+    this.privateKeySecretStore =
+      options.privateKeySecretStore ||
+      createOsKeychainSecretReader(DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE);
+    this.certificateStoreClient = options.certificateStoreClient || windowsCertificateStoreClient;
     this.openBrowser = options.openBrowser || openSystemBrowser;
     this.interactiveBrowserTimeoutMs =
       options.interactiveBrowserTimeoutMs || DEFAULT_INTERACTIVE_BROWSER_TIMEOUT_MS;
@@ -139,6 +165,10 @@ export class TokenManager {
       return this.requestInteractiveBrowserFlow(env, options);
     }
 
+    if (env.authType === "clientCertificate") {
+      return this.requestClientCertificateToken(env);
+    }
+
     return this.requestClientSecretToken(env);
   }
 
@@ -160,6 +190,35 @@ export class TokenManager {
         grant_type: "client_credentials",
         client_id: env.clientId,
         client_secret: env.clientSecret,
+        scope,
+      }),
+    );
+
+    return this.storeToken(env, data);
+  }
+
+  private async requestClientCertificateToken(env: EnvironmentConfig): Promise<string> {
+    if (!env.clientId) {
+      throw new AuthenticationError(env.name, "clientCertificate auth requires clientId");
+    }
+
+    const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
+    const scope = `${env.url}/.default`;
+    const assertion = await createClientCertificateAssertion(
+      env,
+      tokenUrl,
+      this.privateKeySecretStore,
+      this.certificateStoreClient,
+    );
+
+    const data = await this.requestTokenEndpoint(
+      env,
+      tokenUrl,
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: env.clientId,
+        client_assertion_type: CLIENT_ASSERTION_TYPE,
+        client_assertion: assertion,
         scope,
       }),
     );
@@ -826,9 +885,326 @@ function createPkceChallenge(codeVerifier: string): string {
   return base64UrlEncode(createHash("sha256").update(codeVerifier).digest());
 }
 
+async function createClientCertificateAssertion(
+  env: EnvironmentConfig,
+  audience: string,
+  privateKeySecretStore: OsSecretReader,
+  certificateStoreClient: CertificateStoreClient,
+): Promise<string> {
+  if (!env.clientId) {
+    throw new AuthenticationError(env.name, "clientCertificate auth requires clientId");
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: audience,
+    exp: nowSeconds + 600,
+    iss: env.clientId,
+    jti: base64UrlEncode(randomBytes(16)),
+    nbf: nowSeconds,
+    sub: env.clientId,
+  };
+
+  if (env.certificateStore) {
+    const { x5tS256 } = await certificateStoreClient.getCertificateThumbprint(env);
+    const unsignedHeader = {
+      alg: "PS256",
+      typ: "JWT",
+      "x5t#S256": x5tS256,
+    };
+    const signingInput = `${base64UrlEncodeJson(unsignedHeader)}.${base64UrlEncodeJson(payload)}`;
+    const signature = await certificateStoreClient.sign(env, signingInput);
+    return `${signingInput}.${base64UrlEncode(signature)}`;
+  }
+
+  const header = {
+    alg: "PS256",
+    typ: "JWT",
+    "x5t#S256": getCertificateThumbprint(env),
+  };
+  const signingInput = `${base64UrlEncodeJson(header)}.${base64UrlEncodeJson(payload)}`;
+  const privateKey = await getPrivateKeyPem(env, privateKeySecretStore);
+  const signature = signWithPrivateKey(env, signingInput, privateKey);
+
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+}
+
+async function getPrivateKeyPem(
+  env: EnvironmentConfig,
+  privateKeySecretStore: OsSecretReader,
+): Promise<string> {
+  if (env.privateKeySource === "osKeychain") {
+    if (!env.privateKeyName) {
+      throw new AuthenticationError(
+        env.name,
+        "clientCertificate auth with osKeychain privateKeySource requires privateKeyName",
+      );
+    }
+
+    const secretStore =
+      env.privateKeyKeychainService &&
+      env.privateKeyKeychainService !== DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE
+        ? createOsKeychainSecretReader(env.privateKeyKeychainService)
+        : privateKeySecretStore;
+    const privateKey = await secretStore.loadSecret(env.privateKeyName);
+    if (!privateKey) {
+      throw new AuthenticationError(
+        env.name,
+        `Private key '${env.privateKeyName}' was not found in the OS keychain`,
+      );
+    }
+    return privateKey;
+  }
+
+  if (!env.privateKeyPath) {
+    throw new AuthenticationError(
+      env.name,
+      "clientCertificate auth with file private key source requires privateKeyPath",
+    );
+  }
+
+  try {
+    return readFileSync(resolveCredentialPath(env.privateKeyPath), "utf8");
+  } catch (error) {
+    throw new AuthenticationError(
+      env.name,
+      `Could not read client certificate private key: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function signWithPrivateKey(
+  env: EnvironmentConfig,
+  signingInput: string,
+  privateKey: string,
+): Buffer {
+  try {
+    const signer = createSign("RSA-SHA256");
+    signer.update(signingInput);
+    signer.end();
+    return signer.sign({
+      key: privateKey,
+      passphrase: env.privateKeyPassphrase,
+      padding: constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: 32,
+    });
+  } catch (error) {
+    throw new AuthenticationError(
+      env.name,
+      `Could not sign client certificate assertion: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+const windowsCertificateStoreClient: CertificateStoreClient = {
+  async getCertificateThumbprint(env) {
+    const result = await runWindowsCertificateStoreCommand(env, "metadata");
+    return { x5tS256: result.x5tS256 };
+  },
+
+  async sign(env, signingInput) {
+    const result = await runWindowsCertificateStoreCommand(env, "sign", signingInput);
+    if (!result.signature) {
+      throw new AuthenticationError(
+        env.name,
+        "Windows certificate store did not return a signature",
+      );
+    }
+    return Buffer.from(result.signature, "base64url");
+  },
+};
+
+async function runWindowsCertificateStoreCommand(
+  env: EnvironmentConfig,
+  action: "metadata" | "sign",
+  signingInput?: string,
+): Promise<{ signature?: string; x5tS256: string }> {
+  if (process.platform !== "win32") {
+    throw new AuthenticationError(
+      env.name,
+      "certificateStore is only supported on Windows. Use privateKeySource=osKeychain on macOS or Linux.",
+    );
+  }
+
+  if (!env.certificateStoreThumbprint) {
+    throw new AuthenticationError(
+      env.name,
+      "clientCertificate auth with certificateStore requires certificateStoreThumbprint",
+    );
+  }
+
+  const storeLocation =
+    env.certificateStore === "windowsLocalMachine" ? "LocalMachine" : "CurrentUser";
+  const encodedCommand = Buffer.from(WINDOWS_CERTIFICATE_STORE_SCRIPT, "utf16le").toString(
+    "base64",
+  );
+
+  try {
+    const result = await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-EncodedCommand",
+        encodedCommand,
+      ],
+      {
+        env: {
+          ...process.env,
+          D365_MCP_CERT_STORE_ACTION: action,
+          D365_MCP_CERT_STORE_LOCATION: storeLocation,
+          D365_MCP_CERT_STORE_THUMBPRINT: env.certificateStoreThumbprint,
+          D365_MCP_CERT_SIGNING_INPUT: signingInput || "",
+        },
+      },
+    );
+    return JSON.parse(result.stdout.toString()) as { signature?: string; x5tS256: string };
+  } catch (error) {
+    const commandError = error as { stderr?: string | Buffer; message?: string };
+    const detail = String(commandError.stderr || commandError.message || error).trim();
+    throw new AuthenticationError(env.name, `Could not use Windows certificate store: ${detail}`);
+  }
+}
+
+function getCertificateThumbprint(env: EnvironmentConfig): string {
+  if (env.clientCertificateThumbprint) {
+    return normalizeCertificateThumbprint(env);
+  }
+
+  if (!env.certificatePath) {
+    throw new AuthenticationError(
+      env.name,
+      "clientCertificate auth requires certificatePath or clientCertificateThumbprint",
+    );
+  }
+
+  try {
+    const certificate = new X509Certificate(
+      readFileSync(resolveCredentialPath(env.certificatePath)),
+    );
+    return base64UrlEncode(createHash("sha256").update(certificate.raw).digest());
+  } catch (error) {
+    throw new AuthenticationError(
+      env.name,
+      `Could not read client certificate: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function normalizeCertificateThumbprint(env: EnvironmentConfig): string {
+  const cleaned = (env.clientCertificateThumbprint || "").trim().replace(/\s+/g, "");
+  if (/^[a-fA-F0-9]+$/.test(cleaned) && cleaned.length % 2 === 0) {
+    if (cleaned.length !== 64) {
+      throw new AuthenticationError(
+        env.name,
+        "clientCertificateThumbprint must be a SHA-256 thumbprint when hex is used",
+      );
+    }
+    return base64UrlEncode(Buffer.from(cleaned, "hex"));
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(cleaned)) {
+    throw new AuthenticationError(env.name, "clientCertificateThumbprint must be hex or base64url");
+  }
+
+  return cleaned.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function resolveCredentialPath(inputPath: string): string {
+  const expandedPath = inputPath.replace(/^~(?=$|\/|\\)/, homedir());
+  return isAbsolute(expandedPath) ? expandedPath : resolve(expandedPath);
+}
+
+function base64UrlEncodeJson(input: Record<string, unknown>): string {
+  return base64UrlEncode(Buffer.from(JSON.stringify(input), "utf8"));
+}
+
 function base64UrlEncode(input: Buffer): string {
   return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
+
+const WINDOWS_CERTIFICATE_STORE_SCRIPT = `
+Set-StrictMode -Version Latest
+
+function ConvertTo-Base64Url([byte[]]$Bytes) {
+  return [Convert]::ToBase64String($Bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
+$action = $env:D365_MCP_CERT_STORE_ACTION
+$storeLocation = $env:D365_MCP_CERT_STORE_LOCATION
+$thumbprint = ($env:D365_MCP_CERT_STORE_THUMBPRINT -replace "\\s", "").ToUpperInvariant()
+
+if ($storeLocation -ne "CurrentUser" -and $storeLocation -ne "LocalMachine") {
+  throw "Unsupported certificate store location: $storeLocation"
+}
+
+$store = [Security.Cryptography.X509Certificates.X509Store]::new(
+  "My",
+  [Security.Cryptography.X509Certificates.StoreLocation]::$storeLocation
+)
+
+try {
+  $store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+  $certificate = $store.Certificates |
+    Where-Object { ($_.Thumbprint -replace "\\s", "").ToUpperInvariant() -eq $thumbprint } |
+    Select-Object -First 1
+
+  if (-not $certificate) {
+    throw "Certificate was not found in Cert:\\$storeLocation\\My"
+  }
+
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $x5tS256 = ConvertTo-Base64Url($sha256.ComputeHash($certificate.RawData))
+  } finally {
+    $sha256.Dispose()
+  }
+
+  if ($action -eq "metadata") {
+    [Console]::Out.Write((@{ x5tS256 = $x5tS256 } | ConvertTo-Json -Compress))
+    exit 0
+  }
+
+  if ($action -ne "sign") {
+    throw "Unsupported certificate store action: $action"
+  }
+
+  if (-not $certificate.HasPrivateKey) {
+    throw "Certificate has no private key"
+  }
+
+  $rsa = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certificate)
+  if (-not $rsa) {
+    throw "Certificate private key is not RSA"
+  }
+
+  try {
+    $data = [Text.Encoding]::ASCII.GetBytes($env:D365_MCP_CERT_SIGNING_INPUT)
+    $signature = $rsa.SignData(
+      $data,
+      [Security.Cryptography.HashAlgorithmName]::SHA256,
+      [Security.Cryptography.RSASignaturePadding]::Pss
+    )
+    [Console]::Out.Write((@{
+      signature = ConvertTo-Base64Url($signature)
+      x5tS256 = $x5tS256
+    } | ConvertTo-Json -Compress))
+    exit 0
+  } finally {
+    $rsa.Dispose()
+  }
+} finally {
+  $store.Close()
+}
+`;
 
 function isLoopbackHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";

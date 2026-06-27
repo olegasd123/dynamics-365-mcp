@@ -222,6 +222,172 @@ describe("environments config", () => {
     });
   });
 
+  it("loads client certificate auth from the JSON config file", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "dev",
+            url: "https://dev.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "clientCertificate",
+            clientId: "client",
+            certificatePath: "/secure/client.crt",
+            privateKeyPath: "/secure/client.key",
+            privateKeyPassphrase: "passphrase",
+          },
+        ],
+        defaultEnvironment: "dev",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientCertificate",
+          clientId: "client",
+          clientSecret: undefined,
+          certificatePath: "/secure/client.crt",
+          certificateStore: undefined,
+          certificateStoreThumbprint: undefined,
+          clientCertificateThumbprint: undefined,
+          privateKeySource: "file",
+          privateKeyName: undefined,
+          privateKeyKeychainService: undefined,
+          privateKeyPath: "/secure/client.key",
+          privateKeyPassphrase: "passphrase",
+        },
+      ],
+      defaultEnvironment: "dev",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads client certificate auth from a connection string", async () => {
+    const dir = createTempDir();
+    process.env.D365_CONNECTION_STRING =
+      "AuthType=ClientCertificate;Url=https://org.crm.dynamics.com/;TenantId=tenant;ClientId=client;CertificatePath=/secure/client.crt;PrivateKeyPath=/secure/client.key;PrivateKeyPassphrase=passphrase";
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "default",
+          url: "https://org.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientCertificate",
+          clientId: "client",
+          certificatePath: "/secure/client.crt",
+          certificateStore: undefined,
+          certificateStoreThumbprint: undefined,
+          clientCertificateThumbprint: undefined,
+          privateKeySource: "file",
+          privateKeyName: undefined,
+          privateKeyKeychainService: undefined,
+          privateKeyPath: "/secure/client.key",
+          privateKeyPassphrase: "passphrase",
+        },
+      ],
+      defaultEnvironment: "default",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads client certificate auth with an OS keychain private key", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "prod",
+            url: "https://prod.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "clientCertificate",
+            clientId: "client",
+            certificatePath: "/secure/client.crt",
+            privateKeySource: "osKeychain",
+            privateKeyName: "prod-client-key",
+            privateKeyKeychainService: "dynamics-365-mcp-client-certificates",
+          },
+        ],
+        defaultEnvironment: "prod",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "prod",
+          url: "https://prod.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientCertificate",
+          clientId: "client",
+          clientSecret: undefined,
+          certificatePath: "/secure/client.crt",
+          certificateStore: undefined,
+          certificateStoreThumbprint: undefined,
+          clientCertificateThumbprint: undefined,
+          privateKeySource: "osKeychain",
+          privateKeyName: "prod-client-key",
+          privateKeyKeychainService: "dynamics-365-mcp-client-certificates",
+          privateKeyPath: undefined,
+          privateKeyPassphrase: undefined,
+        },
+      ],
+      defaultEnvironment: "prod",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads client certificate auth with a Windows certificate store", async () => {
+    const dir = createTempDir();
+    process.env.D365_CONNECTION_STRING =
+      "AuthType=ClientCertificate;Url=https://org.crm.dynamics.com/;TenantId=tenant;ClientId=client;CertificateStore=windowsCurrentUser;CertificateStoreThumbprint=11223344556677889900AABBCCDDEEFF00112233";
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "default",
+          url: "https://org.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientCertificate",
+          clientId: "client",
+          certificatePath: undefined,
+          certificateStore: "windowsCurrentUser",
+          certificateStoreThumbprint: "11223344556677889900AABBCCDDEEFF00112233",
+          clientCertificateThumbprint: undefined,
+        },
+      ],
+      defaultEnvironment: "default",
+      advancedQueries: undefined,
+    });
+  });
+
   it("loads device code auth from a connection string", async () => {
     const dir = createTempDir();
     process.env.D365_CONNECTION_STRING =

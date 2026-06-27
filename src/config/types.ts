@@ -1,4 +1,6 @@
-export type AuthType = "clientSecret" | "deviceCode" | "interactiveBrowser";
+export type AuthType = "clientSecret" | "clientCertificate" | "deviceCode" | "interactiveBrowser";
+export type PrivateKeySource = "file" | "osKeychain";
+export type CertificateStore = "windowsCurrentUser" | "windowsLocalMachine";
 
 export const DEFAULT_DYNAMICS_API_VERSION = "v9.2";
 
@@ -21,6 +23,15 @@ export interface EnvironmentConfig {
   authType?: AuthType;
   clientId?: string;
   clientSecret?: string;
+  certificatePath?: string;
+  certificateStore?: CertificateStore;
+  certificateStoreThumbprint?: string;
+  clientCertificateThumbprint?: string;
+  privateKeySource?: PrivateKeySource;
+  privateKeyName?: string;
+  privateKeyKeychainService?: string;
+  privateKeyPath?: string;
+  privateKeyPassphrase?: string;
   redirectUri?: string;
 }
 

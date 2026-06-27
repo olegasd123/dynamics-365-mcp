@@ -22,6 +22,15 @@ interface EnvironmentJsonEntry {
   authType?: string;
   clientId?: string;
   clientSecret?: string;
+  certificatePath?: string;
+  certificateStore?: string;
+  certificateStoreThumbprint?: string;
+  clientCertificateThumbprint?: string;
+  privateKeySource?: string;
+  privateKeyName?: string;
+  privateKeyKeychainService?: string;
+  privateKeyPath?: string;
+  privateKeyPassphrase?: string;
   redirectUri?: string;
 }
 
@@ -58,6 +67,16 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
   const url = parts.get("url");
   const clientId = parts.get("clientid");
   const clientSecret = parts.get("clientsecret");
+  const certificatePath = parts.get("certificatepath") || parts.get("clientcertificatepath");
+  const certificateStore = parts.get("certificatestore");
+  const certificateStoreThumbprint = parts.get("certificatestorethumbprint");
+  const clientCertificateThumbprint =
+    parts.get("clientcertificatethumbprint") || parts.get("certificatethumbprint");
+  const privateKeySource = parts.get("privatekeysource");
+  const privateKeyName = parts.get("privatekeyname");
+  const privateKeyKeychainService = parts.get("privatekeykeychainservice");
+  const privateKeyPath = parts.get("privatekeypath");
+  const privateKeyPassphrase = parts.get("privatekeypassphrase");
   const tenantId = parts.get("tenantid");
   const redirectUri = parts.get("redirecturi");
 
@@ -90,6 +109,42 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
       clientId,
       redirectUri,
     };
+  }
+
+  if (authTypeValue === "clientcertificate" || authTypeValue === "certificate") {
+    validateClientCertificateConfig("default", {
+      clientId,
+      certificatePath,
+      certificateStore,
+      certificateStoreThumbprint,
+      clientCertificateThumbprint,
+      privateKeySource,
+      privateKeyName,
+      privateKeyPath,
+    });
+
+    const parsed: EnvironmentConfig = {
+      name: "default",
+      url: url.replace(/\/$/, ""),
+      apiVersion: DEFAULT_DYNAMICS_API_VERSION,
+      tenantId,
+      authType: "clientCertificate",
+      clientId,
+      certificatePath,
+      certificateStore: normalizeCertificateStore(certificateStore),
+      certificateStoreThumbprint,
+      clientCertificateThumbprint,
+    };
+
+    if (!parsed.certificateStore) {
+      parsed.privateKeySource = normalizePrivateKeySource(privateKeySource, privateKeyName);
+      parsed.privateKeyName = privateKeyName;
+      parsed.privateKeyKeychainService = privateKeyKeychainService;
+      parsed.privateKeyPath = privateKeyPath;
+      parsed.privateKeyPassphrase = privateKeyPassphrase;
+    }
+
+    return parsed;
   }
 
   if (!clientId || !clientSecret) {
@@ -166,13 +221,16 @@ function loadFromJsonFile(filePath: string): AppConfig {
         `Environment '${env.name}' uses clientSecret auth and must include clientId and clientSecret`,
       );
     }
+    if (authType === "clientCertificate") {
+      validateClientCertificateConfig(env.name, env);
+    }
     if (authType === "interactiveBrowser" && !env.clientId) {
       throw new Error(
         `Environment '${env.name}' uses interactiveBrowser auth and must include clientId`,
       );
     }
 
-    return {
+    const normalized: EnvironmentConfig = {
       name: env.name,
       url: env.url.replace(/\/$/, ""),
       apiVersion: env.apiVersion || DEFAULT_DYNAMICS_API_VERSION,
@@ -182,6 +240,25 @@ function loadFromJsonFile(filePath: string): AppConfig {
       clientSecret: env.clientSecret,
       redirectUri: env.redirectUri,
     };
+
+    if (authType === "clientCertificate") {
+      normalized.certificatePath = env.certificatePath;
+      normalized.certificateStore = normalizeCertificateStore(env.certificateStore);
+      normalized.certificateStoreThumbprint = env.certificateStoreThumbprint;
+      normalized.clientCertificateThumbprint = env.clientCertificateThumbprint;
+      if (!normalized.certificateStore) {
+        normalized.privateKeySource = normalizePrivateKeySource(
+          env.privateKeySource,
+          env.privateKeyName,
+        );
+        normalized.privateKeyName = env.privateKeyName;
+        normalized.privateKeyKeychainService = env.privateKeyKeychainService;
+        normalized.privateKeyPath = env.privateKeyPath;
+        normalized.privateKeyPassphrase = env.privateKeyPassphrase;
+      }
+    }
+
+    return normalized;
   });
 
   return {
@@ -200,7 +277,96 @@ function normalizeAuthType(authType: string | undefined): AuthType {
     return "interactiveBrowser";
   }
 
+  if (authType === "clientCertificate" || authType === "certificate") {
+    return "clientCertificate";
+  }
+
   return "clientSecret";
+}
+
+function validateClientCertificateConfig(
+  name: string,
+  env: {
+    clientId?: string;
+    certificatePath?: string;
+    certificateStore?: string;
+    certificateStoreThumbprint?: string;
+    clientCertificateThumbprint?: string;
+    privateKeySource?: string;
+    privateKeyName?: string;
+    privateKeyPath?: string;
+  },
+): void {
+  if (!env.clientId) {
+    throw new Error(`Environment '${name}' uses clientCertificate auth and must include clientId`);
+  }
+
+  const certificateStore = normalizeCertificateStore(env.certificateStore);
+  if (certificateStore) {
+    if (!env.certificateStoreThumbprint) {
+      throw new Error(
+        `Environment '${name}' uses clientCertificate auth with certificateStore and must include certificateStoreThumbprint`,
+      );
+    }
+    return;
+  }
+
+  if (!env.certificatePath && !env.clientCertificateThumbprint) {
+    throw new Error(
+      `Environment '${name}' uses clientCertificate auth and must include certificatePath or clientCertificateThumbprint`,
+    );
+  }
+
+  const privateKeySource = normalizePrivateKeySource(env.privateKeySource, env.privateKeyName);
+  if (privateKeySource === "osKeychain") {
+    if (!env.privateKeyName) {
+      throw new Error(
+        `Environment '${name}' uses clientCertificate auth with osKeychain and must include privateKeyName`,
+      );
+    }
+    return;
+  }
+
+  if (!env.privateKeyPath) {
+    throw new Error(
+      `Environment '${name}' uses clientCertificate auth with file private key source and must include privateKeyPath`,
+    );
+  }
+}
+
+function normalizePrivateKeySource(
+  source: string | undefined,
+  privateKeyName?: string,
+): EnvironmentConfig["privateKeySource"] {
+  if (source === "osKeychain" || source === "keychain") {
+    return "osKeychain";
+  }
+
+  if (source === "file") {
+    return "file";
+  }
+
+  return privateKeyName ? "osKeychain" : "file";
+}
+
+function normalizeCertificateStore(
+  store: string | undefined,
+): EnvironmentConfig["certificateStore"] {
+  if (store === "windowsCurrentUser" || store === "CurrentUser") {
+    return "windowsCurrentUser";
+  }
+
+  if (store === "windowsLocalMachine" || store === "LocalMachine") {
+    return "windowsLocalMachine";
+  }
+
+  if (store) {
+    throw new Error(
+      `Unsupported certificateStore '${store}'. Use windowsCurrentUser or windowsLocalMachine.`,
+    );
+  }
+
+  return undefined;
 }
 
 export function loadConfig(): AppConfig {

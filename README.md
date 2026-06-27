@@ -15,7 +15,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
 - **Transport**: `stdio` and Streamable HTTP
-- **Auth**: Azure AD OAuth2 — client secret, device code, or browser PKCE
+- **Auth**: Azure AD OAuth2 — client secret, client certificate, device code, or browser PKCE
 - **Package manager**: npm
 
 ## Architecture
@@ -24,7 +24,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 src/
   index.ts                    # Bootstraps config, auth, tools, prompts, resources, and transport
   config/                     # Config loading and runtime env support
-  auth/                       # Client-secret, device-code, and browser PKCE token flows
+  auth/                       # Client-secret, client-certificate, device-code, and browser PKCE token flows
   client/                     # Dataverse HTTP client, retry policy, and response cache
   http/                       # Streamable HTTP session runtime and health state
   logging/                    # Per-tool request logging and runtime error capture
@@ -95,9 +95,10 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.jso
       "name": "prod",
       "url": "https://prod-org.crm.dynamics.com",
       "tenantId": "...",
-      "authType": "clientSecret",
+      "authType": "clientCertificate",
       "clientId": "...",
-      "clientSecret": "..."
+      "certificatePath": "/secure/prod-client.crt",
+      "privateKeyPath": "/secure/prod-client.key"
     }
   ],
   "defaultEnvironment": "dev"
@@ -188,12 +189,142 @@ Device-code tokens are stored in the OS keychain:
 - Linux: Secret Service
 - Windows: Credential Manager
 
+### JSON Config File With Client Certificate Auth
+
+Use this for headless service access when a user cannot sign in. Upload the public certificate to the Entra app registration. Keep the private key file locked down.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://prod-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientCertificate",
+      "clientId": "...",
+      "certificatePath": "/secure/prod-client.crt",
+      "privateKeyPath": "/secure/prod-client.key"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+Optional:
+
+- Set `privateKeyPassphrase` if the private key is encrypted.
+- Set `clientCertificateThumbprint` only if you cannot provide `certificatePath`. The value must be the SHA-256 certificate thumbprint in hex or base64url format.
+- Use absolute paths or `~` paths for certificate files.
+
+#### Client Certificate With OS Keychain Private Key
+
+Use this when you want the private key in the OS secret store instead of a plain file. The MCP reads the PEM private key from the keychain when it needs to sign a client assertion.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://prod-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientCertificate",
+      "clientId": "...",
+      "certificatePath": "/secure/prod-client.crt",
+      "privateKeySource": "osKeychain",
+      "privateKeyName": "prod-client-key"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+Default keychain service is `dynamics-365-mcp-client-certificates`. You can override it with `privateKeyKeychainService`.
+
+Store the PEM key:
+
+macOS Keychain:
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat /secure/prod-client.key)"
+```
+
+Linux Secret Service:
+
+```bash
+secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < /secure/prod-client.key
+```
+
+For Windows, prefer the Windows Certificate Store mode below. It can use a non-exportable private key.
+
+#### Client Certificate With Windows Certificate Store
+
+Use this on Windows when the certificate and private key are in `Cert:\CurrentUser\My` or `Cert:\LocalMachine\My`. The MCP asks Windows to sign the assertion with RSA-PSS. It does not read the private key bytes.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://prod-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientCertificate",
+      "clientId": "...",
+      "certificateStore": "windowsCurrentUser",
+      "certificateStoreThumbprint": "11223344556677889900AABBCCDDEEFF00112233"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+`certificateStoreThumbprint` is the Windows certificate thumbprint used to find the cert. The MCP computes the SHA-256 `x5t#S256` value from the certificate. Use `windowsLocalMachine` if the cert is in `Cert:\LocalMachine\My`.
+
+Example setup in PowerShell:
+
+```powershell
+Import-PfxCertificate -FilePath .\prod-client.pfx -CertStoreLocation Cert:\CurrentUser\My
+Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -Like "*prod-client*" | Select-Object Thumbprint, Subject
+```
+
+Do not use `-Exportable` when importing the PFX if you want the private key to stay non-exportable.
+
+#### Azure Key Vault
+
+Azure Key Vault is a good place to create, store, rotate, and audit certificate keys. This MCP does not yet call Key Vault `Sign` directly at runtime. Use Key Vault to manage the certificate lifecycle, then deploy the private key to one supported runtime store:
+
+- Windows Certificate Store for a non-exportable key
+- OS keychain PEM storage
+- locked-down PEM files
+
+Relevant Microsoft docs:
+
+- [Azure Key Vault certificates](https://learn.microsoft.com/en-us/azure/key-vault/certificates/about-certificates)
+- [Azure Key Vault keys and signing](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys)
+
 ### Connection String (single env)
 
 Via `D365_CONNECTION_STRING` env var:
 
 ```
 AuthType=ClientSecret;Url=https://org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=...
+```
+
+Client certificate auth:
+
+```
+AuthType=ClientCertificate;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;CertificatePath=/secure/client.crt;PrivateKeyPath=/secure/client.key
+```
+
+Client certificate auth with OS keychain private key:
+
+```
+AuthType=ClientCertificate;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;CertificatePath=/secure/client.crt;PrivateKeySource=osKeychain;PrivateKeyName=prod-client-key
+```
+
+Client certificate auth with Windows Certificate Store:
+
+```
+AuthType=ClientCertificate;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;CertificateStore=windowsCurrentUser;CertificateStoreThumbprint=11223344556677889900AABBCCDDEEFF00112233
 ```
 
 Interactive auth:
@@ -825,9 +956,10 @@ Use this when you want one report that combines direct usage and dependency risk
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-7. For `interactiveBrowser` auth, if silent refresh is not possible, start a local callback server, open the browser, and exchange the authorization code with PKCE
-8. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
-9. Cache the new access token in memory and save interactive tokens in the OS keychain when possible
+7. For `clientCertificate` auth, build a PS256 `private_key_jwt` client assertion with the certificate SHA-256 thumbprint, then POST the client credentials request with `client_assertion_type` and `client_assertion`
+8. For `interactiveBrowser` auth, if silent refresh is not possible, start a local callback server, open the browser, and exchange the authorization code with PKCE
+9. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+10. Cache the new access token in memory and save interactive tokens in the OS keychain when possible
 
 ## Cross-Environment Comparison Design
 
