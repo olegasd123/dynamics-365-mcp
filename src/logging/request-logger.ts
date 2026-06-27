@@ -44,7 +44,7 @@ type ToolHandlerExtra = RequestHandlerExtra<Request, Notification> | undefined;
 const DEFAULT_LOG_DIR = resolve(homedir(), ".dynamics-365-mcp", "logs");
 const DEFAULT_MAX_BODY_CHARS = 0;
 const SENSITIVE_KEY_PATTERN =
-  /(authorization|clientsecret|client_secret|token|secret|password|cookie)/i;
+  /(authorization|clientsecret|client_secret|code_verifier|device_code|token|secret|password|cookie)/i;
 const instrumentedServers = new WeakSet<object>();
 
 export class RequestLogger {
@@ -373,6 +373,8 @@ function sanitizeString(value: string, key?: string): string {
 
   return value
     .replace(/(client_secret=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/(code_verifier=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/(device_code=)[^&\s]+/gi, "$1[REDACTED]")
     .replace(/(refresh_token=)[^&\s]+/gi, "$1[REDACTED]")
     .replace(/(access_token=)[^&\s]+/gi, "$1[REDACTED]");
 }

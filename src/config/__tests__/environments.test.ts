@@ -245,6 +245,73 @@ describe("environments config", () => {
     });
   });
 
+  it("loads interactive browser auth from the JSON config file", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "dev",
+            url: "https://dev.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "interactiveBrowser",
+            clientId: "public-client",
+            redirectUri: "http://localhost:8400/callback",
+          },
+        ],
+        defaultEnvironment: "dev",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "dev",
+          url: "https://dev.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "interactiveBrowser",
+          clientId: "public-client",
+          clientSecret: undefined,
+          redirectUri: "http://localhost:8400/callback",
+        },
+      ],
+      defaultEnvironment: "dev",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads interactive browser auth from a connection string", async () => {
+    const dir = createTempDir();
+    process.env.D365_CONNECTION_STRING =
+      "AuthType=InteractiveBrowser;Url=https://org.crm.dynamics.com/;TenantId=tenant;ClientId=public-client;RedirectUri=http://127.0.0.1:8401/callback";
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "default",
+          url: "https://org.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "interactiveBrowser",
+          clientId: "public-client",
+          redirectUri: "http://127.0.0.1:8401/callback",
+        },
+      ],
+      defaultEnvironment: "default",
+      advancedQueries: undefined,
+    });
+  });
+
   it("loads a custom api version from the JSON config file", async () => {
     const dir = createTempDir();
     const configPath = join(dir, "config.json");

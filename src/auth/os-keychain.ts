@@ -9,6 +9,8 @@ export interface StoredDeviceCodeToken {
   tenantId: string;
   url: string;
   clientId: string;
+  authType?: "deviceCode" | "interactiveBrowser";
+  redirectUri?: string;
   accessToken?: string;
   accessTokenExpiresAt?: number;
   refreshToken?: string;

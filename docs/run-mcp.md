@@ -16,6 +16,7 @@ Default transport is `stdio`.
 - Access to a Dynamics 365 / Dataverse environment
 - One of these auth options:
   - `clientSecret` auth: tenant ID, client ID, client secret
+  - `interactiveBrowser` auth: tenant ID, public client ID, browser sign-in access
   - `deviceCode` auth: tenant ID and browser sign-in access
 
 ## 2. Clone The Repository
@@ -86,7 +87,36 @@ Use this if you have an app registration with a client secret.
 }
 ```
 
-### Option B: Interactive Device Code Auth
+### Option B: Interactive Browser PKCE Auth
+
+Use this if the user can sign in in a browser and device-code auth is blocked.
+This uses no client secret.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "interactiveBrowser",
+      "clientId": "your-public-client-id",
+      "redirectUri": "http://localhost:8400/callback"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+Optional:
+
+- Set `apiVersion` if you need something other than the default `v9.2`.
+- Set `redirectUri` if your app registration uses a different local callback URI.
+- If `redirectUri` is missing, the server uses `http://localhost:8400/callback`.
+- Browser PKCE tokens are stored in the OS keychain.
+
+### Option C: Interactive Device Code Auth
 
 Use this if you do not have a client secret and can sign in with a user account.
 
@@ -139,6 +169,18 @@ If you also need a client secret:
 2. Create a new client secret
 3. Copy the secret value
 
+### Client ID For Browser PKCE Auth
+
+For `interactiveBrowser` auth, create or use a public client app:
+
+1. Open `Microsoft Entra ID`
+2. Open `App registrations`
+3. Create a new app registration or open an existing public client app
+4. Copy `Application (client) ID`
+5. Open `Authentication`
+6. Add a mobile and desktop redirect URI, for example `http://localhost:8400/callback`
+7. Enable public client / mobile and desktop flow if your tenant requires it
+
 ### Client ID For Device Code Auth
 
 For `deviceCode` auth you can:
@@ -172,9 +214,11 @@ node dist/index.js
 
 The server uses `stdio`, so it waits for MCP client input. This is normal.
 
+If you use `interactiveBrowser` auth, the server opens your browser when a tool needs a token. Finish sign-in in the browser. The callback page says when sign-in is complete.
+
 If you use `deviceCode` auth, the server prints sign-in instructions when a tool needs a token. Open the URL shown in the terminal, enter the code, and finish sign-in.
 
-After the first sign-in, the server stores device-code tokens in the OS keychain when the auth response allows it. This means a restart often does not need a new browser sign-in.
+After the first sign-in, the server stores interactive tokens in the OS keychain when the auth response allows it. This means a restart often does not need a new browser sign-in.
 
 Example MCP client config:
 
@@ -389,6 +433,7 @@ Check that `~/.dynamics-365-mcp/config.json` exists and has valid JSON.
 - Check `tenantId`
 - Check the environment `url`
 - For `clientSecret` auth, check `clientId` and `clientSecret`
+- For `interactiveBrowser` auth, check `clientId` and make sure `redirectUri` is allowed in the app registration
 - For `deviceCode` auth, make sure the user account can access the Dataverse environment
 
 ### Build fails

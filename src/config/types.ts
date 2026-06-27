@@ -1,4 +1,4 @@
-export type AuthType = "clientSecret" | "deviceCode";
+export type AuthType = "clientSecret" | "deviceCode" | "interactiveBrowser";
 
 export const DEFAULT_DYNAMICS_API_VERSION = "v9.2";
 
@@ -21,6 +21,7 @@ export interface EnvironmentConfig {
   authType?: AuthType;
   clientId?: string;
   clientSecret?: string;
+  redirectUri?: string;
 }
 
 export interface AppConfig {

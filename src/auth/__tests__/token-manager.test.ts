@@ -163,6 +163,80 @@ describe("TokenManager", () => {
     timeoutSpy.mockRestore();
   });
 
+  it("supports interactive browser auth with PKCE", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const redirectUri = "http://127.0.0.1:18401/callback";
+    let tokenRequestBody = "";
+
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.startsWith(redirectUri)) {
+        return originalFetch(input, init);
+      }
+
+      tokenRequestBody = String(init?.body || "");
+      return createJsonResponse({
+        access_token: "browser-token",
+        refresh_token: "browser-refresh-token",
+        expires_in: 3600,
+      });
+    });
+
+    global.fetch = fetchMock;
+
+    const openBrowser = vi.fn(async (authorizeUrl: string) => {
+      const url = new URL(authorizeUrl);
+      expect(url.pathname).toBe("/tenant-id/oauth2/v2.0/authorize");
+      expect(url.searchParams.get("client_id")).toBe("public-client");
+      expect(url.searchParams.get("response_type")).toBe("code");
+      expect(url.searchParams.get("redirect_uri")).toBe(redirectUri);
+      expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+      expect(url.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]+$/);
+
+      const state = url.searchParams.get("state");
+      expect(state).toBeTruthy();
+      await originalFetch(`${redirectUri}?code=authorization-code&state=${state}`);
+    });
+
+    const manager = new TokenManager({
+      secretStore: createMemorySecretStore(),
+      openBrowser,
+    });
+
+    await expect(
+      manager.getToken({
+        name: "browser",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "interactiveBrowser",
+        clientId: "public-client",
+        redirectUri,
+      }),
+    ).resolves.toBe("browser-token");
+
+    expect(openBrowser).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tokenRequestBody).toContain("grant_type=authorization_code");
+    expect(tokenRequestBody).toContain("client_id=public-client");
+    expect(tokenRequestBody).toContain("code=authorization-code");
+    expect(tokenRequestBody).toContain(`redirect_uri=${encodeURIComponent(redirectUri)}`);
+    expect(tokenRequestBody).toContain("code_verifier=");
+    expect(stderrSpy).toHaveBeenCalled();
+  });
+
+  it("requires a client id for interactive browser auth", async () => {
+    const manager = new TokenManager({ secretStore: createMemorySecretStore() });
+
+    await expect(
+      manager.getToken({
+        name: "browser",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "interactiveBrowser",
+      }),
+    ).rejects.toThrow("interactiveBrowser auth requires clientId");
+  });
+
   it("persists device code tokens and reuses them after restart", async () => {
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const timeoutSpy = createImmediateTimeoutSpy();

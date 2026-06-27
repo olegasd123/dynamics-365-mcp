@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import {
+  type AuthType,
   DEFAULT_DYNAMICS_API_VERSION,
   type AdvancedQueriesConfig,
   type AppConfig,
@@ -21,6 +22,7 @@ interface EnvironmentJsonEntry {
   authType?: string;
   clientId?: string;
   clientSecret?: string;
+  redirectUri?: string;
 }
 
 interface ConnectionStringsEnvPayload {
@@ -57,6 +59,7 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
   const clientId = parts.get("clientid");
   const clientSecret = parts.get("clientsecret");
   const tenantId = parts.get("tenantid");
+  const redirectUri = parts.get("redirecturi");
 
   if (!url || !tenantId) {
     throw new Error("Connection string must contain Url and TenantId");
@@ -70,6 +73,22 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
       tenantId,
       authType: "deviceCode",
       clientId,
+    };
+  }
+
+  if (authTypeValue === "interactivebrowser" || authTypeValue === "pkce") {
+    if (!clientId) {
+      throw new Error("Interactive browser auth requires ClientId, Url, and TenantId");
+    }
+
+    return {
+      name: "default",
+      url: url.replace(/\/$/, ""),
+      apiVersion: DEFAULT_DYNAMICS_API_VERSION,
+      tenantId,
+      authType: "interactiveBrowser",
+      clientId,
+      redirectUri,
     };
   }
 
@@ -141,10 +160,15 @@ function loadFromJsonFile(filePath: string): AppConfig {
       );
     }
 
-    const authType = env.authType === "deviceCode" ? "deviceCode" : "clientSecret";
+    const authType = normalizeAuthType(env.authType);
     if (authType === "clientSecret" && (!env.clientId || !env.clientSecret)) {
       throw new Error(
         `Environment '${env.name}' uses clientSecret auth and must include clientId and clientSecret`,
+      );
+    }
+    if (authType === "interactiveBrowser" && !env.clientId) {
+      throw new Error(
+        `Environment '${env.name}' uses interactiveBrowser auth and must include clientId`,
       );
     }
 
@@ -156,6 +180,7 @@ function loadFromJsonFile(filePath: string): AppConfig {
       authType,
       clientId: env.clientId,
       clientSecret: env.clientSecret,
+      redirectUri: env.redirectUri,
     };
   });
 
@@ -164,6 +189,18 @@ function loadFromJsonFile(filePath: string): AppConfig {
     defaultEnvironment: json.defaultEnvironment || environments[0].name,
     advancedQueries: normalizeAdvancedQueriesConfig(json.advancedQueries),
   };
+}
+
+function normalizeAuthType(authType: string | undefined): AuthType {
+  if (authType === "deviceCode") {
+    return "deviceCode";
+  }
+
+  if (authType === "interactiveBrowser" || authType === "pkce") {
+    return "interactiveBrowser";
+  }
+
+  return "clientSecret";
 }
 
 export function loadConfig(): AppConfig {

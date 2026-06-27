@@ -15,7 +15,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
 - **Transport**: `stdio` and Streamable HTTP
-- **Auth**: Azure AD OAuth2 — client secret or interactive device code
+- **Auth**: Azure AD OAuth2 — client secret, device code, or browser PKCE
 - **Package manager**: npm
 
 ## Architecture
@@ -24,7 +24,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 src/
   index.ts                    # Bootstraps config, auth, tools, prompts, resources, and transport
   config/                     # Config loading and runtime env support
-  auth/                       # Client-secret and device-code token flows
+  auth/                       # Client-secret, device-code, and browser PKCE token flows
   client/                     # Dataverse HTTP client, retry policy, and response cache
   http/                       # Streamable HTTP session runtime and health state
   logging/                    # Per-tool request logging and runtime error capture
@@ -136,7 +136,32 @@ Use `allowedEnvironments` when you want the escape hatch available only in lower
 
 When you call `run_fetchxml`, pass row limits through the tool `limit` argument rather than a FetchXML `top` attribute. The server normalizes the outgoing query to use a FetchXML `count` before sending it to Dataverse.
 
-### JSON Config File With Interactive Auth
+### JSON Config File With Browser PKCE Auth
+
+Use this when the user can sign in in a browser and device-code auth is blocked.
+This uses authorization code flow with PKCE and no client secret.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://dev-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "interactiveBrowser",
+      "clientId": "...",
+      "redirectUri": "http://localhost:8400/callback"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+`clientId` must be a public client app. Add the same `redirectUri` to the app registration as a mobile and desktop redirect URI. If `redirectUri` is missing, the server uses `http://localhost:8400/callback`.
+
+Browser PKCE tokens are stored in the OS keychain.
+
+### JSON Config File With Device Code Auth
 
 Use this when the user can sign in in a browser and does not have a client secret.
 
@@ -175,6 +200,12 @@ Interactive auth:
 
 ```
 AuthType=DeviceCode;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...
+```
+
+Browser PKCE auth:
+
+```
+AuthType=InteractiveBrowser;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;RedirectUri=http://localhost:8400/callback
 ```
 
 ### Connection Strings JSON (multiple envs)
@@ -786,7 +817,7 @@ Use this when you want one report that combines direct usage and dependency risk
 
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
-3. For `deviceCode` auth, check the OS keychain for a saved token
+3. For `deviceCode` and `interactiveBrowser` auth, check the OS keychain for a saved token
 4. If a valid access token exists, return it
 5. If a stored refresh token exists, try silent refresh before asking the user to sign in again
 6. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
@@ -794,8 +825,9 @@ Use this when you want one report that combines direct usage and dependency risk
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-7. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
-8. Cache the new access token in memory and save device-code tokens in the OS keychain when possible
+7. For `interactiveBrowser` auth, if silent refresh is not possible, start a local callback server, open the browser, and exchange the authorization code with PKCE
+8. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+9. Cache the new access token in memory and save interactive tokens in the OS keychain when possible
 
 ## Cross-Environment Comparison Design
 
