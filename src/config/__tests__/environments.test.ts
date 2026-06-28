@@ -72,6 +72,127 @@ describe("environments config", () => {
     });
   });
 
+  it("loads client secret auth with an environment variable secret source", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "prod",
+            url: "https://prod.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "clientSecret",
+            clientId: "client",
+            clientSecretSource: "env",
+            clientSecretEnv: "D365_PROD_CLIENT_SECRET",
+          },
+        ],
+        defaultEnvironment: "prod",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "prod",
+          url: "https://prod.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientSecret",
+          clientId: "client",
+          clientSecret: undefined,
+          clientSecretSource: "env",
+          clientSecretEnv: "D365_PROD_CLIENT_SECRET",
+        },
+      ],
+      defaultEnvironment: "prod",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads client secret auth with an OS keychain secret source", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "prod",
+            url: "https://prod.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "clientSecret",
+            clientId: "client",
+            clientSecretSource: "osKeychain",
+            clientSecretName: "prod-client-secret",
+            clientSecretKeychainService: "dynamics-365-mcp-client-secrets",
+          },
+        ],
+        defaultEnvironment: "prod",
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "prod",
+          url: "https://prod.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientSecret",
+          clientId: "client",
+          clientSecret: undefined,
+          clientSecretSource: "osKeychain",
+          clientSecretName: "prod-client-secret",
+          clientSecretKeychainService: "dynamics-365-mcp-client-secrets",
+        },
+      ],
+      defaultEnvironment: "prod",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("throws when client secret auth misses the required source field", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "config.json");
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        environments: [
+          {
+            name: "prod",
+            url: "https://prod.crm.dynamics.com/",
+            tenantId: "tenant",
+            authType: "clientSecret",
+            clientId: "client",
+            clientSecretSource: "env",
+          },
+        ],
+      }),
+    );
+
+    process.env.D365_MCP_CONFIG = configPath;
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(() => loadConfig()).toThrow(
+      "Environment 'prod' uses clientSecret auth with env clientSecretSource and must include clientSecretEnv",
+    );
+  });
+
   it("loads config from a connection string", async () => {
     const dir = createTempDir();
     process.env.D365_CONNECTION_STRING =
@@ -89,6 +210,31 @@ describe("environments config", () => {
           authType: "clientSecret",
           clientId: "client",
           clientSecret: "secret",
+        },
+      ],
+      defaultEnvironment: "default",
+      advancedQueries: undefined,
+    });
+  });
+
+  it("loads client secret auth with an environment variable from a connection string", async () => {
+    const dir = createTempDir();
+    process.env.D365_CONNECTION_STRING =
+      "AuthType=ClientSecret;Url=https://org.crm.dynamics.com/;ClientId=client;ClientSecretSource=Env;ClientSecretEnv=D365_CLIENT_SECRET;TenantId=tenant";
+
+    const { loadConfig } = await importEnvironmentsModule(dir);
+
+    expect(loadConfig()).toEqual({
+      environments: [
+        {
+          name: "default",
+          url: "https://org.crm.dynamics.com",
+          apiVersion: "v9.2",
+          tenantId: "tenant",
+          authType: "clientSecret",
+          clientId: "client",
+          clientSecretSource: "env",
+          clientSecretEnv: "D365_CLIENT_SECRET",
         },
       ],
       defaultEnvironment: "default",

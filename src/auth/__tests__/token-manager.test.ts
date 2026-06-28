@@ -11,6 +11,7 @@ import type {
 } from "../os-keychain.js";
 
 const originalFetch = global.fetch;
+const originalEnv = { ...process.env };
 const tempDirs: string[] = [];
 
 const environment = {
@@ -89,6 +90,7 @@ function createImmediateTimeoutSpy() {
 
 afterEach(() => {
   global.fetch = originalFetch;
+  process.env = { ...originalEnv };
   vi.restoreAllMocks();
 
   for (const dir of tempDirs.splice(0)) {
@@ -130,6 +132,8 @@ describe("TokenManager", () => {
     const firstRequest = manager.getToken(environment);
     const secondRequest = manager.getToken(environment);
 
+    await Promise.resolve();
+
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     resolveResponse?.(createTokenResponse("shared-token"));
@@ -138,6 +142,74 @@ describe("TokenManager", () => {
       "shared-token",
       "shared-token",
     ]);
+  });
+
+  it("uses a client secret from an environment variable", async () => {
+    process.env.D365_TEST_CLIENT_SECRET = "env-client-secret";
+    let tokenRequestBody = "";
+
+    global.fetch = vi.fn<typeof fetch>((_input, init) => {
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("env-secret-token"));
+    });
+
+    const manager = new TokenManager();
+
+    await expect(
+      manager.getToken({
+        ...environment,
+        clientSecret: undefined,
+        clientSecretSource: "env",
+        clientSecretEnv: "D365_TEST_CLIENT_SECRET",
+      }),
+    ).resolves.toBe("env-secret-token");
+
+    const body = new URLSearchParams(tokenRequestBody);
+    expect(body.get("client_id")).toBe("client-id");
+    expect(body.get("client_secret")).toBe("env-client-secret");
+  });
+
+  it("uses a client secret from the OS keychain", async () => {
+    let tokenRequestBody = "";
+
+    global.fetch = vi.fn<typeof fetch>((_input, init) => {
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("keychain-secret-token"));
+    });
+
+    const manager = new TokenManager({
+      clientSecretStore: createMemoryPrivateKeyStore({
+        "prod-client-secret": "keychain-client-secret",
+      }),
+    });
+
+    await expect(
+      manager.getToken({
+        ...environment,
+        clientSecret: undefined,
+        clientSecretSource: "osKeychain",
+        clientSecretName: "prod-client-secret",
+      }),
+    ).resolves.toBe("keychain-secret-token");
+
+    const body = new URLSearchParams(tokenRequestBody);
+    expect(body.get("client_id")).toBe("client-id");
+    expect(body.get("client_secret")).toBe("keychain-client-secret");
+  });
+
+  it("throws when a keychain client secret is missing", async () => {
+    const manager = new TokenManager({
+      clientSecretStore: createMemoryPrivateKeyStore({}),
+    });
+
+    await expect(
+      manager.getToken({
+        ...environment,
+        clientSecret: undefined,
+        clientSecretSource: "osKeychain",
+        clientSecretName: "missing-client-secret",
+      }),
+    ).rejects.toThrow("Client secret 'missing-client-secret' was not found in the OS keychain");
   });
 
   it("throws an AuthenticationError when the token request fails", async () => {

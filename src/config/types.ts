@@ -1,4 +1,5 @@
 export type AuthType = "clientSecret" | "clientCertificate" | "deviceCode" | "interactiveBrowser";
+export type ClientSecretSource = "inline" | "env" | "osKeychain";
 export type PrivateKeySource = "file" | "osKeychain";
 export type CertificateStore = "windowsCurrentUser" | "windowsLocalMachine";
 
@@ -23,6 +24,10 @@ export interface EnvironmentConfig {
   authType?: AuthType;
   clientId?: string;
   clientSecret?: string;
+  clientSecretSource?: ClientSecretSource;
+  clientSecretName?: string;
+  clientSecretEnv?: string;
+  clientSecretKeychainService?: string;
   certificatePath?: string;
   certificateStore?: CertificateStore;
   certificateStoreThumbprint?: string;

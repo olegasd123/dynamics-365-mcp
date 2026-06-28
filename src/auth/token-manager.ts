@@ -53,11 +53,13 @@ const DEFAULT_INTERACTIVE_BROWSER_REDIRECT_URI = "http://localhost:8400/callback
 const EXPIRY_BUFFER_SECONDS = 300;
 const DEFAULT_INTERACTIVE_BROWSER_TIMEOUT_MS = 5 * 60 * 1000;
 const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+const DEFAULT_CLIENT_SECRET_KEYCHAIN_SERVICE = "dynamics-365-mcp-client-secrets";
 const DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE = "dynamics-365-mcp-client-certificates";
 const execFileAsync = promisify(execFile);
 
 interface TokenManagerOptions {
   secretStore?: DeviceCodeSecretStore;
+  clientSecretStore?: OsSecretReader;
   privateKeySecretStore?: OsSecretReader;
   certificateStoreClient?: CertificateStoreClient;
   openBrowser?: (url: string) => Promise<void> | void;
@@ -81,6 +83,7 @@ export class TokenManager {
   private persistedDeviceCodeTokens = new Map<string, StoredDeviceCodeToken>();
   private loadedPersistedDeviceCodeEnvironments = new Set<string>();
   private readonly secretStore: DeviceCodeSecretStore;
+  private readonly clientSecretStore: OsSecretReader;
   private readonly privateKeySecretStore: OsSecretReader;
   private readonly certificateStoreClient: CertificateStoreClient;
   private readonly openBrowser: (url: string) => Promise<void> | void;
@@ -88,6 +91,9 @@ export class TokenManager {
 
   constructor(options: TokenManagerOptions = {}) {
     this.secretStore = options.secretStore || createOsKeychainSecretStore();
+    this.clientSecretStore =
+      options.clientSecretStore ||
+      createOsKeychainSecretReader(DEFAULT_CLIENT_SECRET_KEYCHAIN_SERVICE);
     this.privateKeySecretStore =
       options.privateKeySecretStore ||
       createOsKeychainSecretReader(DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE);
@@ -173,13 +179,11 @@ export class TokenManager {
   }
 
   private async requestClientSecretToken(env: EnvironmentConfig): Promise<string> {
-    if (!env.clientId || !env.clientSecret) {
-      throw new AuthenticationError(
-        env.name,
-        "clientSecret auth requires clientId and clientSecret",
-      );
+    if (!env.clientId) {
+      throw new AuthenticationError(env.name, "clientSecret auth requires clientId");
     }
 
+    const clientSecret = await this.resolveClientSecret(env);
     const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
     const scope = `${env.url}/.default`;
 
@@ -189,12 +193,74 @@ export class TokenManager {
       new URLSearchParams({
         grant_type: "client_credentials",
         client_id: env.clientId,
-        client_secret: env.clientSecret,
+        client_secret: clientSecret,
         scope,
       }),
     );
 
     return this.storeToken(env, data);
+  }
+
+  private async resolveClientSecret(env: EnvironmentConfig): Promise<string> {
+    const source =
+      env.clientSecretSource ||
+      (env.clientSecretName ? "osKeychain" : env.clientSecretEnv ? "env" : "inline");
+
+    if (source === "inline") {
+      if (!env.clientSecret) {
+        throw new AuthenticationError(
+          env.name,
+          "clientSecret auth with inline clientSecretSource requires clientSecret",
+        );
+      }
+      return env.clientSecret;
+    }
+
+    if (source === "env") {
+      if (!env.clientSecretEnv) {
+        throw new AuthenticationError(
+          env.name,
+          "clientSecret auth with env clientSecretSource requires clientSecretEnv",
+        );
+      }
+
+      const clientSecret = process.env[env.clientSecretEnv];
+      if (!clientSecret) {
+        throw new AuthenticationError(
+          env.name,
+          `Environment variable '${env.clientSecretEnv}' was not found or is empty`,
+        );
+      }
+      return clientSecret;
+    }
+
+    if (source === "osKeychain") {
+      if (!env.clientSecretName) {
+        throw new AuthenticationError(
+          env.name,
+          "clientSecret auth with osKeychain clientSecretSource requires clientSecretName",
+        );
+      }
+
+      const secretStore =
+        env.clientSecretKeychainService &&
+        env.clientSecretKeychainService !== DEFAULT_CLIENT_SECRET_KEYCHAIN_SERVICE
+          ? createOsKeychainSecretReader(env.clientSecretKeychainService)
+          : this.clientSecretStore;
+      const clientSecret = await secretStore.loadSecret(env.clientSecretName);
+      if (!clientSecret) {
+        throw new AuthenticationError(
+          env.name,
+          `Client secret '${env.clientSecretName}' was not found in the OS keychain`,
+        );
+      }
+      return clientSecret;
+    }
+
+    throw new AuthenticationError(
+      env.name,
+      `Unsupported clientSecretSource '${source}'. Use inline, env, or osKeychain.`,
+    );
   }
 
   private async requestClientCertificateToken(env: EnvironmentConfig): Promise<string> {

@@ -88,6 +88,64 @@ Use this if you have an app registration with a client secret.
 }
 ```
 
+For local use, it is better to keep `clientSecret` out of this file. Store it in the OS keychain and keep only a secret name in the config:
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientSecret",
+      "clientId": "your-client-id",
+      "clientSecretSource": "osKeychain",
+      "clientSecretName": "dev-client-secret"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+Default keychain service is `dynamics-365-mcp-client-secrets`. You can override it with `clientSecretKeychainService`.
+
+Store the client secret:
+
+macOS Keychain:
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-secrets -a dev-client-secret -w "your-client-secret"
+```
+
+Linux Secret Service:
+
+```bash
+printf %s "your-client-secret" | secret-tool store --label="Dynamics 365 MCP dev client secret" service dynamics-365-mcp-client-secrets account dev-client-secret
+```
+
+For Windows, store a generic credential in Windows Credential Manager with target `dynamics-365-mcp-client-secrets/dev-client-secret`.
+
+For CI, use an environment variable:
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientSecret",
+      "clientId": "your-client-id",
+      "clientSecretSource": "env",
+      "clientSecretEnv": "D365_DEV_CLIENT_SECRET"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
 ### Option B: Client Certificate Auth
 
 Use this for headless service access when a user cannot sign in. Upload the public certificate to the Entra app registration. Keep the private key file locked down.

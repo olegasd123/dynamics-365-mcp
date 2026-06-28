@@ -105,6 +105,30 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.jso
 }
 ```
 
+For better protection, keep the client secret out of the JSON file. Store it in the OS keychain:
+
+```json
+{
+  "authType": "clientSecret",
+  "clientId": "...",
+  "clientSecretSource": "osKeychain",
+  "clientSecretName": "dev-client-secret"
+}
+```
+
+Default keychain service is `dynamics-365-mcp-client-secrets`. You can override it with `clientSecretKeychainService`.
+
+Or read the client secret from an environment variable:
+
+```json
+{
+  "authType": "clientSecret",
+  "clientId": "...",
+  "clientSecretSource": "env",
+  "clientSecretEnv": "D365_DEV_CLIENT_SECRET"
+}
+```
+
 ### Enable Advanced FetchXML Escape Hatch
 
 `run_fetchxml` is disabled by default. Enable it explicitly in the JSON config when you want a read-only fallback for ad-hoc Dataverse queries.

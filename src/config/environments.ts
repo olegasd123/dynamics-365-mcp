@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { homedir } from "node:os";
 import {
   type AuthType,
+  type ClientSecretSource,
   DEFAULT_DYNAMICS_API_VERSION,
   type AdvancedQueriesConfig,
   type AppConfig,
@@ -22,6 +23,10 @@ interface EnvironmentJsonEntry {
   authType?: string;
   clientId?: string;
   clientSecret?: string;
+  clientSecretSource?: string;
+  clientSecretName?: string;
+  clientSecretEnv?: string;
+  clientSecretKeychainService?: string;
   certificatePath?: string;
   certificateStore?: string;
   certificateStoreThumbprint?: string;
@@ -67,6 +72,11 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
   const url = parts.get("url");
   const clientId = parts.get("clientid");
   const clientSecret = parts.get("clientsecret");
+  const clientSecretSource = parts.get("clientsecretsource");
+  const clientSecretName = parts.get("clientsecretname");
+  const clientSecretEnv =
+    parts.get("clientsecretenv") || parts.get("clientsecretenvironmentvariable");
+  const clientSecretKeychainService = parts.get("clientsecretkeychainservice");
   const certificatePath = parts.get("certificatepath") || parts.get("clientcertificatepath");
   const certificateStore = parts.get("certificatestore");
   const certificateStoreThumbprint = parts.get("certificatestorethumbprint");
@@ -147,19 +157,29 @@ function parseConnectionString(connStr: string): EnvironmentConfig {
     return parsed;
   }
 
-  if (!clientId || !clientSecret) {
-    throw new Error("Client secret auth requires ClientId, ClientSecret, Url, and TenantId");
-  }
+  const clientSecretConfig = {
+    clientId,
+    clientSecret,
+    clientSecretSource,
+    clientSecretName,
+    clientSecretEnv,
+  };
+  validateClientSecretConfig("default", clientSecretConfig);
 
-  return {
+  const parsed: EnvironmentConfig = {
     name: "default",
     url: url.replace(/\/$/, ""),
     apiVersion: DEFAULT_DYNAMICS_API_VERSION,
     tenantId,
     authType: "clientSecret",
     clientId,
-    clientSecret,
   };
+  applyClientSecretConfig(parsed, {
+    ...clientSecretConfig,
+    clientSecretKeychainService,
+  });
+
+  return parsed;
 }
 
 function loadFromConnectionStringsEnv(): AppConfig | null {
@@ -216,10 +236,8 @@ function loadFromJsonFile(filePath: string): AppConfig {
     }
 
     const authType = normalizeAuthType(env.authType);
-    if (authType === "clientSecret" && (!env.clientId || !env.clientSecret)) {
-      throw new Error(
-        `Environment '${env.name}' uses clientSecret auth and must include clientId and clientSecret`,
-      );
+    if (authType === "clientSecret") {
+      validateClientSecretConfig(env.name, env);
     }
     if (authType === "clientCertificate") {
       validateClientCertificateConfig(env.name, env);
@@ -240,6 +258,10 @@ function loadFromJsonFile(filePath: string): AppConfig {
       clientSecret: env.clientSecret,
       redirectUri: env.redirectUri,
     };
+
+    if (authType === "clientSecret") {
+      applyClientSecretConfig(normalized, env);
+    }
 
     if (authType === "clientCertificate") {
       normalized.certificatePath = env.certificatePath;
@@ -282,6 +304,117 @@ function normalizeAuthType(authType: string | undefined): AuthType {
   }
 
   return "clientSecret";
+}
+
+function validateClientSecretConfig(
+  name: string,
+  env: {
+    clientId?: string;
+    clientSecret?: string;
+    clientSecretSource?: string;
+    clientSecretName?: string;
+    clientSecretEnv?: string;
+  },
+): void {
+  if (!env.clientId) {
+    throw new Error(`Environment '${name}' uses clientSecret auth and must include clientId`);
+  }
+
+  const source = normalizeClientSecretSource(env.clientSecretSource, env);
+  if (source === "inline") {
+    if (!env.clientSecret) {
+      throw new Error(
+        `Environment '${name}' uses clientSecret auth with inline clientSecretSource and must include clientSecret`,
+      );
+    }
+    return;
+  }
+
+  if (source === "env") {
+    if (!env.clientSecretEnv) {
+      throw new Error(
+        `Environment '${name}' uses clientSecret auth with env clientSecretSource and must include clientSecretEnv`,
+      );
+    }
+    return;
+  }
+
+  if (!env.clientSecretName) {
+    throw new Error(
+      `Environment '${name}' uses clientSecret auth with osKeychain clientSecretSource and must include clientSecretName`,
+    );
+  }
+}
+
+function applyClientSecretConfig(
+  target: EnvironmentConfig,
+  env: {
+    clientSecret?: string;
+    clientSecretSource?: string;
+    clientSecretName?: string;
+    clientSecretEnv?: string;
+    clientSecretKeychainService?: string;
+  },
+): void {
+  const source = normalizeClientSecretSource(env.clientSecretSource, env);
+
+  if (source === "inline") {
+    target.clientSecret = env.clientSecret;
+    if (env.clientSecretSource) {
+      target.clientSecretSource = source;
+    }
+    return;
+  }
+
+  target.clientSecretSource = source;
+  if (source === "env") {
+    target.clientSecretEnv = env.clientSecretEnv;
+    return;
+  }
+
+  target.clientSecretName = env.clientSecretName;
+  target.clientSecretKeychainService = env.clientSecretKeychainService;
+}
+
+function normalizeClientSecretSource(
+  source: string | undefined,
+  env: {
+    clientSecret?: string;
+    clientSecretName?: string;
+    clientSecretEnv?: string;
+  },
+): ClientSecretSource {
+  const normalizedSource = source?.toLowerCase();
+
+  if (normalizedSource === "inline") {
+    return "inline";
+  }
+
+  if (
+    normalizedSource === "env" ||
+    normalizedSource === "environment" ||
+    normalizedSource === "environmentvariable"
+  ) {
+    return "env";
+  }
+
+  if (normalizedSource === "oskeychain" || normalizedSource === "keychain") {
+    return "osKeychain";
+  }
+
+  if (source) {
+    throw new Error(`Unsupported clientSecretSource '${source}'. Use inline, env, or osKeychain.`);
+  }
+
+  if (env.clientSecretName) {
+    return "osKeychain";
+  }
+
+  if (env.clientSecretEnv) {
+    return "env";
+  }
+
+  return "inline";
 }
 
 function validateClientCertificateConfig(
