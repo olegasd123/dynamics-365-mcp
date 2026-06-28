@@ -116,7 +116,27 @@ For better protection, keep the client secret out of the JSON file. Store it in 
 }
 ```
 
-Default keychain service is `dynamics-365-mcp-client-secrets`. You can override it with `clientSecretKeychainService`.
+Default keychain service is `dynamics-365-mcp-client-certificates`. You can override it with `privateKeyKeychainService`.
+
+Store the PEM key:
+
+macOS Keychain:
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat /secure/prod-client.key)"
+```
+
+Linux Secret Service:
+
+```bash
+secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < /secure/prod-client.key
+```
+
+Windows Credential Manager target:
+
+```powershell
+cmdkey /generic:dynamics-365-mcp-client-secrets/dev-client-secret /user:dev-client-secret /pass:"your-client-secret"
+```
 
 Or read the client secret from an environment variable:
 
@@ -261,24 +281,6 @@ Use this when you want the private key in the OS secret store instead of a plain
   "defaultEnvironment": "prod"
 }
 ```
-
-Default keychain service is `dynamics-365-mcp-client-certificates`. You can override it with `privateKeyKeychainService`.
-
-Store the PEM key:
-
-macOS Keychain:
-
-```bash
-security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat /secure/prod-client.key)"
-```
-
-Linux Secret Service:
-
-```bash
-secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < /secure/prod-client.key
-```
-
-For Windows, prefer the Windows Certificate Store mode below. It can use a non-exportable private key.
 
 #### Client Certificate With Windows Certificate Store
 

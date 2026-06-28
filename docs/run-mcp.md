@@ -124,7 +124,11 @@ Linux Secret Service:
 printf %s "your-client-secret" | secret-tool store --label="Dynamics 365 MCP dev client secret" service dynamics-365-mcp-client-secrets account dev-client-secret
 ```
 
-For Windows, store a generic credential in Windows Credential Manager with target `dynamics-365-mcp-client-secrets/dev-client-secret`.
+Windows Credential Manager:
+
+```powershell
+cmdkey /generic:dynamics-365-mcp-client-secrets/dev-client-secret /user:dev-client-secret /pass:"your-client-secret"
+```
 
 For CI, use an environment variable:
 
