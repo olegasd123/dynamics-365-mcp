@@ -80,6 +80,47 @@ export function listSystemJobsQuery(options?: {
     .toString();
 }
 
+export function summarizeSystemJobsQuery(options: {
+  status?: SystemJobStatus;
+  jobType?: SystemJobType;
+  createdAfter: string;
+  createdBefore: string;
+  top: number;
+}): string {
+  return query()
+    .select([
+      "asyncoperationid",
+      "name",
+      "operationtype",
+      "statecode",
+      "statuscode",
+      "createdon",
+      "startedon",
+      "completedon",
+      "messagename",
+      "primaryentitytype",
+      "friendlymessage",
+      "message",
+      "errorcode",
+      "retrycount",
+      "executiontimespan",
+      "_owningextensionid_value",
+      "_workflowactivationid_value",
+    ])
+    .filter(
+      and(
+        buildSystemJobTypeFilter(options.jobType),
+        buildSystemJobStatusFilter(options.status),
+        rawFilter(`createdon ge ${options.createdAfter}`),
+        rawFilter(`createdon le ${options.createdBefore}`),
+      ),
+    )
+    .orderby("createdon asc")
+    .top(options.top)
+    .count(true)
+    .toString();
+}
+
 export function getSystemJobByIdQuery(): string {
   return query()
     .select([

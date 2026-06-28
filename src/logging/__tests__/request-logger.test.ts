@@ -35,6 +35,7 @@ describe("request logger", () => {
         headers: {
           Authorization: "Bearer secret-token",
         },
+        body: "client_assertion=signed-jwt&client_assertion_type=jwt-bearer",
       });
       requestLogger.logHttpResponse(callId, {
         status: 200,
@@ -66,6 +67,8 @@ describe("request logger", () => {
     expect(text).toContain("CRM REQUEST #1");
     expect(text).toContain("HTTP RESPONSE #1");
     expect(text).toContain('"Authorization": "[REDACTED]"');
+    expect(text).toContain("client_assertion=[REDACTED]");
+    expect(text).not.toContain("signed-jwt");
     expect(text).toContain("TOOL RESPONSE demo_tool");
   });
 

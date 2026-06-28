@@ -16,6 +16,8 @@ Default transport is `stdio`.
 - Access to a Dynamics 365 / Dataverse environment
 - One of these auth options:
   - `clientSecret` auth: tenant ID, client ID, client secret
+  - `clientCertificate` auth: tenant ID, client ID, public certificate, private key
+  - `interactiveBrowser` auth: tenant ID, public client ID, browser sign-in access
   - `deviceCode` auth: tenant ID and browser sign-in access
 
 ## 2. Clone The Repository
@@ -86,7 +88,214 @@ Use this if you have an app registration with a client secret.
 }
 ```
 
-### Option B: Interactive Device Code Auth
+For local use, it is better to keep `clientSecret` out of this file. Store it in the OS keychain and keep only a secret name in the config:
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientSecret",
+      "clientId": "your-client-id",
+      "clientSecretSource": "osKeychain",
+      "clientSecretName": "dev-client-secret"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+Default keychain service is `dynamics-365-mcp-client-secrets`. You can override it with `clientSecretKeychainService`.
+
+Store the client secret:
+
+macOS Keychain:
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-secrets -a dev-client-secret -w "your-client-secret"
+```
+
+Linux Secret Service:
+
+```bash
+printf %s "your-client-secret" | secret-tool store --label="Dynamics 365 MCP dev client secret" service dynamics-365-mcp-client-secrets account dev-client-secret
+```
+
+Windows Credential Manager:
+
+```powershell
+cmdkey /generic:dynamics-365-mcp-client-secrets/dev-client-secret /user:dev-client-secret /pass:"your-client-secret"
+```
+
+For CI, use an environment variable:
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientSecret",
+      "clientId": "your-client-id",
+      "clientSecretSource": "env",
+      "clientSecretEnv": "D365_DEV_CLIENT_SECRET"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+### Option B: Client Certificate Auth
+
+Use this for headless service access when a user cannot sign in. Upload the public certificate to the Entra app registration. Keep the private key file locked down.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientCertificate",
+      "clientId": "your-client-id",
+      "certificatePath": "/secure/client.crt",
+      "privateKeyPath": "/secure/client.key"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+Optional:
+
+- Set `apiVersion` if you need something other than the default `v9.2`.
+- Set `privateKeyPassphrase` if the private key is encrypted.
+- Set `clientCertificateThumbprint` only if you cannot provide `certificatePath`. The value must be the SHA-256 certificate thumbprint in hex or base64url format.
+- Use absolute paths or `~` paths for certificate files.
+
+#### OS Keychain Private Key
+
+Use this when you want the private key in the OS secret store instead of a plain file. The MCP reads the PEM private key from the keychain when it needs to sign a client assertion.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientCertificate",
+      "clientId": "your-client-id",
+      "certificatePath": "/secure/client.crt",
+      "privateKeySource": "osKeychain",
+      "privateKeyName": "prod-client-key"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+Default keychain service is `dynamics-365-mcp-client-certificates`. You can override it with `privateKeyKeychainService`.
+
+Store the PEM key:
+
+macOS Keychain:
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat /secure/client.key)"
+```
+
+Linux Secret Service:
+
+```bash
+secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < /secure/client.key
+```
+
+For Windows, prefer the Windows Certificate Store mode below.
+
+#### Windows Certificate Store
+
+Use this on Windows when the certificate and private key are in `Cert:\CurrentUser\My` or `Cert:\LocalMachine\My`. The MCP asks Windows to sign the assertion with RSA-PSS. It does not read the private key bytes.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "clientCertificate",
+      "clientId": "your-client-id",
+      "certificateStore": "windowsCurrentUser",
+      "certificateStoreThumbprint": "11223344556677889900AABBCCDDEEFF00112233"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+`certificateStoreThumbprint` is the Windows certificate thumbprint used to find the cert. The MCP computes the SHA-256 `x5t#S256` value from the certificate. Use `windowsLocalMachine` if the cert is in `Cert:\LocalMachine\My`.
+
+Example setup in PowerShell:
+
+```powershell
+Import-PfxCertificate -FilePath .\prod-client.pfx -CertStoreLocation Cert:\CurrentUser\My
+Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -Like "*prod-client*" | Select-Object Thumbprint, Subject
+```
+
+Do not use `-Exportable` when importing the PFX if you want the private key to stay non-exportable.
+
+#### Azure Key Vault
+
+Azure Key Vault is a good place to create, store, rotate, and audit certificate keys. This MCP does not yet call Key Vault `Sign` directly at runtime. Use Key Vault to manage the certificate lifecycle, then deploy the private key to one supported runtime store:
+
+- Windows Certificate Store for a non-exportable key
+- OS keychain PEM storage
+- locked-down PEM files
+
+Relevant Microsoft docs:
+
+- [Azure Key Vault certificates](https://learn.microsoft.com/en-us/azure/key-vault/certificates/about-certificates)
+- [Azure Key Vault keys and signing](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys)
+
+### Option C: Interactive Browser PKCE Auth
+
+Use this if the user can sign in in a browser and device-code auth is blocked.
+This uses no client secret.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://your-org.crm.dynamics.com",
+      "apiVersion": "v9.2",
+      "tenantId": "your-tenant-id",
+      "authType": "interactiveBrowser",
+      "clientId": "your-public-client-id",
+      "redirectUri": "http://localhost:8400/callback"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+Optional:
+
+- Set `apiVersion` if you need something other than the default `v9.2`.
+- Set `redirectUri` if your app registration uses a different local callback URI.
+- If `redirectUri` is missing, the server uses `http://localhost:8400/callback`.
+- Browser PKCE tokens are stored in the OS keychain.
+
+### Option D: Interactive Device Code Auth
 
 Use this if you do not have a client secret and can sign in with a user account.
 
@@ -139,6 +348,30 @@ If you also need a client secret:
 2. Create a new client secret
 3. Copy the secret value
 
+### Client ID For Client Certificate Auth
+
+For `clientCertificate` auth, create or use a confidential client app:
+
+1. Open `Microsoft Entra ID`
+2. Open `App registrations`
+3. Create a new app registration or open an existing confidential client app
+4. Copy `Application (client) ID`
+5. Open `Certificates & secrets`
+6. Upload the public certificate
+7. Keep the matching private key on the server that runs this MCP
+
+### Client ID For Browser PKCE Auth
+
+For `interactiveBrowser` auth, create or use a public client app:
+
+1. Open `Microsoft Entra ID`
+2. Open `App registrations`
+3. Create a new app registration or open an existing public client app
+4. Copy `Application (client) ID`
+5. Open `Authentication`
+6. Add a mobile and desktop redirect URI, for example `http://localhost:8400/callback`
+7. Enable public client / mobile and desktop flow if your tenant requires it
+
 ### Client ID For Device Code Auth
 
 For `deviceCode` auth you can:
@@ -172,9 +405,11 @@ node dist/index.js
 
 The server uses `stdio`, so it waits for MCP client input. This is normal.
 
+If you use `interactiveBrowser` auth, the server opens your browser when a tool needs a token. Finish sign-in in the browser. The callback page says when sign-in is complete.
+
 If you use `deviceCode` auth, the server prints sign-in instructions when a tool needs a token. Open the URL shown in the terminal, enter the code, and finish sign-in.
 
-After the first sign-in, the server stores device-code tokens in the OS keychain when the auth response allows it. This means a restart often does not need a new browser sign-in.
+After the first sign-in, the server stores interactive tokens in the OS keychain when the auth response allows it. This means a restart often does not need a new browser sign-in.
 
 Example MCP client config:
 
@@ -389,6 +624,7 @@ Check that `~/.dynamics-365-mcp/config.json` exists and has valid JSON.
 - Check `tenantId`
 - Check the environment `url`
 - For `clientSecret` auth, check `clientId` and `clientSecret`
+- For `interactiveBrowser` auth, check `clientId` and make sure `redirectUri` is allowed in the app registration
 - For `deviceCode` auth, make sure the user account can access the Dataverse environment
 
 ### Build fails

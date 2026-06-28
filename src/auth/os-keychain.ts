@@ -9,6 +9,8 @@ export interface StoredDeviceCodeToken {
   tenantId: string;
   url: string;
   clientId: string;
+  authType?: "deviceCode" | "interactiveBrowser";
+  redirectUri?: string;
   accessToken?: string;
   accessTokenExpiresAt?: number;
   refreshToken?: string;
@@ -27,6 +29,11 @@ export interface DeviceCodeSecretStore {
   load(environmentName: string): Promise<StoredDeviceCodeToken | undefined>;
   save(token: StoredDeviceCodeToken): Promise<void>;
   delete(environmentName: string): Promise<void>;
+  getHealthSnapshot(): KeychainHealthSnapshot;
+}
+
+export interface OsSecretReader {
+  loadSecret(secretName: string): Promise<string | undefined>;
   getHealthSnapshot(): KeychainHealthSnapshot;
 }
 
@@ -58,28 +65,44 @@ class UnsupportedSecretStore implements DeviceCodeSecretStore {
     return undefined;
   }
 
+  async loadSecret(): Promise<string | undefined> {
+    return undefined;
+  }
+
   async save(): Promise<void> {}
 
   async delete(): Promise<void> {}
 }
 
 export function createOsKeychainSecretStore(): DeviceCodeSecretStore {
+  return createOsKeychainStore(DEFAULT_KEYCHAIN_SERVICE);
+}
+
+export function createOsKeychainSecretReader(
+  serviceName = DEFAULT_KEYCHAIN_SERVICE,
+): OsSecretReader {
+  return createOsKeychainStore(serviceName);
+}
+
+function createOsKeychainStore(
+  serviceName: string,
+): OsKeychainSecretStore | UnsupportedSecretStore {
   if (process.platform === "darwin") {
-    return new OsKeychainSecretStore("macos-keychain", DEFAULT_KEYCHAIN_SERVICE);
+    return new OsKeychainSecretStore("macos-keychain", serviceName);
   }
 
   if (process.platform === "linux") {
-    return new OsKeychainSecretStore("linux-secret-service", DEFAULT_KEYCHAIN_SERVICE);
+    return new OsKeychainSecretStore("linux-secret-service", serviceName);
   }
 
   if (process.platform === "win32") {
-    return new OsKeychainSecretStore("windows-credential-manager", DEFAULT_KEYCHAIN_SERVICE);
+    return new OsKeychainSecretStore("windows-credential-manager", serviceName);
   }
 
   return new UnsupportedSecretStore();
 }
 
-class OsKeychainSecretStore implements DeviceCodeSecretStore {
+class OsKeychainSecretStore implements DeviceCodeSecretStore, OsSecretReader {
   private available = true;
   private lastError?: string;
 
@@ -103,6 +126,21 @@ class OsKeychainSecretStore implements DeviceCodeSecretStore {
       const secret = await this.readSecret(environmentName);
       this.clearError();
       return JSON.parse(secret) as StoredDeviceCodeToken;
+    } catch (error) {
+      if (error instanceof SecretNotFoundError) {
+        return undefined;
+      }
+
+      this.recordError(error);
+      return undefined;
+    }
+  }
+
+  async loadSecret(secretName: string): Promise<string | undefined> {
+    try {
+      const secret = await this.readSecret(secretName);
+      this.clearError();
+      return secret;
     } catch (error) {
       if (error instanceof SecretNotFoundError) {
         return undefined;

@@ -5,10 +5,20 @@
     "maxLoggedRequestChars": 240
   },
   "tools": {
+    "access_utilization_report": [
+      {
+        "name": "salesperson access",
+        "arguments": {
+          "environment": "dev",
+          "roleName": "Salesperson",
+          "activeWithinDays": 90,
+          "includeTeams": true
+        }
+      }
+    ],
     "analyze_create_triggers": [
       {
         "name": "account name",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "account",
@@ -538,7 +548,6 @@
     "get_table_record_details": [
       {
         "name": "contact by id",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "contact",
@@ -549,7 +558,6 @@
     "list_audit_history": [
       {
         "name": "contact table audit history",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "contact",
@@ -559,10 +567,36 @@
         }
       }
     ],
+    "record_activity_trends": [
+      {
+        "name": "contact activity trends",
+        "arguments": {
+          "environment": "dev",
+          "tables": ["contact"],
+          "createdAfter": "2026-04-01T00:00:00Z",
+          "createdBefore": "2026-04-30T23:59:59Z",
+          "maxRecords": 5000,
+          "includeEmptyDays": true
+        }
+      }
+    ],
+    "field_change_frequency": [
+      {
+        "name": "contact field change frequency",
+        "arguments": {
+          "environment": "dev",
+          "table": "contact",
+          "createdAfter": "2026-04-01T00:00:00Z",
+          "createdBefore": "2026-04-30T23:59:59Z",
+          "maxRecords": 500,
+          "topFields": 25,
+          "includeSystemUsers": true
+        }
+      }
+    ],
     "get_audit_details": [
       {
         "name": "one contact audit record",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "auditId": "00000000-0000-0000-0000-000000000001"
@@ -596,7 +630,6 @@
     "run_fetchxml": [
       {
         "name": "active accounts escape hatch",
-        "enabled": false,
         "arguments": {
           "environment": "dev",
           "table": "account",
@@ -786,6 +819,20 @@
         }
       }
     ],
+    "summarize_plugin_trace_logs": [
+      {
+        "name": "recent plugin trace summary",
+        "arguments": {
+          "environment": "dev",
+          "pluginName": "Contoso.Plugins.AccountPlugin",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "createdBefore": "2026-04-20T09:00:00Z",
+          "groupBy": "plugin_step",
+          "maxRecords": 1000,
+          "topExceptions": 5
+        }
+      }
+    ],
     "list_system_jobs": [
       {
         "name": "recent failed import jobs",
@@ -796,6 +843,20 @@
           "createdAfter": "2026-04-20T08:00:00Z",
           "failedOnly": true,
           "limit": 10
+        }
+      }
+    ],
+    "summarize_system_jobs": [
+      {
+        "name": "recent system job summary",
+        "arguments": {
+          "environment": "dev",
+          "createdAfter": "2026-04-20T08:00:00Z",
+          "createdBefore": "2026-04-20T09:00:00Z",
+          "groupBy": "category",
+          "bucketMinutes": 60,
+          "maxRecords": 1000,
+          "topMessages": 5
         }
       }
     ],
@@ -935,6 +996,17 @@
         "arguments": {
           "environment": "dev",
           "solution": "Contoso_Core"
+        }
+      }
+    ],
+    "storage_breakdown": [
+      {
+        "name": "core storage signals",
+        "arguments": {
+          "environment": "dev",
+          "tables": ["account", "annotation", "plugintracelog"],
+          "includeColumns": true,
+          "limit": 25
         }
       }
     ]

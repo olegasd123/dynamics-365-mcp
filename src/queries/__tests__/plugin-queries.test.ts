@@ -12,6 +12,7 @@ import {
   listPluginTypesQuery,
   listSdkMessageProcessingStepsQuery,
   listStepsForAssemblyQuery,
+  summarizePluginTraceLogsQuery,
 } from "../plugin-queries.js";
 
 describe("plugin queries", () => {
@@ -158,5 +159,24 @@ describe("plugin queries", () => {
     expect(query).toContain(
       "$select=plugintracelogid,typename,correlationid,createdon,messagename,primaryentity,mode,depth,performanceexecutionduration,performanceconstructorduration,exceptiondetails,messageblock,configuration,secureconfiguration,profile,requestid,operationtype,pluginstepid,issystemcreated,persistencekey",
     );
+  });
+
+  it("builds the plugin trace log summary query", () => {
+    const query = summarizePluginTraceLogsQuery({
+      pluginTypeName: "Contoso.Plugins.AccountPlugin",
+      createdAfter: "2026-04-20T08:00:00.000Z",
+      createdBefore: "2026-04-20T09:00:00.000Z",
+      top: 200,
+    });
+
+    expect(query).toContain(
+      "$select=plugintracelogid,typename,createdon,messagename,primaryentity,mode,performanceexecutionduration,exceptiondetails,pluginstepid",
+    );
+    expect(query).toContain("typename eq 'Contoso.Plugins.AccountPlugin'");
+    expect(query).toContain("createdon ge 2026-04-20T08:00:00.000Z");
+    expect(query).toContain("createdon le 2026-04-20T09:00:00.000Z");
+    expect(query).toContain("$orderby=createdon desc");
+    expect(query).toContain("$top=200");
+    expect(query).toContain("$count=true");
   });
 });

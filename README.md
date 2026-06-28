@@ -15,7 +15,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
 - **Transport**: `stdio` and Streamable HTTP
-- **Auth**: Azure AD OAuth2 — client secret or interactive device code
+- **Auth**: Azure AD OAuth2 — client secret, client certificate, device code, or browser PKCE
 - **Package manager**: npm
 
 ## Architecture
@@ -24,7 +24,7 @@ An MCP (Model Context Protocol) server that exposes Microsoft Dynamics 365 CRM m
 src/
   index.ts                    # Bootstraps config, auth, tools, prompts, resources, and transport
   config/                     # Config loading and runtime env support
-  auth/                       # Client-secret and device-code token flows
+  auth/                       # Client-secret, client-certificate, device-code, and browser PKCE token flows
   client/                     # Dataverse HTTP client, retry policy, and response cache
   http/                       # Streamable HTTP session runtime and health state
   logging/                    # Per-tool request logging and runtime error capture
@@ -95,12 +95,57 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.jso
       "name": "prod",
       "url": "https://prod-org.crm.dynamics.com",
       "tenantId": "...",
-      "authType": "clientSecret",
+      "authType": "clientCertificate",
       "clientId": "...",
-      "clientSecret": "..."
+      "certificatePath": "/secure/prod-client.crt",
+      "privateKeyPath": "/secure/prod-client.key"
     }
   ],
   "defaultEnvironment": "dev"
+}
+```
+
+For better protection, keep the client secret out of the JSON file. Store it in the OS keychain:
+
+```json
+{
+  "authType": "clientSecret",
+  "clientId": "...",
+  "clientSecretSource": "osKeychain",
+  "clientSecretName": "dev-client-secret"
+}
+```
+
+Default keychain service is `dynamics-365-mcp-client-certificates`. You can override it with `privateKeyKeychainService`.
+
+Store the PEM key:
+
+macOS Keychain:
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat /secure/prod-client.key)"
+```
+
+Linux Secret Service:
+
+```bash
+secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < /secure/prod-client.key
+```
+
+Windows Credential Manager target:
+
+```powershell
+cmdkey /generic:dynamics-365-mcp-client-secrets/dev-client-secret /user:dev-client-secret /pass:"your-client-secret"
+```
+
+Or read the client secret from an environment variable:
+
+```json
+{
+  "authType": "clientSecret",
+  "clientId": "...",
+  "clientSecretSource": "env",
+  "clientSecretEnv": "D365_DEV_CLIENT_SECRET"
 }
 ```
 
@@ -136,7 +181,32 @@ Use `allowedEnvironments` when you want the escape hatch available only in lower
 
 When you call `run_fetchxml`, pass row limits through the tool `limit` argument rather than a FetchXML `top` attribute. The server normalizes the outgoing query to use a FetchXML `count` before sending it to Dataverse.
 
-### JSON Config File With Interactive Auth
+### JSON Config File With Browser PKCE Auth
+
+Use this when the user can sign in in a browser and device-code auth is blocked.
+This uses authorization code flow with PKCE and no client secret.
+
+```json
+{
+  "environments": [
+    {
+      "name": "dev",
+      "url": "https://dev-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "interactiveBrowser",
+      "clientId": "...",
+      "redirectUri": "http://localhost:8400/callback"
+    }
+  ],
+  "defaultEnvironment": "dev"
+}
+```
+
+`clientId` must be a public client app. Add the same `redirectUri` to the app registration as a mobile and desktop redirect URI. If `redirectUri` is missing, the server uses `http://localhost:8400/callback`.
+
+Browser PKCE tokens are stored in the OS keychain.
+
+### JSON Config File With Device Code Auth
 
 Use this when the user can sign in in a browser and does not have a client secret.
 
@@ -163,6 +233,100 @@ Device-code tokens are stored in the OS keychain:
 - Linux: Secret Service
 - Windows: Credential Manager
 
+### JSON Config File With Client Certificate Auth
+
+Use this for headless service access when a user cannot sign in. Upload the public certificate to the Entra app registration. Keep the private key file locked down.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://prod-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientCertificate",
+      "clientId": "...",
+      "certificatePath": "/secure/prod-client.crt",
+      "privateKeyPath": "/secure/prod-client.key"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+Optional:
+
+- Set `privateKeyPassphrase` if the private key is encrypted.
+- Set `clientCertificateThumbprint` only if you cannot provide `certificatePath`. The value must be the SHA-256 certificate thumbprint in hex or base64url format.
+- Use absolute paths or `~` paths for certificate files.
+
+#### Client Certificate With OS Keychain Private Key
+
+Use this when you want the private key in the OS secret store instead of a plain file. The MCP reads the PEM private key from the keychain when it needs to sign a client assertion.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://prod-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientCertificate",
+      "clientId": "...",
+      "certificatePath": "/secure/prod-client.crt",
+      "privateKeySource": "osKeychain",
+      "privateKeyName": "prod-client-key"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+#### Client Certificate With Windows Certificate Store
+
+Use this on Windows when the certificate and private key are in `Cert:\CurrentUser\My` or `Cert:\LocalMachine\My`. The MCP asks Windows to sign the assertion with RSA-PSS. It does not read the private key bytes.
+
+```json
+{
+  "environments": [
+    {
+      "name": "prod",
+      "url": "https://prod-org.crm.dynamics.com",
+      "tenantId": "...",
+      "authType": "clientCertificate",
+      "clientId": "...",
+      "certificateStore": "windowsCurrentUser",
+      "certificateStoreThumbprint": "11223344556677889900AABBCCDDEEFF00112233"
+    }
+  ],
+  "defaultEnvironment": "prod"
+}
+```
+
+`certificateStoreThumbprint` is the Windows certificate thumbprint used to find the cert. The MCP computes the SHA-256 `x5t#S256` value from the certificate. Use `windowsLocalMachine` if the cert is in `Cert:\LocalMachine\My`.
+
+Example setup in PowerShell:
+
+```powershell
+Import-PfxCertificate -FilePath .\prod-client.pfx -CertStoreLocation Cert:\CurrentUser\My
+Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -Like "*prod-client*" | Select-Object Thumbprint, Subject
+```
+
+Do not use `-Exportable` when importing the PFX if you want the private key to stay non-exportable.
+
+#### Azure Key Vault
+
+Azure Key Vault is a good place to create, store, rotate, and audit certificate keys. This MCP does not yet call Key Vault `Sign` directly at runtime. Use Key Vault to manage the certificate lifecycle, then deploy the private key to one supported runtime store:
+
+- Windows Certificate Store for a non-exportable key
+- OS keychain PEM storage
+- locked-down PEM files
+
+Relevant Microsoft docs:
+
+- [Azure Key Vault certificates](https://learn.microsoft.com/en-us/azure/key-vault/certificates/about-certificates)
+- [Azure Key Vault keys and signing](https://learn.microsoft.com/en-us/azure/key-vault/keys/about-keys)
+
 ### Connection String (single env)
 
 Via `D365_CONNECTION_STRING` env var:
@@ -171,10 +335,34 @@ Via `D365_CONNECTION_STRING` env var:
 AuthType=ClientSecret;Url=https://org.crm.dynamics.com;ClientId=...;ClientSecret=...;TenantId=...
 ```
 
+Client certificate auth:
+
+```
+AuthType=ClientCertificate;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;CertificatePath=/secure/client.crt;PrivateKeyPath=/secure/client.key
+```
+
+Client certificate auth with OS keychain private key:
+
+```
+AuthType=ClientCertificate;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;CertificatePath=/secure/client.crt;PrivateKeySource=osKeychain;PrivateKeyName=prod-client-key
+```
+
+Client certificate auth with Windows Certificate Store:
+
+```
+AuthType=ClientCertificate;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;CertificateStore=windowsCurrentUser;CertificateStoreThumbprint=11223344556677889900AABBCCDDEEFF00112233
+```
+
 Interactive auth:
 
 ```
 AuthType=DeviceCode;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...
+```
+
+Browser PKCE auth:
+
+```
+AuthType=InteractiveBrowser;Url=https://org.crm.dynamics.com;TenantId=tenant;ClientId=...;RedirectUri=http://localhost:8400/callback
 ```
 
 ### Connection Strings JSON (multiple envs)
@@ -295,89 +483,95 @@ Priority order:
 
 ### Metadata Query Tools
 
-| Tool                                | Description                                                                                                                                                                                                                          | Key Parameters                                                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `find_metadata`                     | Search across common Dynamics 365 metadata objects and suggest the next tool to use.                                                                                                                                                 | `environment`, `query`, `componentType`, `limit`                                                                        |
-| `list_environment_variables`        | List environment variables with definition and current value metadata.                                                                                                                                                               | `environment`, `nameFilter`, `solution`                                                                                 |
-| `get_environment_variable_details`  | Show one environment variable with default and current value details.                                                                                                                                                                | `environment`, `variableName`, `solution`                                                                               |
-| `list_connection_references`        | List connection references with connector and connection status details.                                                                                                                                                             | `environment`, `nameFilter`, `solution`                                                                                 |
-| `get_connection_reference_details`  | Show one connection reference with connector and connection status details.                                                                                                                                                          | `environment`, `referenceName`, `solution`                                                                              |
-| `list_app_modules`                  | List app modules with state and managed status.                                                                                                                                                                                      | `environment`, `nameFilter`, `solution`                                                                                 |
-| `get_app_module_details`            | Show one app module with unique name and state details.                                                                                                                                                                              | `environment`, `appName`, `solution`                                                                                    |
-| `list_dashboards`                   | List dashboards with table, type, and managed status.                                                                                                                                                                                | `environment`, `nameFilter`, `solution`                                                                                 |
-| `get_dashboard_details`             | Show one dashboard with table and managed status details.                                                                                                                                                                            | `environment`, `dashboardName`, `solution`                                                                              |
-| `list_publishers`                   | List Dataverse solution publishers with customization prefixes and option value prefixes.                                                                                                                                            | `environment`, `nameFilter`, `prefixFilter`, `limit`, `cursor`                                                          |
-| `get_publisher_details`             | Show one Dataverse solution publisher with prefix metadata and the solutions that use it.                                                                                                                                            | `environment`, `publisher`                                                                                              |
-| `list_solutions`                    | List Dynamics 365 solutions. Users can later select a solution by display name or unique name.                                                                                                                                       | `environment`, `nameFilter`                                                                                             |
-| `get_solution_details`              | Show a solution summary and list supported components like tables, apps, environment variables, plugins, and web resources.                                                                                                          | `environment`, `solution`                                                                                               |
-| `get_solution_dependencies`         | Show Dataverse dependency links for supported components in one solution.                                                                                                                                                            | `environment`, `solution`, `direction`, `componentType`                                                                 |
-| `get_solution_layers`               | Show the active solution layer stack for one supported solution component to debug why a change is not taking effect.                                                                                                                | `environment`, `solution`, `componentType`, `componentName`                                                             |
-| `list_business_units`               | List business units with parent and state details.                                                                                                                                                                                   | `environment`, `nameFilter`                                                                                             |
-| `get_business_units_details`        | Show one business unit with parent and child context.                                                                                                                                                                                | `environment`, `businessUnitName`                                                                                       |
-| `list_security_roles`               | List security roles with business unit context.                                                                                                                                                                                      | `environment`, `nameFilter`, `businessUnit`                                                                             |
-| `get_role_privileges`               | Show privileges for one security role.                                                                                                                                                                                               | `environment`, `roleName`, `businessUnit`                                                                               |
-| `list_field_security_profiles`      | List field security profiles with secured column grants, solution membership, and user/team counts.                                                                                                                                  | `environment`, `profileName`, `table`, `column`, `solution`, `includeMembers`, `limit`, `cursor`                        |
-| `list_sitemaps`                     | List app sitemaps with navigation counts and managed status.                                                                                                                                                                         | `environment`, `nameFilter`, `solution`, `appName`                                                                      |
-| `get_sitemap_details`               | Show one sitemap with parsed area, group, and subarea navigation details.                                                                                                                                                            | `environment`, `sitemapName`, `appName`, `solution`, `includeRawXml`                                                    |
-| `list_tables`                       | List Dataverse tables with schema flags. Optionally filter by name or solution.                                                                                                                                                      | `environment`, `nameFilter`, `solution`                                                                                 |
-| `get_table_schema`                  | Show table schema details, including columns, alternate keys, and relationships.                                                                                                                                                     | `environment`, `table`, `solution`                                                                                      |
-| `list_table_alternate_keys`         | List Dataverse table alternate keys for one table.                                                                                                                                                                                   | `environment`, `table`, `solution`                                                                                      |
-| `list_duplicate_detection_rules`    | List Dataverse duplicate detection rules, their tables, status, and conditions.                                                                                                                                                      | `environment`, `table`, `status`, `limit`, `cursor`                                                                     |
-| `get_table_message_details`         | Show one SDK message with raw sdkmessagefilter context for one Dataverse table.                                                                                                                                                      | `environment`, `table`, `messageName`                                                                                   |
-| `list_table_messages`               | List platform SDK messages plus bound custom actions and Custom APIs for one Dataverse table.                                                                                                                                        | `environment`, `table`                                                                                                  |
-| `list_table_columns`                | List Dataverse table columns with type, required level, and schema flags.                                                                                                                                                            | `environment`, `table`, `solution`                                                                                      |
-| `list_global_option_sets`           | List Dataverse global option sets (shared choices) separately from column-local option sets.                                                                                                                                         | `environment`, `nameFilter`, `limit`, `cursor`                                                                          |
-| `get_option_set_details`            | Show one Dataverse global option set (shared choice) with full option metadata and labels.                                                                                                                                           | `environment`, `optionSet`                                                                                              |
-| `list_table_relationships`          | List Dataverse table relationships for one table.                                                                                                                                                                                    | `environment`, `table`, `solution`                                                                                      |
-| `list_table_records`                | List Dataverse table records with server-side paging. Defaults to active rows unless you ask for inactive ones.                                                                                                                      | `environment`, `table`, `nameFilter`, `createdWithinDays`, `modifiedWithinDays`, `state`                                |
-| `get_table_record_details`          | Show one Dataverse table record by id or common name fields. Defaults to active rows, returns a compact field set by default, and returns structured choices for ambiguous matches.                                                  | `environment`, `table`, `recordId`, `name`, `firstName`, `lastName`, `state`, `includeAllFields`, `limit`, `cursor`     |
-| `list_audit_history`                | List Dataverse audit history for one table over a time window, or for one record when you provide a row lookup.                                                                                                                      | `environment`, `table`, `recordId`, `name`, `firstName`, `lastName`, `createdAfter`, `createdBefore`, `limit`, `cursor` |
-| `get_audit_details`                 | Show one Dataverse audit record with full detail payload and formatted change sections.                                                                                                                                              | `environment`, `auditId`                                                                                                |
-| `list_forms`                        | List model-driven app forms. Supports main, quick create, and card forms.                                                                                                                                                            | `environment`, `table`, `type`, `solution`                                                                              |
-| `get_form_details`                  | Show one form with a normalized XML summary.                                                                                                                                                                                         | `environment`, `formName`, `table`, `solution`                                                                          |
-| `list_table_ribbons`                | List table ribbons and the buttons available on each ribbon.                                                                                                                                                                         | `environment`, `table`, `location`                                                                                      |
-| `get_ribbon_button_details`         | Show command, rule, and image details for one ribbon button by name or ID.                                                                                                                                                           | `environment`, `table`, `buttonName`, `location`                                                                        |
-| `list_views`                        | List system or personal views with normalized metadata.                                                                                                                                                                              | `environment`, `table`, `scope`, `solution`                                                                             |
-| `get_view_details`                  | Show one view with normalized FetchXML and layout summary.                                                                                                                                                                           | `environment`, `viewName`, `table`, `scope`                                                                             |
-| `get_view_fetchxml`                 | Return normalized FetchXML for one system or personal view.                                                                                                                                                                          | `environment`, `viewName`, `table`, `scope`                                                                             |
-| `list_charts`                       | List Dataverse system or personal charts with table, chart type, and managed status.                                                                                                                                                 | `environment`, `table`, `scope`, `nameFilter`, `solution`, `limit`, `cursor`                                            |
-| `get_chart_details`                 | Show one chart with data XML and presentation XML summary.                                                                                                                                                                           | `environment`, `chartName`, `table`, `scope`, `solution`, `includeRawXml`                                               |
-| `run_fetchxml`                      | Run a read-only FetchXML query against one Dataverse table as an advanced escape hatch. Disabled unless advancedQueries.fetchXml.enabled is true.                                                                                    | `environment`, `table`, `fetchXml`, `limit`                                                                             |
-| `list_plugins`                      | List plugin classes (IPlugin implementations, also called plugin types) registered in Dynamics 365. Workflow activities (CodeActivity) are excluded. Use filter='no_steps' to find orphaned plugin classes with no registered steps. | `environment`, `filter`, `solution`                                                                                     |
-| `list_plugin_steps`                 | List registered steps (message processing steps) for one plugin class in Dynamics 365. Workflow activities (CodeActivity) are excluded.                                                                                              | `environment`, `pluginName`, `assemblyName`, `solution`                                                                 |
-| `get_plugin_details`                | Get detailed information about one plugin class including its assembly, steps, and images. Workflow activities (CodeActivity) are excluded.                                                                                          | `environment`, `pluginName`, `assemblyName`, `solution`                                                                 |
-| `list_plugin_assemblies`            | List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugin assemblies with no registered steps.                                                                                                | `environment`, `filter`, `solution`                                                                                     |
-| `list_plugin_assembly_steps`        | List registered steps (message processing steps) for a plugin assembly in Dynamics 365.                                                                                                                                              | `environment`, `assemblyName`                                                                                           |
-| `list_plugin_assembly_images`       | List pre/post entity images registered on steps for a plugin assembly in Dynamics 365.                                                                                                                                               | `environment`, `assemblyName`, `stepName`, `message`                                                                    |
-| `list_sdk_message_processing_steps` | List SDK message processing steps org-wide for a Dataverse message and optional table.                                                                                                                                               | `environment`, `message`, `primaryEntity`, `stage`, `mode`, `statecode`, `includeImages`                                |
-| `get_plugin_assembly_details`       | Get detailed information about a plugin assembly. Output separates plugin classes and workflow activities.                                                                                                                           | `environment`, `assemblyName`                                                                                           |
-| `list_plugin_trace_logs`            | List Dataverse plug-in trace logs with filters for plugin class, correlation id, time range, and exception presence.                                                                                                                 | `environment`, `pluginName`, `correlationId`, `createdAfter`, `createdBefore`, `hasException`, `limit`, `cursor`        |
-| `get_plugin_trace_log_details`      | Show one Dataverse plug-in trace log with full runtime details.                                                                                                                                                                      | `environment`, `pluginTraceLogId`                                                                                       |
-| `list_system_jobs`                  | List Dataverse system jobs with filters for runtime status, job type, time range, and failures.                                                                                                                                      | `environment`, `status`, `jobType`, `correlationId`, `createdAfter`, `completedAfter`, `failedOnly`, `limit`, `cursor`  |
-| `get_system_job_details`            | Show one Dataverse system job with runtime status, message details, and related workflow, plug-in, or bulk delete context.                                                                                                           | `environment`, `systemJobId`                                                                                            |
-| `list_workflows`                    | List workflows and processes in Dynamics 365 with their status.                                                                                                                                                                      | `environment`, `category`, `status`, `solution`                                                                         |
-| `list_actions`                      | List custom actions registered in Dynamics 365.                                                                                                                                                                                      | `environment`, `solution`                                                                                               |
-| `get_workflow_details`              | Get detailed information about a specific workflow including triggers, scope, and definition. `uniqueName` also accepts a workflow id.                                                                                               | `environment`, `workflowName`, `uniqueName`                                                                             |
-| `get_bpf_details`                   | Show business process flow details including stages, inferred business fields, backing table, and runtime-state behavior.                                                                                                            | `environment`, `workflowName`, `uniqueName`                                                                             |
-| `list_web_resources`                | List web resources in Dynamics 365, optionally filtered by type or name.                                                                                                                                                             | `environment`, `type`, `nameFilter`, `solution`                                                                         |
-| `get_web_resource_content`          | Fetch the content of a specific web resource from Dynamics 365 by name or web resource id.                                                                                                                                           | `environment`, `name`                                                                                                   |
-| `list_email_templates`              | List Dataverse email templates with type, scope, language, and solution filters.                                                                                                                                                     | `environment`, `nameFilter`, `templateTypeCode`, `scope`, `languageCode`, `solution`, `limit`, `cursor`                 |
-| `get_email_template_details`        | Show one email template with subject, content hashes, placeholders, and optional raw content.                                                                                                                                        | `environment`, `templateName`, `templateTypeCode`, `scope`, `languageCode`, `solution`, `includeRawContent`             |
-| `list_document_templates`           | List Dataverse document templates with document type, table, status, and language filters.                                                                                                                                           | `environment`, `nameFilter`, `associatedEntityTypeCode`, `documentType`, `status`, `languageCode`, `limit`, `cursor`    |
-| `get_document_template_details`     | Show one document template with metadata, content hashes, and optional base64 content.                                                                                                                                               | `environment`, `templateName`, `associatedEntityTypeCode`, `documentType`, `status`, `languageCode`, `includeContent`   |
-| `list_custom_apis`                  | List Dataverse Custom APIs with binding and execution settings.                                                                                                                                                                      | `environment`, `nameFilter`                                                                                             |
-| `get_custom_api_details`            | Show one Custom API with request and response metadata.                                                                                                                                                                              | `environment`, `apiName`                                                                                                |
-| `list_cloud_flows`                  | List cloud flows stored in Dataverse workflow metadata.                                                                                                                                                                              | `environment`, `status`, `solution`                                                                                     |
-| `get_flow_details`                  | Show cloud flow metadata and a parsed summary of triggers, actions, and connections.                                                                                                                                                 | `environment`, `flowName`, `solution`                                                                                   |
-| `find_table_usage`                  | Find where one Dataverse table is used across metadata assets.                                                                                                                                                                       | `environment`, `table`                                                                                                  |
-| `find_column_usage`                 | Find where one Dataverse column is used across metadata assets.                                                                                                                                                                      | `environment`, `column`, `table`                                                                                        |
-| `find_web_resource_usage`           | Find where one web resource is used in forms and other text web resources. `name` can be a web resource name or id.                                                                                                                  | `environment`, `name`                                                                                                   |
-| `find_workflow_activity_usage`      | Find workflow processes (category Workflow) whose XAML or clientdata references a custom workflow activity (`CodeActivity`) class.                                                                                                   | `environment`, `className`, `solution`, `status`                                                                        |
-| `analyze_create_triggers`           | Analyze what direct create triggers can run for a Dataverse table create.                                                                                                                                                            | `environment`, `table`, `providedAttributes`                                                                            |
-| `analyze_update_triggers`           | Analyze what direct update triggers can run for a Dataverse table change.                                                                                                                                                            | `environment`, `table`, `changedAttributes`                                                                             |
-| `analyze_impact`                    | Analyze likely impact for a table, column, plugin assembly, workflow, cloud flow, web resource, or solution.                                                                                                                         | `environment`, `componentType`, `name`                                                                                  |
-| `environment_health_report`         | Build a health report for one environment or one solution in one environment.                                                                                                                                                        | `environment`, `solution`                                                                                               |
-| `release_gate_report`               | Build an opinionated go or no-go report for moving one solution.                                                                                                                                                                     | `environment`, `solution`, `targetEnvironment`, `strict`                                                                |
+| Tool                                | Description                                                                                                                                                                                                                          | Key Parameters                                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `find_metadata`                     | Search across common Dynamics 365 metadata objects and suggest the next tool to use.                                                                                                                                                 | `environment`, `query`, `componentType`, `limit`                                                                             |
+| `list_environment_variables`        | List environment variables with definition and current value metadata.                                                                                                                                                               | `environment`, `nameFilter`, `solution`                                                                                      |
+| `get_environment_variable_details`  | Show one environment variable with default and current value details.                                                                                                                                                                | `environment`, `variableName`, `solution`                                                                                    |
+| `list_connection_references`        | List connection references with connector and connection status details.                                                                                                                                                             | `environment`, `nameFilter`, `solution`                                                                                      |
+| `get_connection_reference_details`  | Show one connection reference with connector and connection status details.                                                                                                                                                          | `environment`, `referenceName`, `solution`                                                                                   |
+| `list_app_modules`                  | List app modules with state and managed status.                                                                                                                                                                                      | `environment`, `nameFilter`, `solution`                                                                                      |
+| `get_app_module_details`            | Show one app module with unique name and state details.                                                                                                                                                                              | `environment`, `appName`, `solution`                                                                                         |
+| `list_dashboards`                   | List dashboards with table, type, and managed status.                                                                                                                                                                                | `environment`, `nameFilter`, `solution`                                                                                      |
+| `get_dashboard_details`             | Show one dashboard with table and managed status details.                                                                                                                                                                            | `environment`, `dashboardName`, `solution`                                                                                   |
+| `list_publishers`                   | List Dataverse solution publishers with customization prefixes and option value prefixes.                                                                                                                                            | `environment`, `nameFilter`, `prefixFilter`, `limit`, `cursor`                                                               |
+| `get_publisher_details`             | Show one Dataverse solution publisher with prefix metadata and the solutions that use it.                                                                                                                                            | `environment`, `publisher`                                                                                                   |
+| `list_solutions`                    | List Dynamics 365 solutions. Users can later select a solution by display name or unique name.                                                                                                                                       | `environment`, `nameFilter`                                                                                                  |
+| `get_solution_details`              | Show a solution summary and list supported components like tables, apps, environment variables, plugins, and web resources.                                                                                                          | `environment`, `solution`                                                                                                    |
+| `get_solution_dependencies`         | Show Dataverse dependency links for supported components in one solution.                                                                                                                                                            | `environment`, `solution`, `direction`, `componentType`                                                                      |
+| `get_solution_layers`               | Show the active solution layer stack for one supported solution component to debug why a change is not taking effect.                                                                                                                | `environment`, `solution`, `componentType`, `componentName`                                                                  |
+| `list_business_units`               | List business units with parent and state details.                                                                                                                                                                                   | `environment`, `nameFilter`                                                                                                  |
+| `get_business_units_details`        | Show one business unit with parent and child context.                                                                                                                                                                                | `environment`, `businessUnitName`                                                                                            |
+| `list_security_roles`               | List security roles with business unit context.                                                                                                                                                                                      | `environment`, `nameFilter`, `businessUnit`                                                                                  |
+| `get_role_privileges`               | Show privileges for one security role.                                                                                                                                                                                               | `environment`, `roleName`, `businessUnit`                                                                                    |
+| `list_field_security_profiles`      | List field security profiles with secured column grants, solution membership, and user/team counts.                                                                                                                                  | `environment`, `profileName`, `table`, `column`, `solution`, `includeMembers`, `limit`, `cursor`                             |
+| `list_sitemaps`                     | List app sitemaps with navigation counts and managed status.                                                                                                                                                                         | `environment`, `nameFilter`, `solution`, `appName`                                                                           |
+| `get_sitemap_details`               | Show one sitemap with parsed area, group, and subarea navigation details.                                                                                                                                                            | `environment`, `sitemapName`, `appName`, `solution`, `includeRawXml`                                                         |
+| `list_tables`                       | List Dataverse tables with schema flags. Optionally filter by name or solution.                                                                                                                                                      | `environment`, `nameFilter`, `solution`                                                                                      |
+| `get_table_schema`                  | Show table schema details, including columns, alternate keys, and relationships.                                                                                                                                                     | `environment`, `table`, `solution`                                                                                           |
+| `list_table_alternate_keys`         | List Dataverse table alternate keys for one table.                                                                                                                                                                                   | `environment`, `table`, `solution`                                                                                           |
+| `list_duplicate_detection_rules`    | List Dataverse duplicate detection rules, their tables, status, and conditions.                                                                                                                                                      | `environment`, `table`, `status`, `limit`, `cursor`                                                                          |
+| `get_table_message_details`         | Show one SDK message with raw sdkmessagefilter context for one Dataverse table.                                                                                                                                                      | `environment`, `table`, `messageName`                                                                                        |
+| `list_table_messages`               | List platform SDK messages plus bound custom actions and Custom APIs for one Dataverse table.                                                                                                                                        | `environment`, `table`                                                                                                       |
+| `list_table_columns`                | List Dataverse table columns with type, required level, and schema flags.                                                                                                                                                            | `environment`, `table`, `solution`                                                                                           |
+| `list_global_option_sets`           | List Dataverse global option sets (shared choices) separately from column-local option sets.                                                                                                                                         | `environment`, `nameFilter`, `limit`, `cursor`                                                                               |
+| `get_option_set_details`            | Show one Dataverse global option set (shared choice) with full option metadata and labels.                                                                                                                                           | `environment`, `optionSet`                                                                                                   |
+| `list_table_relationships`          | List Dataverse table relationships for one table.                                                                                                                                                                                    | `environment`, `table`, `solution`                                                                                           |
+| `list_table_records`                | List Dataverse table records with server-side paging. Defaults to active rows unless you ask for inactive ones.                                                                                                                      | `environment`, `table`, `nameFilter`, `createdWithinDays`, `modifiedWithinDays`, `state`                                     |
+| `get_table_record_details`          | Show one Dataverse table record by id or common name fields. Defaults to active rows, returns a compact field set by default, and returns structured choices for ambiguous matches.                                                  | `environment`, `table`, `recordId`, `name`, `firstName`, `lastName`, `state`, `includeAllFields`, `limit`, `cursor`          |
+| `list_audit_history`                | List Dataverse audit history for one table over a time window, or for one record when you provide a row lookup.                                                                                                                      | `environment`, `table`, `recordId`, `name`, `firstName`, `lastName`, `createdAfter`, `createdBefore`, `limit`, `cursor`      |
+| `record_activity_trends`            | Report audit-based created, modified, and deleted record activity counts per table per day.                                                                                                                                          | `environment`, `tables`, `createdAfter`, `createdBefore`, `maxRecords`, `includeEmptyDays`                                   |
+| `field_change_frequency`            | Rank table fields by audit-based edit frequency, with distinct records, distinct users, actor hints, and audit coverage warnings.                                                                                                    | `environment`, `table`, `createdAfter`, `createdBefore`, `maxRecords`, `topFields`, `includeSystemUsers`                     |
+| `get_audit_details`                 | Show one Dataverse audit record with full detail payload and formatted change sections.                                                                                                                                              | `environment`, `auditId`                                                                                                     |
+| `list_forms`                        | List model-driven app forms. Supports main, quick create, and card forms.                                                                                                                                                            | `environment`, `table`, `type`, `solution`                                                                                   |
+| `get_form_details`                  | Show one form with a normalized XML summary.                                                                                                                                                                                         | `environment`, `formName`, `table`, `solution`                                                                               |
+| `list_table_ribbons`                | List table ribbons and the buttons available on each ribbon.                                                                                                                                                                         | `environment`, `table`, `location`                                                                                           |
+| `get_ribbon_button_details`         | Show command, rule, and image details for one ribbon button by name or ID.                                                                                                                                                           | `environment`, `table`, `buttonName`, `location`                                                                             |
+| `list_views`                        | List system or personal views with normalized metadata.                                                                                                                                                                              | `environment`, `table`, `scope`, `solution`                                                                                  |
+| `get_view_details`                  | Show one view with normalized FetchXML and layout summary.                                                                                                                                                                           | `environment`, `viewName`, `table`, `scope`                                                                                  |
+| `get_view_fetchxml`                 | Return normalized FetchXML for one system or personal view.                                                                                                                                                                          | `environment`, `viewName`, `table`, `scope`                                                                                  |
+| `list_charts`                       | List Dataverse system or personal charts with table, chart type, and managed status.                                                                                                                                                 | `environment`, `table`, `scope`, `nameFilter`, `solution`, `limit`, `cursor`                                                 |
+| `get_chart_details`                 | Show one chart with data XML and presentation XML summary.                                                                                                                                                                           | `environment`, `chartName`, `table`, `scope`, `solution`, `includeRawXml`                                                    |
+| `run_fetchxml`                      | Run a read-only FetchXML query against one Dataverse table as an advanced escape hatch. Disabled unless advancedQueries.fetchXml.enabled is true.                                                                                    | `environment`, `table`, `fetchXml`, `limit`                                                                                  |
+| `list_plugins`                      | List plugin classes (IPlugin implementations, also called plugin types) registered in Dynamics 365. Workflow activities (CodeActivity) are excluded. Use filter='no_steps' to find orphaned plugin classes with no registered steps. | `environment`, `filter`, `solution`                                                                                          |
+| `list_plugin_steps`                 | List registered steps (message processing steps) for one plugin class in Dynamics 365. Workflow activities (CodeActivity) are excluded.                                                                                              | `environment`, `pluginName`, `assemblyName`, `solution`                                                                      |
+| `get_plugin_details`                | Get detailed information about one plugin class including its assembly, steps, and images. Workflow activities (CodeActivity) are excluded.                                                                                          | `environment`, `pluginName`, `assemblyName`, `solution`                                                                      |
+| `list_plugin_assemblies`            | List plugin assemblies registered in Dynamics 365. Use filter='no_steps' to find orphaned plugin assemblies with no registered steps.                                                                                                | `environment`, `filter`, `solution`                                                                                          |
+| `list_plugin_assembly_steps`        | List registered steps (message processing steps) for a plugin assembly in Dynamics 365.                                                                                                                                              | `environment`, `assemblyName`                                                                                                |
+| `list_plugin_assembly_images`       | List pre/post entity images registered on steps for a plugin assembly in Dynamics 365.                                                                                                                                               | `environment`, `assemblyName`, `stepName`, `message`                                                                         |
+| `list_sdk_message_processing_steps` | List SDK message processing steps org-wide for a Dataverse message and optional table.                                                                                                                                               | `environment`, `message`, `primaryEntity`, `stage`, `mode`, `statecode`, `includeImages`                                     |
+| `get_plugin_assembly_details`       | Get detailed information about a plugin assembly. Output separates plugin classes and workflow activities.                                                                                                                           | `environment`, `assemblyName`                                                                                                |
+| `list_plugin_trace_logs`            | List Dataverse plug-in trace logs with filters for plugin class, correlation id, time range, and exception presence.                                                                                                                 | `environment`, `pluginName`, `correlationId`, `createdAfter`, `createdBefore`, `hasException`, `limit`, `cursor`             |
+| `summarize_plugin_trace_logs`       | Summarize Dataverse plug-in trace logs over a time window with counts, duration percentiles, failure rate, and top exception messages.                                                                                               | `environment`, `pluginName`, `createdAfter`, `createdBefore`, `groupBy`, `maxRecords`, `topExceptions`                       |
+| `get_plugin_trace_log_details`      | Show one Dataverse plug-in trace log with full runtime details.                                                                                                                                                                      | `environment`, `pluginTraceLogId`                                                                                            |
+| `list_system_jobs`                  | List Dataverse system jobs with filters for runtime status, job type, time range, and failures.                                                                                                                                      | `environment`, `status`, `jobType`, `correlationId`, `createdAfter`, `completedAfter`, `failedOnly`, `limit`, `cursor`       |
+| `summarize_system_jobs`             | Summarize Dataverse system jobs over a time window with status counts, runtime stats, grouped failures, and estimated queue depth.                                                                                                   | `environment`, `createdAfter`, `createdBefore`, `jobType`, `status`, `groupBy`, `bucketMinutes`, `maxRecords`, `topMessages` |
+| `get_system_job_details`            | Show one Dataverse system job with runtime status, message details, and related workflow, plug-in, or bulk delete context.                                                                                                           | `environment`, `systemJobId`                                                                                                 |
+| `list_workflows`                    | List workflows and processes in Dynamics 365 with their status.                                                                                                                                                                      | `environment`, `category`, `status`, `solution`                                                                              |
+| `list_actions`                      | List custom actions registered in Dynamics 365.                                                                                                                                                                                      | `environment`, `solution`                                                                                                    |
+| `get_workflow_details`              | Get detailed information about a specific workflow including triggers, scope, and definition. `uniqueName` also accepts a workflow id.                                                                                               | `environment`, `workflowName`, `uniqueName`                                                                                  |
+| `get_bpf_details`                   | Show business process flow details including stages, inferred business fields, backing table, and runtime-state behavior.                                                                                                            | `environment`, `workflowName`, `uniqueName`                                                                                  |
+| `list_web_resources`                | List web resources in Dynamics 365, optionally filtered by type or name.                                                                                                                                                             | `environment`, `type`, `nameFilter`, `solution`                                                                              |
+| `get_web_resource_content`          | Fetch the content of a specific web resource from Dynamics 365 by name or web resource id.                                                                                                                                           | `environment`, `name`                                                                                                        |
+| `list_email_templates`              | List Dataverse email templates with type, scope, language, and solution filters.                                                                                                                                                     | `environment`, `nameFilter`, `templateTypeCode`, `scope`, `languageCode`, `solution`, `limit`, `cursor`                      |
+| `get_email_template_details`        | Show one email template with subject, content hashes, placeholders, and optional raw content.                                                                                                                                        | `environment`, `templateName`, `templateTypeCode`, `scope`, `languageCode`, `solution`, `includeRawContent`                  |
+| `list_document_templates`           | List Dataverse document templates with document type, table, status, and language filters.                                                                                                                                           | `environment`, `nameFilter`, `associatedEntityTypeCode`, `documentType`, `status`, `languageCode`, `limit`, `cursor`         |
+| `get_document_template_details`     | Show one document template with metadata, content hashes, and optional base64 content.                                                                                                                                               | `environment`, `templateName`, `associatedEntityTypeCode`, `documentType`, `status`, `languageCode`, `includeContent`        |
+| `list_custom_apis`                  | List Dataverse Custom APIs with binding and execution settings.                                                                                                                                                                      | `environment`, `nameFilter`                                                                                                  |
+| `get_custom_api_details`            | Show one Custom API with request and response metadata.                                                                                                                                                                              | `environment`, `apiName`                                                                                                     |
+| `list_cloud_flows`                  | List cloud flows stored in Dataverse workflow metadata.                                                                                                                                                                              | `environment`, `status`, `solution`                                                                                          |
+| `get_flow_details`                  | Show cloud flow metadata and a parsed summary of triggers, actions, and connections.                                                                                                                                                 | `environment`, `flowName`, `solution`                                                                                        |
+| `access_utilization_report`         | Report assigned versus audit-active users by security role or app module access.                                                                                                                                                     | `environment`, `roleName`, `appName`, `businessUnit`, `includeTeams`, `activeWithinDays`, `maxUsers`                         |
+| `find_table_usage`                  | Find where one Dataverse table is used across metadata assets.                                                                                                                                                                       | `environment`, `table`                                                                                                       |
+| `find_column_usage`                 | Find where one Dataverse column is used across metadata assets.                                                                                                                                                                      | `environment`, `column`, `table`                                                                                             |
+| `find_web_resource_usage`           | Find where one web resource is used in forms and other text web resources. `name` can be a web resource name or id.                                                                                                                  | `environment`, `name`                                                                                                        |
+| `find_workflow_activity_usage`      | Find workflow processes (category Workflow) whose XAML or clientdata references a custom workflow activity (`CodeActivity`) class.                                                                                                   | `environment`, `className`, `solution`, `status`                                                                             |
+| `analyze_create_triggers`           | Analyze what direct create triggers can run for a Dataverse table create.                                                                                                                                                            | `environment`, `table`, `providedAttributes`                                                                                 |
+| `analyze_update_triggers`           | Analyze what direct update triggers can run for a Dataverse table change.                                                                                                                                                            | `environment`, `table`, `changedAttributes`                                                                                  |
+| `analyze_impact`                    | Analyze likely impact for a table, column, plugin assembly, workflow, cloud flow, web resource, or solution.                                                                                                                         | `environment`, `componentType`, `name`                                                                                       |
+| `storage_breakdown`                 | Estimate Dataverse storage drivers by table using organization context, table row counts, and storage type signals.                                                                                                                  | `environment`, `tables`, `limit`, `includeColumns`, `columnScanLimit`                                                        |
+| `environment_health_report`         | Build a health report for one environment or one solution in one environment.                                                                                                                                                        | `environment`, `solution`                                                                                                    |
+| `release_gate_report`               | Build an opinionated go or no-go report for moving one solution.                                                                                                                                                                     | `environment`, `solution`, `targetEnvironment`, `strict`                                                                     |
 
 ### Cross-Environment Comparison Tools
 
@@ -637,6 +831,25 @@ Use this when metadata looks correct but the runtime still fails and you need re
 }
 ```
 
+### Summarize Plugin Trace Logs
+
+Use this to find busy, slow, or failing plugin steps over a recent time window.
+
+```json
+{
+  "tool": "summarize_plugin_trace_logs",
+  "arguments": {
+    "environment": "dev",
+    "pluginName": "Contoso.Plugins.AccountPlugin",
+    "createdAfter": "2026-04-20T08:00:00Z",
+    "createdBefore": "2026-04-20T09:00:00Z",
+    "groupBy": "plugin_step",
+    "maxRecords": 1000,
+    "topExceptions": 5
+  }
+}
+```
+
 ### Get One Plugin Trace Log
 
 Use this when you already have one `pluginTraceLogId` from `list_plugin_trace_logs` and need the full exception and trace text.
@@ -761,7 +974,7 @@ Use this when you want one report that combines direct usage and dependency risk
 
 1. Tool receives request with environment name
 2. `TokenManager.getToken(envName)` checks in-memory cache
-3. For `deviceCode` auth, check the OS keychain for a saved token
+3. For `deviceCode` and `interactiveBrowser` auth, check the OS keychain for a saved token
 4. If a valid access token exists, return it
 5. If a stored refresh token exists, try silent refresh before asking the user to sign in again
 6. For `clientSecret` auth, POST to `https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token` with:
@@ -769,8 +982,10 @@ Use this when you want one report that combines direct usage and dependency risk
    - `client_id={clientId}`
    - `client_secret={clientSecret}`
    - `scope={orgUrl}/.default`
-7. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
-8. Cache the new access token in memory and save device-code tokens in the OS keychain when possible
+7. For `clientCertificate` auth, build a PS256 `private_key_jwt` client assertion with the certificate SHA-256 thumbprint, then POST the client credentials request with `client_assertion_type` and `client_assertion`
+8. For `interactiveBrowser` auth, if silent refresh is not possible, start a local callback server, open the browser, and exchange the authorization code with PKCE
+9. For `deviceCode` auth, if silent refresh is not possible, ask Entra for a device code, print the sign-in text to `stderr`, then poll the token endpoint until the user finishes sign-in
+10. Cache the new access token in memory and save interactive tokens in the OS keychain when possible
 
 ## Cross-Environment Comparison Design
 

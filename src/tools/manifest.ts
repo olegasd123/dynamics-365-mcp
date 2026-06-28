@@ -19,8 +19,10 @@ import { listSdkMessageProcessingStepsTool } from "./plugins/list-sdk-message-pr
 import { getPluginAssemblyDetailsTool } from "./plugins/get-plugin-assembly-details.js";
 import { getPluginTraceLogDetailsTool } from "./plugins/get-plugin-trace-log-details.js";
 import { listPluginTraceLogsTool } from "./plugins/list-plugin-trace-logs.js";
+import { summarizePluginTraceLogsTool } from "./plugins/summarize-plugin-trace-logs.js";
 import { getSystemJobDetailsTool } from "./system-jobs/get-system-job-details.js";
 import { listSystemJobsTool } from "./system-jobs/list-system-jobs.js";
+import { summarizeSystemJobsTool } from "./system-jobs/summarize-system-jobs.js";
 import { listWorkflowsTool } from "./workflows/list-workflows.js";
 import { listActionsTool } from "./workflows/list-actions.js";
 import { getWorkflowDetailsTool } from "./workflows/get-workflow-details.js";
@@ -47,6 +49,8 @@ import { listTableRecordsTool } from "./data/list-table-records.js";
 import { getTableRecordDetailsTool } from "./data/get-table-record-details.js";
 import { listAuditHistoryTool } from "./auditing/list-audit-history.js";
 import { getAuditDetailsTool } from "./auditing/get-audit-details.js";
+import { recordActivityTrendsTool } from "./auditing/record-activity-trends.js";
+import { fieldChangeFrequencyTool } from "./auditing/field-change-frequency.js";
 import { listFormsTool } from "./forms/list-forms.js";
 import { getFormDetailsTool } from "./forms/get-form-details.js";
 import { listTableRibbonsTool } from "./ribbons/list-table-ribbons.js";
@@ -69,6 +73,7 @@ import { getBusinessUnitsDetailsTool } from "./security/get-business-units-detai
 import { listSecurityRolesTool } from "./security/list-security-roles.js";
 import { getRolePrivilegesTool } from "./security/get-role-privileges.js";
 import { listFieldSecurityProfilesTool } from "./security/list-field-security-profiles.js";
+import { accessUtilizationReportTool } from "./security/access-utilization-report.js";
 import { findTableUsageTool } from "./usage/find-table-usage.js";
 import { findColumnUsageTool } from "./usage/find-column-usage.js";
 import { findWebResourceUsageTool } from "./usage/find-web-resource-usage.js";
@@ -76,6 +81,7 @@ import { findWorkflowActivityUsageTool } from "./usage/find-workflow-activity-us
 import { analyzeCreateTriggersTool } from "./usage/analyze-create-triggers.js";
 import { analyzeUpdateTriggersTool } from "./usage/analyze-update-triggers.js";
 import { analyzeImpactTool } from "./impact/analyze-impact.js";
+import { storageBreakdownTool } from "./storage/storage-breakdown.js";
 import { environmentHealthReportTool } from "./health/environment-health-report.js";
 import { releaseGateReportTool } from "./health/release-gate-report.js";
 import { comparePluginAssembliesTool } from "./comparison/compare-plugin-assemblies.js";
@@ -274,6 +280,19 @@ export const TOOL_MANIFEST = [
     ],
   },
   {
+    ...summarizePluginTraceLogsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "pluginName",
+      "createdAfter",
+      "createdBefore",
+      "groupBy",
+      "maxRecords",
+      "topExceptions",
+    ],
+  },
+  {
     ...getPluginTraceLogDetailsTool,
     group: "automation_runtime",
     mainParams: ["environment", "pluginTraceLogId"],
@@ -291,6 +310,21 @@ export const TOOL_MANIFEST = [
       "failedOnly",
       "limit",
       "cursor",
+    ],
+  },
+  {
+    ...summarizeSystemJobsTool,
+    group: "automation_runtime",
+    mainParams: [
+      "environment",
+      "createdAfter",
+      "createdBefore",
+      "jobType",
+      "status",
+      "groupBy",
+      "bucketMinutes",
+      "maxRecords",
+      "topMessages",
     ],
   },
   {
@@ -450,6 +484,31 @@ export const TOOL_MANIFEST = [
       "createdBefore",
       "limit",
       "cursor",
+    ],
+  },
+  {
+    ...recordActivityTrendsTool,
+    group: "schema_ui",
+    mainParams: [
+      "environment",
+      "tables",
+      "createdAfter",
+      "createdBefore",
+      "maxRecords",
+      "includeEmptyDays",
+    ],
+  },
+  {
+    ...fieldChangeFrequencyTool,
+    group: "schema_ui",
+    mainParams: [
+      "environment",
+      "table",
+      "createdAfter",
+      "createdBefore",
+      "maxRecords",
+      "topFields",
+      "includeSystemUsers",
     ],
   },
   {
@@ -617,6 +676,19 @@ export const TOOL_MANIFEST = [
     ],
   },
   {
+    ...accessUtilizationReportTool,
+    group: "usage_analysis",
+    mainParams: [
+      "environment",
+      "roleName",
+      "appName",
+      "businessUnit",
+      "includeTeams",
+      "activeWithinDays",
+      "maxUsers",
+    ],
+  },
+  {
     ...findTableUsageTool,
     group: "usage_analysis",
     mainParams: ["environment", "table"],
@@ -650,6 +722,11 @@ export const TOOL_MANIFEST = [
     ...analyzeImpactTool,
     group: "usage_analysis",
     mainParams: ["environment", "componentType", "name"],
+  },
+  {
+    ...storageBreakdownTool,
+    group: "health",
+    mainParams: ["environment", "tables", "limit", "includeColumns", "columnScanLimit"],
   },
   {
     ...environmentHealthReportTool,

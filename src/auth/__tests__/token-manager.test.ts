@@ -1,8 +1,18 @@
+import { constants, generateKeyPairSync, sign as cryptoSign, verify } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthenticationError, TokenManager } from "../token-manager.js";
-import type { DeviceCodeSecretStore, StoredDeviceCodeToken } from "../os-keychain.js";
+import type {
+  DeviceCodeSecretStore,
+  OsSecretReader,
+  StoredDeviceCodeToken,
+} from "../os-keychain.js";
 
 const originalFetch = global.fetch;
+const originalEnv = { ...process.env };
+const tempDirs: string[] = [];
 
 const environment = {
   name: "dev",
@@ -53,6 +63,22 @@ function createMemorySecretStore(
   };
 }
 
+function createMemoryPrivateKeyStore(secrets: Record<string, string>): OsSecretReader {
+  return {
+    async loadSecret(secretName) {
+      return secrets[secretName];
+    },
+    getHealthSnapshot() {
+      return {
+        storageType: "osKeychain",
+        provider: "test-keychain",
+        serviceName: "dynamics-365-mcp-client-certificates-test",
+        available: true,
+      };
+    },
+  };
+}
+
 function createImmediateTimeoutSpy() {
   return vi.spyOn(global, "setTimeout").mockImplementation(((callback: TimerHandler) => {
     if (typeof callback === "function") {
@@ -64,7 +90,12 @@ function createImmediateTimeoutSpy() {
 
 afterEach(() => {
   global.fetch = originalFetch;
+  process.env = { ...originalEnv };
   vi.restoreAllMocks();
+
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 describe("TokenManager", () => {
@@ -101,6 +132,8 @@ describe("TokenManager", () => {
     const firstRequest = manager.getToken(environment);
     const secondRequest = manager.getToken(environment);
 
+    await Promise.resolve();
+
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     resolveResponse?.(createTokenResponse("shared-token"));
@@ -111,6 +144,74 @@ describe("TokenManager", () => {
     ]);
   });
 
+  it("uses a client secret from an environment variable", async () => {
+    process.env.D365_TEST_CLIENT_SECRET = "env-client-secret";
+    let tokenRequestBody = "";
+
+    global.fetch = vi.fn<typeof fetch>((_input, init) => {
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("env-secret-token"));
+    });
+
+    const manager = new TokenManager();
+
+    await expect(
+      manager.getToken({
+        ...environment,
+        clientSecret: undefined,
+        clientSecretSource: "env",
+        clientSecretEnv: "D365_TEST_CLIENT_SECRET",
+      }),
+    ).resolves.toBe("env-secret-token");
+
+    const body = new URLSearchParams(tokenRequestBody);
+    expect(body.get("client_id")).toBe("client-id");
+    expect(body.get("client_secret")).toBe("env-client-secret");
+  });
+
+  it("uses a client secret from the OS keychain", async () => {
+    let tokenRequestBody = "";
+
+    global.fetch = vi.fn<typeof fetch>((_input, init) => {
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("keychain-secret-token"));
+    });
+
+    const manager = new TokenManager({
+      clientSecretStore: createMemoryPrivateKeyStore({
+        "prod-client-secret": "keychain-client-secret",
+      }),
+    });
+
+    await expect(
+      manager.getToken({
+        ...environment,
+        clientSecret: undefined,
+        clientSecretSource: "osKeychain",
+        clientSecretName: "prod-client-secret",
+      }),
+    ).resolves.toBe("keychain-secret-token");
+
+    const body = new URLSearchParams(tokenRequestBody);
+    expect(body.get("client_id")).toBe("client-id");
+    expect(body.get("client_secret")).toBe("keychain-client-secret");
+  });
+
+  it("throws when a keychain client secret is missing", async () => {
+    const manager = new TokenManager({
+      clientSecretStore: createMemoryPrivateKeyStore({}),
+    });
+
+    await expect(
+      manager.getToken({
+        ...environment,
+        clientSecret: undefined,
+        clientSecretSource: "osKeychain",
+        clientSecretName: "missing-client-secret",
+      }),
+    ).rejects.toThrow("Client secret 'missing-client-secret' was not found in the OS keychain");
+  });
+
   it("throws an AuthenticationError when the token request fails", async () => {
     global.fetch = vi.fn<typeof fetch>().mockRejectedValue(new Error("network down"));
 
@@ -118,6 +219,190 @@ describe("TokenManager", () => {
 
     await expect(manager.getToken(environment)).rejects.toBeInstanceOf(AuthenticationError);
     await expect(manager.getToken(environment)).rejects.toThrow("Network error: network down");
+  });
+
+  it("supports client certificate auth with a signed client assertion", async () => {
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    });
+    const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+    const dir = mkdtempSync(join(tmpdir(), "d365-mcp-cert-auth-"));
+    tempDirs.push(dir);
+    const privateKeyPath = join(dir, "client.key");
+    writeFileSync(privateKeyPath, privateKeyPem);
+    let tokenRequestBody = "";
+
+    const fetchMock = vi.fn<typeof fetch>((input, init) => {
+      expect(String(input)).toBe("https://login.microsoftonline.com/tenant-id/oauth2/v2.0/token");
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("certificate-token"));
+    });
+    global.fetch = fetchMock;
+
+    const manager = new TokenManager();
+    await expect(
+      manager.getToken({
+        name: "cert",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "clientCertificate",
+        clientId: "client-id",
+        privateKeyPath,
+        clientCertificateThumbprint:
+          "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      }),
+    ).resolves.toBe("certificate-token");
+
+    const body = new URLSearchParams(tokenRequestBody);
+    const assertion = body.get("client_assertion") || "";
+    const [encodedHeader, encodedPayload, encodedSignature] = assertion.split(".");
+    const header = JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"));
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    const signature = Buffer.from(encodedSignature, "base64url");
+
+    expect(body.get("grant_type")).toBe("client_credentials");
+    expect(body.get("client_id")).toBe("client-id");
+    expect(body.get("client_assertion_type")).toBe(
+      "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+    );
+    expect(body.get("scope")).toBe("https://org.crm.dynamics.com/.default");
+    expect(header).toMatchObject({
+      alg: "PS256",
+      typ: "JWT",
+      "x5t#S256": "ABEiM0RVZneImaq7zN3u_wARIjNEVWZ3iJmqu8zd7v8",
+    });
+    expect(payload).toMatchObject({
+      aud: "https://login.microsoftonline.com/tenant-id/oauth2/v2.0/token",
+      exp: 1_700_000_600,
+      iss: "client-id",
+      nbf: 1_700_000_000,
+      sub: "client-id",
+    });
+    expect(payload.jti).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(
+      verify(
+        "RSA-SHA256",
+        Buffer.from(`${encodedHeader}.${encodedPayload}`),
+        {
+          key: publicKey,
+          padding: constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: 32,
+        },
+        signature,
+      ),
+    ).toBe(true);
+    nowSpy.mockRestore();
+  });
+
+  it("supports client certificate auth with a private key from the OS keychain", async () => {
+    const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    });
+    const privateKeyPem = privateKey.export({ format: "pem", type: "pkcs8" }).toString();
+    let tokenRequestBody = "";
+
+    global.fetch = vi.fn<typeof fetch>((_input, init) => {
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("keychain-certificate-token"));
+    });
+
+    const manager = new TokenManager({
+      privateKeySecretStore: createMemoryPrivateKeyStore({
+        "prod-client-key": privateKeyPem,
+      }),
+    });
+    await expect(
+      manager.getToken({
+        name: "cert",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "clientCertificate",
+        clientId: "client-id",
+        privateKeySource: "osKeychain",
+        privateKeyName: "prod-client-key",
+        clientCertificateThumbprint:
+          "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      }),
+    ).resolves.toBe("keychain-certificate-token");
+
+    const assertion = new URLSearchParams(tokenRequestBody).get("client_assertion") || "";
+    const [encodedHeader, encodedPayload, encodedSignature] = assertion.split(".");
+    const signature = Buffer.from(encodedSignature, "base64url");
+
+    expect(
+      verify(
+        "RSA-SHA256",
+        Buffer.from(`${encodedHeader}.${encodedPayload}`),
+        {
+          key: publicKey,
+          padding: constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: 32,
+        },
+        signature,
+      ),
+    ).toBe(true);
+  });
+
+  it("supports client certificate auth with a certificate store signer", async () => {
+    const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    });
+    let tokenRequestBody = "";
+
+    global.fetch = vi.fn<typeof fetch>((_input, init) => {
+      tokenRequestBody = String(init?.body || "");
+      return Promise.resolve(createTokenResponse("store-certificate-token"));
+    });
+
+    const manager = new TokenManager({
+      certificateStoreClient: {
+        async getCertificateThumbprint() {
+          return { x5tS256: "ABEiM0RVZneImaq7zN3u_wARIjNEVWZ3iJmqu8zd7v8" };
+        },
+        async sign(_env, signingInput) {
+          return cryptoSign("RSA-SHA256", Buffer.from(signingInput), {
+            key: privateKey,
+            padding: constants.RSA_PKCS1_PSS_PADDING,
+            saltLength: 32,
+          });
+        },
+      },
+    });
+    await expect(
+      manager.getToken({
+        name: "cert",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "clientCertificate",
+        clientId: "client-id",
+        certificateStore: "windowsCurrentUser",
+        certificateStoreThumbprint: "11223344556677889900AABBCCDDEEFF00112233",
+      }),
+    ).resolves.toBe("store-certificate-token");
+
+    const assertion = new URLSearchParams(tokenRequestBody).get("client_assertion") || "";
+    const [encodedHeader, encodedPayload, encodedSignature] = assertion.split(".");
+    const header = JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"));
+    const signature = Buffer.from(encodedSignature, "base64url");
+
+    expect(header).toMatchObject({
+      alg: "PS256",
+      typ: "JWT",
+      "x5t#S256": "ABEiM0RVZneImaq7zN3u_wARIjNEVWZ3iJmqu8zd7v8",
+    });
+    expect(
+      verify(
+        "RSA-SHA256",
+        Buffer.from(`${encodedHeader}.${encodedPayload}`),
+        {
+          key: publicKey,
+          padding: constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: 32,
+        },
+        signature,
+      ),
+    ).toBe(true);
   });
 
   it("supports device code auth without a client secret", async () => {
@@ -161,6 +446,80 @@ describe("TokenManager", () => {
     );
 
     timeoutSpy.mockRestore();
+  });
+
+  it("supports interactive browser auth with PKCE", async () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const redirectUri = "http://127.0.0.1:18401/callback";
+    let tokenRequestBody = "";
+
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.startsWith(redirectUri)) {
+        return originalFetch(input, init);
+      }
+
+      tokenRequestBody = String(init?.body || "");
+      return createJsonResponse({
+        access_token: "browser-token",
+        refresh_token: "browser-refresh-token",
+        expires_in: 3600,
+      });
+    });
+
+    global.fetch = fetchMock;
+
+    const openBrowser = vi.fn(async (authorizeUrl: string) => {
+      const url = new URL(authorizeUrl);
+      expect(url.pathname).toBe("/tenant-id/oauth2/v2.0/authorize");
+      expect(url.searchParams.get("client_id")).toBe("public-client");
+      expect(url.searchParams.get("response_type")).toBe("code");
+      expect(url.searchParams.get("redirect_uri")).toBe(redirectUri);
+      expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+      expect(url.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]+$/);
+
+      const state = url.searchParams.get("state");
+      expect(state).toBeTruthy();
+      await originalFetch(`${redirectUri}?code=authorization-code&state=${state}`);
+    });
+
+    const manager = new TokenManager({
+      secretStore: createMemorySecretStore(),
+      openBrowser,
+    });
+
+    await expect(
+      manager.getToken({
+        name: "browser",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "interactiveBrowser",
+        clientId: "public-client",
+        redirectUri,
+      }),
+    ).resolves.toBe("browser-token");
+
+    expect(openBrowser).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tokenRequestBody).toContain("grant_type=authorization_code");
+    expect(tokenRequestBody).toContain("client_id=public-client");
+    expect(tokenRequestBody).toContain("code=authorization-code");
+    expect(tokenRequestBody).toContain(`redirect_uri=${encodeURIComponent(redirectUri)}`);
+    expect(tokenRequestBody).toContain("code_verifier=");
+    expect(stderrSpy).toHaveBeenCalled();
+  });
+
+  it("requires a client id for interactive browser auth", async () => {
+    const manager = new TokenManager({ secretStore: createMemorySecretStore() });
+
+    await expect(
+      manager.getToken({
+        name: "browser",
+        url: "https://org.crm.dynamics.com",
+        tenantId: "tenant-id",
+        authType: "interactiveBrowser",
+      }),
+    ).rejects.toThrow("interactiveBrowser auth requires clientId");
   });
 
   it("persists device code tokens and reuses them after restart", async () => {

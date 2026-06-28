@@ -1,8 +1,17 @@
+import { execFile, spawn } from "node:child_process";
+import { constants, createHash, createSign, randomBytes, X509Certificate } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import { homedir } from "node:os";
+import { isAbsolute, resolve } from "node:path";
+import { promisify } from "node:util";
 import type { EnvironmentConfig } from "../config/types.js";
 import { requestLogger } from "../logging/request-logger.js";
 import {
+  createOsKeychainSecretReader,
   createOsKeychainSecretStore,
   type DeviceCodeSecretStore,
+  type OsSecretReader,
   type StoredDeviceCodeToken,
 } from "./os-keychain.js";
 
@@ -30,11 +39,31 @@ interface TokenRequestOptions {
   forceRefresh?: boolean;
 }
 
+interface CertificateStoreSignature {
+  x5tS256: string;
+}
+
+interface CertificateStoreClient {
+  getCertificateThumbprint(env: EnvironmentConfig): Promise<CertificateStoreSignature>;
+  sign(env: EnvironmentConfig, signingInput: string): Promise<Buffer>;
+}
+
 const DEFAULT_DEVICE_CODE_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
+const DEFAULT_INTERACTIVE_BROWSER_REDIRECT_URI = "http://localhost:8400/callback";
 const EXPIRY_BUFFER_SECONDS = 300;
+const DEFAULT_INTERACTIVE_BROWSER_TIMEOUT_MS = 5 * 60 * 1000;
+const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+const DEFAULT_CLIENT_SECRET_KEYCHAIN_SERVICE = "dynamics-365-mcp-client-secrets";
+const DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE = "dynamics-365-mcp-client-certificates";
+const execFileAsync = promisify(execFile);
 
 interface TokenManagerOptions {
   secretStore?: DeviceCodeSecretStore;
+  clientSecretStore?: OsSecretReader;
+  privateKeySecretStore?: OsSecretReader;
+  certificateStoreClient?: CertificateStoreClient;
+  openBrowser?: (url: string) => Promise<void> | void;
+  interactiveBrowserTimeoutMs?: number;
 }
 
 export class AuthenticationError extends Error {
@@ -54,9 +83,24 @@ export class TokenManager {
   private persistedDeviceCodeTokens = new Map<string, StoredDeviceCodeToken>();
   private loadedPersistedDeviceCodeEnvironments = new Set<string>();
   private readonly secretStore: DeviceCodeSecretStore;
+  private readonly clientSecretStore: OsSecretReader;
+  private readonly privateKeySecretStore: OsSecretReader;
+  private readonly certificateStoreClient: CertificateStoreClient;
+  private readonly openBrowser: (url: string) => Promise<void> | void;
+  private readonly interactiveBrowserTimeoutMs: number;
 
   constructor(options: TokenManagerOptions = {}) {
     this.secretStore = options.secretStore || createOsKeychainSecretStore();
+    this.clientSecretStore =
+      options.clientSecretStore ||
+      createOsKeychainSecretReader(DEFAULT_CLIENT_SECRET_KEYCHAIN_SERVICE);
+    this.privateKeySecretStore =
+      options.privateKeySecretStore ||
+      createOsKeychainSecretReader(DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE);
+    this.certificateStoreClient = options.certificateStoreClient || windowsCertificateStoreClient;
+    this.openBrowser = options.openBrowser || openSystemBrowser;
+    this.interactiveBrowserTimeoutMs =
+      options.interactiveBrowserTimeoutMs || DEFAULT_INTERACTIVE_BROWSER_TIMEOUT_MS;
   }
 
   async getToken(env: EnvironmentConfig, options?: TokenRequestOptions): Promise<string> {
@@ -123,17 +167,23 @@ export class TokenManager {
       return this.requestDeviceCodeFlow(env, options);
     }
 
+    if (env.authType === "interactiveBrowser") {
+      return this.requestInteractiveBrowserFlow(env, options);
+    }
+
+    if (env.authType === "clientCertificate") {
+      return this.requestClientCertificateToken(env);
+    }
+
     return this.requestClientSecretToken(env);
   }
 
   private async requestClientSecretToken(env: EnvironmentConfig): Promise<string> {
-    if (!env.clientId || !env.clientSecret) {
-      throw new AuthenticationError(
-        env.name,
-        "clientSecret auth requires clientId and clientSecret",
-      );
+    if (!env.clientId) {
+      throw new AuthenticationError(env.name, "clientSecret auth requires clientId");
     }
 
+    const clientSecret = await this.resolveClientSecret(env);
     const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
     const scope = `${env.url}/.default`;
 
@@ -143,7 +193,98 @@ export class TokenManager {
       new URLSearchParams({
         grant_type: "client_credentials",
         client_id: env.clientId,
-        client_secret: env.clientSecret,
+        client_secret: clientSecret,
+        scope,
+      }),
+    );
+
+    return this.storeToken(env, data);
+  }
+
+  private async resolveClientSecret(env: EnvironmentConfig): Promise<string> {
+    const source =
+      env.clientSecretSource ||
+      (env.clientSecretName ? "osKeychain" : env.clientSecretEnv ? "env" : "inline");
+
+    if (source === "inline") {
+      if (!env.clientSecret) {
+        throw new AuthenticationError(
+          env.name,
+          "clientSecret auth with inline clientSecretSource requires clientSecret",
+        );
+      }
+      return env.clientSecret;
+    }
+
+    if (source === "env") {
+      if (!env.clientSecretEnv) {
+        throw new AuthenticationError(
+          env.name,
+          "clientSecret auth with env clientSecretSource requires clientSecretEnv",
+        );
+      }
+
+      const clientSecret = process.env[env.clientSecretEnv];
+      if (!clientSecret) {
+        throw new AuthenticationError(
+          env.name,
+          `Environment variable '${env.clientSecretEnv}' was not found or is empty`,
+        );
+      }
+      return clientSecret;
+    }
+
+    if (source === "osKeychain") {
+      if (!env.clientSecretName) {
+        throw new AuthenticationError(
+          env.name,
+          "clientSecret auth with osKeychain clientSecretSource requires clientSecretName",
+        );
+      }
+
+      const secretStore =
+        env.clientSecretKeychainService &&
+        env.clientSecretKeychainService !== DEFAULT_CLIENT_SECRET_KEYCHAIN_SERVICE
+          ? createOsKeychainSecretReader(env.clientSecretKeychainService)
+          : this.clientSecretStore;
+      const clientSecret = await secretStore.loadSecret(env.clientSecretName);
+      if (!clientSecret) {
+        throw new AuthenticationError(
+          env.name,
+          `Client secret '${env.clientSecretName}' was not found in the OS keychain`,
+        );
+      }
+      return clientSecret;
+    }
+
+    throw new AuthenticationError(
+      env.name,
+      `Unsupported clientSecretSource '${source}'. Use inline, env, or osKeychain.`,
+    );
+  }
+
+  private async requestClientCertificateToken(env: EnvironmentConfig): Promise<string> {
+    if (!env.clientId) {
+      throw new AuthenticationError(env.name, "clientCertificate auth requires clientId");
+    }
+
+    const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
+    const scope = `${env.url}/.default`;
+    const assertion = await createClientCertificateAssertion(
+      env,
+      tokenUrl,
+      this.privateKeySecretStore,
+      this.certificateStoreClient,
+    );
+
+    const data = await this.requestTokenEndpoint(
+      env,
+      tokenUrl,
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: env.clientId,
+        client_assertion_type: CLIENT_ASSERTION_TYPE,
+        client_assertion: assertion,
         scope,
       }),
     );
@@ -155,7 +296,7 @@ export class TokenManager {
     env: EnvironmentConfig,
     options?: TokenRequestOptions,
   ): Promise<string> {
-    const persisted = await this.getPersistedDeviceCodeToken(env);
+    const persisted = await this.getPersistedInteractiveToken(env, "deviceCode");
     const now = Date.now();
 
     if (
@@ -178,9 +319,11 @@ export class TokenManager {
       } catch (error) {
         if (error instanceof AuthenticationError && isRecoverableRefreshFailure(error.errorCode)) {
           await this.updatePersistedDeviceCodeToken(env, {
+            authType: "deviceCode",
             accessToken: undefined,
             accessTokenExpiresAt: undefined,
             refreshToken: undefined,
+            clearRefreshToken: true,
           });
         } else {
           throw error;
@@ -195,7 +338,7 @@ export class TokenManager {
     env: EnvironmentConfig,
     refreshToken: string,
   ): Promise<TokenResponse> {
-    const clientId = env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID;
+    const clientId = this.getPublicClientId(env);
     const tokenUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0/token`;
     const scope = `${env.url}/user_impersonation offline_access openid profile`;
 
@@ -211,8 +354,104 @@ export class TokenManager {
     );
   }
 
+  private async requestInteractiveBrowserFlow(
+    env: EnvironmentConfig,
+    options?: TokenRequestOptions,
+  ): Promise<string> {
+    const persisted = await this.getPersistedInteractiveToken(env, "interactiveBrowser");
+    const now = Date.now();
+
+    if (
+      !options?.forceRefresh &&
+      persisted?.accessToken &&
+      persisted.accessTokenExpiresAt &&
+      now < persisted.accessTokenExpiresAt
+    ) {
+      this.cache.set(env.name, {
+        accessToken: persisted.accessToken,
+        expiresAt: persisted.accessTokenExpiresAt,
+      });
+      return persisted.accessToken;
+    }
+
+    if (persisted?.refreshToken) {
+      try {
+        const refreshed = await this.requestRefreshToken(env, persisted.refreshToken);
+        return this.storeToken(env, refreshed);
+      } catch (error) {
+        if (error instanceof AuthenticationError && isRecoverableRefreshFailure(error.errorCode)) {
+          await this.updatePersistedDeviceCodeToken(env, {
+            authType: "interactiveBrowser",
+            accessToken: undefined,
+            accessTokenExpiresAt: undefined,
+            refreshToken: undefined,
+            clearRefreshToken: true,
+          });
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    return this.requestInteractiveBrowserToken(env);
+  }
+
+  private async requestInteractiveBrowserToken(env: EnvironmentConfig): Promise<string> {
+    if (!env.clientId) {
+      throw new AuthenticationError(
+        env.name,
+        "interactiveBrowser auth requires clientId for a public Entra app",
+      );
+    }
+
+    const redirectUri = this.getInteractiveBrowserRedirectUri(env);
+    const state = createPkceValue();
+    const codeVerifier = createPkceValue();
+    const codeChallenge = createPkceChallenge(codeVerifier);
+    const tenantBaseUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0`;
+    const scope = `${env.url}/user_impersonation offline_access openid profile`;
+    const listener = await this.createAuthorizationCodeListener(env, redirectUri, state);
+
+    try {
+      const authorizeUrl = new URL(`${tenantBaseUrl}/authorize`);
+      authorizeUrl.search = new URLSearchParams({
+        client_id: env.clientId,
+        response_type: "code",
+        redirect_uri: redirectUri,
+        response_mode: "query",
+        scope,
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+      }).toString();
+
+      process.stderr.write(
+        `\n[${env.name}] Opening browser for sign-in. If it does not open, visit: ${authorizeUrl.toString()}\n\n`,
+      );
+      await this.openBrowser(authorizeUrl.toString());
+      const authorizationCode = await listener.authorizationCode;
+
+      const tokenData = await this.requestTokenEndpoint(
+        env,
+        `${tenantBaseUrl}/token`,
+        new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: env.clientId,
+          code: authorizationCode,
+          redirect_uri: redirectUri,
+          code_verifier: codeVerifier,
+          scope,
+        }),
+      );
+
+      return this.storeToken(env, tokenData);
+    } finally {
+      await listener.close();
+    }
+  }
+
   private async requestDeviceCodeToken(env: EnvironmentConfig): Promise<string> {
-    const clientId = env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID;
+    const clientId = this.getPublicClientId(env);
     const tenantBaseUrl = `https://login.microsoftonline.com/${env.tenantId}/oauth2/v2.0`;
     const scope = `${env.url}/user_impersonation offline_access openid profile`;
 
@@ -248,6 +487,126 @@ export class TokenManager {
     }
 
     throw new AuthenticationError(env.name, "Device code expired before sign-in completed");
+  }
+
+  private getPublicClientId(env: EnvironmentConfig): string {
+    return env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID;
+  }
+
+  private getInteractiveBrowserRedirectUri(env: EnvironmentConfig): string {
+    return env.redirectUri || DEFAULT_INTERACTIVE_BROWSER_REDIRECT_URI;
+  }
+
+  private async createAuthorizationCodeListener(
+    env: EnvironmentConfig,
+    redirectUri: string,
+    expectedState: string,
+  ): Promise<{
+    authorizationCode: Promise<string>;
+    close: () => Promise<void>;
+  }> {
+    const parsedRedirectUri = this.parseLoopbackRedirectUri(env, redirectUri);
+    let settleCode: ((code: string) => void) | undefined;
+    let rejectCode: ((error: Error) => void) | undefined;
+
+    const authorizationCode = new Promise<string>((resolve, reject) => {
+      settleCode = resolve;
+      rejectCode = reject;
+    });
+
+    const server = createServer((request, response) => {
+      const requestUrl = new URL(request.url || "/", redirectUri);
+
+      if (requestUrl.pathname !== parsedRedirectUri.pathname) {
+        response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+        response.end("Not found");
+        return;
+      }
+
+      const state = requestUrl.searchParams.get("state");
+      const error = requestUrl.searchParams.get("error");
+      const errorDescription = requestUrl.searchParams.get("error_description");
+      const code = requestUrl.searchParams.get("code");
+
+      if (state !== expectedState) {
+        response.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(buildBrowserCallbackHtml("Sign-in failed. You can close this tab."));
+        rejectCode?.(new AuthenticationError(env.name, "Interactive browser state did not match"));
+        return;
+      }
+
+      if (error) {
+        response.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(buildBrowserCallbackHtml("Sign-in failed. You can close this tab."));
+        rejectCode?.(new AuthenticationError(env.name, errorDescription || error, error));
+        return;
+      }
+
+      if (!code) {
+        response.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(buildBrowserCallbackHtml("Sign-in failed. You can close this tab."));
+        rejectCode?.(new AuthenticationError(env.name, "Interactive browser callback missed code"));
+        return;
+      }
+
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(buildBrowserCallbackHtml("Sign-in complete. You can close this tab."));
+      settleCode?.(code);
+    });
+
+    try {
+      await listen(server, parsedRedirectUri);
+    } catch (error) {
+      throw new AuthenticationError(
+        env.name,
+        `Could not start interactive browser callback server at ${redirectUri}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    const timeout = setTimeout(() => {
+      rejectCode?.(
+        new AuthenticationError(env.name, "Interactive browser sign-in timed out before callback"),
+      );
+    }, this.interactiveBrowserTimeoutMs);
+
+    return {
+      authorizationCode: authorizationCode.finally(() => clearTimeout(timeout)),
+      close: () => closeServer(server),
+    };
+  }
+
+  private parseLoopbackRedirectUri(env: EnvironmentConfig, redirectUri: string): URL {
+    let parsed: URL;
+    try {
+      parsed = new URL(redirectUri);
+    } catch {
+      throw new AuthenticationError(env.name, `Invalid redirectUri: ${redirectUri}`);
+    }
+
+    if (parsed.protocol !== "http:") {
+      throw new AuthenticationError(
+        env.name,
+        "interactiveBrowser redirectUri must use http on localhost",
+      );
+    }
+
+    if (!isLoopbackHost(parsed.hostname)) {
+      throw new AuthenticationError(
+        env.name,
+        "interactiveBrowser redirectUri must use localhost or a loopback IP address",
+      );
+    }
+
+    if (!parsed.pathname || parsed.pathname === "/") {
+      throw new AuthenticationError(
+        env.name,
+        "interactiveBrowser redirectUri must include a callback path",
+      );
+    }
+
+    return parsed;
   }
 
   private async requestDeviceCode(
@@ -466,9 +825,10 @@ export class TokenManager {
       expiresAt,
     });
 
-    if (env.authType === "deviceCode") {
-      const persisted = await this.getPersistedDeviceCodeToken(env);
+    if (env.authType === "deviceCode" || env.authType === "interactiveBrowser") {
+      const persisted = await this.getPersistedInteractiveToken(env, env.authType);
       await this.updatePersistedDeviceCodeToken(env, {
+        authType: env.authType,
         accessToken: data.access_token,
         accessTokenExpiresAt: expiresAt,
         refreshToken: data.refresh_token || persisted?.refreshToken,
@@ -478,8 +838,9 @@ export class TokenManager {
     return data.access_token;
   }
 
-  private async getPersistedDeviceCodeToken(
+  private async getPersistedInteractiveToken(
     env: EnvironmentConfig,
+    authType: "deviceCode" | "interactiveBrowser",
   ): Promise<StoredDeviceCodeToken | undefined> {
     await this.loadPersistedDeviceCodeToken(env.name);
     const persisted = this.persistedDeviceCodeTokens.get(env.name);
@@ -487,11 +848,20 @@ export class TokenManager {
       return undefined;
     }
 
-    const expectedClientId = env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID;
+    const expectedClientId = authType === "deviceCode" ? this.getPublicClientId(env) : env.clientId;
+    if (!expectedClientId) {
+      return undefined;
+    }
+
+    const expectedRedirectUri =
+      authType === "interactiveBrowser" ? this.getInteractiveBrowserRedirectUri(env) : undefined;
+    const persistedAuthType = persisted.authType || "deviceCode";
     if (
+      persistedAuthType !== authType ||
       persisted.tenantId !== env.tenantId ||
       persisted.url !== env.url ||
-      persisted.clientId !== expectedClientId
+      persisted.clientId !== expectedClientId ||
+      (expectedRedirectUri && persisted.redirectUri !== expectedRedirectUri)
     ) {
       return undefined;
     }
@@ -502,21 +872,36 @@ export class TokenManager {
   private async updatePersistedDeviceCodeToken(
     env: EnvironmentConfig,
     update: {
+      authType: "deviceCode" | "interactiveBrowser";
       accessToken?: string;
       accessTokenExpiresAt?: number;
       refreshToken?: string;
+      clearRefreshToken?: boolean;
     },
   ): Promise<void> {
     await this.loadPersistedDeviceCodeToken(env.name);
     const existing = this.persistedDeviceCodeTokens.get(env.name);
+    const clientId = update.authType === "deviceCode" ? this.getPublicClientId(env) : env.clientId;
+    if (!clientId) {
+      throw new AuthenticationError(
+        env.name,
+        `${update.authType} auth requires clientId before tokens can be persisted`,
+      );
+    }
+
     const persisted: StoredDeviceCodeToken = {
       environmentName: env.name,
       tenantId: env.tenantId,
       url: env.url,
-      clientId: env.clientId || DEFAULT_DEVICE_CODE_CLIENT_ID,
+      clientId,
+      authType: update.authType,
+      redirectUri:
+        update.authType === "interactiveBrowser"
+          ? this.getInteractiveBrowserRedirectUri(env)
+          : undefined,
       accessToken: update.accessToken,
       accessTokenExpiresAt: update.accessTokenExpiresAt,
-      refreshToken: update.refreshToken,
+      refreshToken: update.clearRefreshToken ? undefined : update.refreshToken,
       updatedAt: Date.now(),
     };
 
@@ -526,7 +911,7 @@ export class TokenManager {
       return;
     }
 
-    if (!persisted.refreshToken && existing?.refreshToken) {
+    if (!persisted.refreshToken && existing?.refreshToken && !update.clearRefreshToken) {
       persisted.refreshToken = existing.refreshToken;
     }
 
@@ -556,6 +941,408 @@ export class TokenManager {
 function computeExpiresInMs(expiresInSeconds: number): number {
   const bufferedSeconds = Math.max(expiresInSeconds - EXPIRY_BUFFER_SECONDS, 60);
   return bufferedSeconds * 1000;
+}
+
+function createPkceValue(): string {
+  return base64UrlEncode(randomBytes(32));
+}
+
+function createPkceChallenge(codeVerifier: string): string {
+  return base64UrlEncode(createHash("sha256").update(codeVerifier).digest());
+}
+
+async function createClientCertificateAssertion(
+  env: EnvironmentConfig,
+  audience: string,
+  privateKeySecretStore: OsSecretReader,
+  certificateStoreClient: CertificateStoreClient,
+): Promise<string> {
+  if (!env.clientId) {
+    throw new AuthenticationError(env.name, "clientCertificate auth requires clientId");
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: audience,
+    exp: nowSeconds + 600,
+    iss: env.clientId,
+    jti: base64UrlEncode(randomBytes(16)),
+    nbf: nowSeconds,
+    sub: env.clientId,
+  };
+
+  if (env.certificateStore) {
+    const { x5tS256 } = await certificateStoreClient.getCertificateThumbprint(env);
+    const unsignedHeader = {
+      alg: "PS256",
+      typ: "JWT",
+      "x5t#S256": x5tS256,
+    };
+    const signingInput = `${base64UrlEncodeJson(unsignedHeader)}.${base64UrlEncodeJson(payload)}`;
+    const signature = await certificateStoreClient.sign(env, signingInput);
+    return `${signingInput}.${base64UrlEncode(signature)}`;
+  }
+
+  const header = {
+    alg: "PS256",
+    typ: "JWT",
+    "x5t#S256": getCertificateThumbprint(env),
+  };
+  const signingInput = `${base64UrlEncodeJson(header)}.${base64UrlEncodeJson(payload)}`;
+  const privateKey = await getPrivateKeyPem(env, privateKeySecretStore);
+  const signature = signWithPrivateKey(env, signingInput, privateKey);
+
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+}
+
+async function getPrivateKeyPem(
+  env: EnvironmentConfig,
+  privateKeySecretStore: OsSecretReader,
+): Promise<string> {
+  if (env.privateKeySource === "osKeychain") {
+    if (!env.privateKeyName) {
+      throw new AuthenticationError(
+        env.name,
+        "clientCertificate auth with osKeychain privateKeySource requires privateKeyName",
+      );
+    }
+
+    const secretStore =
+      env.privateKeyKeychainService &&
+      env.privateKeyKeychainService !== DEFAULT_PRIVATE_KEY_KEYCHAIN_SERVICE
+        ? createOsKeychainSecretReader(env.privateKeyKeychainService)
+        : privateKeySecretStore;
+    const privateKey = await secretStore.loadSecret(env.privateKeyName);
+    if (!privateKey) {
+      throw new AuthenticationError(
+        env.name,
+        `Private key '${env.privateKeyName}' was not found in the OS keychain`,
+      );
+    }
+    return privateKey;
+  }
+
+  if (!env.privateKeyPath) {
+    throw new AuthenticationError(
+      env.name,
+      "clientCertificate auth with file private key source requires privateKeyPath",
+    );
+  }
+
+  try {
+    return readFileSync(resolveCredentialPath(env.privateKeyPath), "utf8");
+  } catch (error) {
+    throw new AuthenticationError(
+      env.name,
+      `Could not read client certificate private key: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function signWithPrivateKey(
+  env: EnvironmentConfig,
+  signingInput: string,
+  privateKey: string,
+): Buffer {
+  try {
+    const signer = createSign("RSA-SHA256");
+    signer.update(signingInput);
+    signer.end();
+    return signer.sign({
+      key: privateKey,
+      passphrase: env.privateKeyPassphrase,
+      padding: constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: 32,
+    });
+  } catch (error) {
+    throw new AuthenticationError(
+      env.name,
+      `Could not sign client certificate assertion: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+const windowsCertificateStoreClient: CertificateStoreClient = {
+  async getCertificateThumbprint(env) {
+    const result = await runWindowsCertificateStoreCommand(env, "metadata");
+    return { x5tS256: result.x5tS256 };
+  },
+
+  async sign(env, signingInput) {
+    const result = await runWindowsCertificateStoreCommand(env, "sign", signingInput);
+    if (!result.signature) {
+      throw new AuthenticationError(
+        env.name,
+        "Windows certificate store did not return a signature",
+      );
+    }
+    return Buffer.from(result.signature, "base64url");
+  },
+};
+
+async function runWindowsCertificateStoreCommand(
+  env: EnvironmentConfig,
+  action: "metadata" | "sign",
+  signingInput?: string,
+): Promise<{ signature?: string; x5tS256: string }> {
+  if (process.platform !== "win32") {
+    throw new AuthenticationError(
+      env.name,
+      "certificateStore is only supported on Windows. Use privateKeySource=osKeychain on macOS or Linux.",
+    );
+  }
+
+  if (!env.certificateStoreThumbprint) {
+    throw new AuthenticationError(
+      env.name,
+      "clientCertificate auth with certificateStore requires certificateStoreThumbprint",
+    );
+  }
+
+  const storeLocation =
+    env.certificateStore === "windowsLocalMachine" ? "LocalMachine" : "CurrentUser";
+  const encodedCommand = Buffer.from(WINDOWS_CERTIFICATE_STORE_SCRIPT, "utf16le").toString(
+    "base64",
+  );
+
+  try {
+    const result = await execFileAsync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-EncodedCommand",
+        encodedCommand,
+      ],
+      {
+        env: {
+          ...process.env,
+          D365_MCP_CERT_STORE_ACTION: action,
+          D365_MCP_CERT_STORE_LOCATION: storeLocation,
+          D365_MCP_CERT_STORE_THUMBPRINT: env.certificateStoreThumbprint,
+          D365_MCP_CERT_SIGNING_INPUT: signingInput || "",
+        },
+      },
+    );
+    return JSON.parse(result.stdout.toString()) as { signature?: string; x5tS256: string };
+  } catch (error) {
+    const commandError = error as { stderr?: string | Buffer; message?: string };
+    const detail = String(commandError.stderr || commandError.message || error).trim();
+    throw new AuthenticationError(env.name, `Could not use Windows certificate store: ${detail}`);
+  }
+}
+
+function getCertificateThumbprint(env: EnvironmentConfig): string {
+  if (env.clientCertificateThumbprint) {
+    return normalizeCertificateThumbprint(env);
+  }
+
+  if (!env.certificatePath) {
+    throw new AuthenticationError(
+      env.name,
+      "clientCertificate auth requires certificatePath or clientCertificateThumbprint",
+    );
+  }
+
+  try {
+    const certificate = new X509Certificate(
+      readFileSync(resolveCredentialPath(env.certificatePath)),
+    );
+    return base64UrlEncode(createHash("sha256").update(certificate.raw).digest());
+  } catch (error) {
+    throw new AuthenticationError(
+      env.name,
+      `Could not read client certificate: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function normalizeCertificateThumbprint(env: EnvironmentConfig): string {
+  const cleaned = (env.clientCertificateThumbprint || "").trim().replace(/\s+/g, "");
+  if (/^[a-fA-F0-9]+$/.test(cleaned) && cleaned.length % 2 === 0) {
+    if (cleaned.length !== 64) {
+      throw new AuthenticationError(
+        env.name,
+        "clientCertificateThumbprint must be a SHA-256 thumbprint when hex is used",
+      );
+    }
+    return base64UrlEncode(Buffer.from(cleaned, "hex"));
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(cleaned)) {
+    throw new AuthenticationError(env.name, "clientCertificateThumbprint must be hex or base64url");
+  }
+
+  return cleaned.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function resolveCredentialPath(inputPath: string): string {
+  const expandedPath = inputPath.replace(/^~(?=$|\/|\\)/, homedir());
+  return isAbsolute(expandedPath) ? expandedPath : resolve(expandedPath);
+}
+
+function base64UrlEncodeJson(input: Record<string, unknown>): string {
+  return base64UrlEncode(Buffer.from(JSON.stringify(input), "utf8"));
+}
+
+function base64UrlEncode(input: Buffer): string {
+  return input.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+const WINDOWS_CERTIFICATE_STORE_SCRIPT = `
+Set-StrictMode -Version Latest
+
+function ConvertTo-Base64Url([byte[]]$Bytes) {
+  return [Convert]::ToBase64String($Bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
+$action = $env:D365_MCP_CERT_STORE_ACTION
+$storeLocation = $env:D365_MCP_CERT_STORE_LOCATION
+$thumbprint = ($env:D365_MCP_CERT_STORE_THUMBPRINT -replace "\\s", "").ToUpperInvariant()
+
+if ($storeLocation -ne "CurrentUser" -and $storeLocation -ne "LocalMachine") {
+  throw "Unsupported certificate store location: $storeLocation"
+}
+
+$store = [Security.Cryptography.X509Certificates.X509Store]::new(
+  "My",
+  [Security.Cryptography.X509Certificates.StoreLocation]::$storeLocation
+)
+
+try {
+  $store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+  $certificate = $store.Certificates |
+    Where-Object { ($_.Thumbprint -replace "\\s", "").ToUpperInvariant() -eq $thumbprint } |
+    Select-Object -First 1
+
+  if (-not $certificate) {
+    throw "Certificate was not found in Cert:\\$storeLocation\\My"
+  }
+
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $x5tS256 = ConvertTo-Base64Url($sha256.ComputeHash($certificate.RawData))
+  } finally {
+    $sha256.Dispose()
+  }
+
+  if ($action -eq "metadata") {
+    [Console]::Out.Write((@{ x5tS256 = $x5tS256 } | ConvertTo-Json -Compress))
+    exit 0
+  }
+
+  if ($action -ne "sign") {
+    throw "Unsupported certificate store action: $action"
+  }
+
+  if (-not $certificate.HasPrivateKey) {
+    throw "Certificate has no private key"
+  }
+
+  $rsa = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certificate)
+  if (-not $rsa) {
+    throw "Certificate private key is not RSA"
+  }
+
+  try {
+    $data = [Text.Encoding]::ASCII.GetBytes($env:D365_MCP_CERT_SIGNING_INPUT)
+    $signature = $rsa.SignData(
+      $data,
+      [Security.Cryptography.HashAlgorithmName]::SHA256,
+      [Security.Cryptography.RSASignaturePadding]::Pss
+    )
+    [Console]::Out.Write((@{
+      signature = ConvertTo-Base64Url($signature)
+      x5tS256 = $x5tS256
+    } | ConvertTo-Json -Compress))
+    exit 0
+  } finally {
+    $rsa.Dispose()
+  }
+} finally {
+  $store.Close()
+}
+`;
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function listen(server: Server, redirectUri: URL): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const port = Number.parseInt(redirectUri.port || "80", 10);
+    const onError = (error: Error) => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = () => {
+      server.off("error", onError);
+      resolve();
+    };
+
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port, redirectUri.hostname);
+  });
+}
+
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!server.listening) {
+      resolve();
+      return;
+    }
+
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+function buildBrowserCallbackHtml(message: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Dynamics 365 MCP</title></head><body><h1>${message}</h1></body></html>`;
+}
+
+function openSystemBrowser(url: string): Promise<void> {
+  const command = getBrowserOpenCommand(url);
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(command.command, command.args, {
+      detached: true,
+      stdio: "ignore",
+    });
+
+    child.once("error", reject);
+    child.once("spawn", () => {
+      child.unref();
+      resolve();
+    });
+  });
+}
+
+function getBrowserOpenCommand(url: string): { command: string; args: string[] } {
+  if (process.platform === "darwin") {
+    return { command: "open", args: [url] };
+  }
+
+  if (process.platform === "win32") {
+    return { command: "cmd.exe", args: ["/c", "start", "", url] };
+  }
+
+  return { command: "xdg-open", args: [url] };
 }
 
 function isRecoverableRefreshFailure(errorCode?: string): boolean {

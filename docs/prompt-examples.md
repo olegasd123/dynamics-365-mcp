@@ -167,6 +167,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list recent plugin trace logs for correlation id <CORRELATION_ID>.`
   `(Required: none)`
 
+- `summarize_plugin_trace_logs`
+  `In <ENV>, summarize plugin trace logs for the last 24 hours. Group by plugin step and show failure rate, p95 duration, and top exceptions.`
+  `In <ENV>, summarize recent trace logs for plugin class <PLUGIN_CLASS> from <START_TIME> to <END_TIME>.`
+  `(Required: none)`
+
 - `get_plugin_trace_log_details`
   `In <ENV>, show full details for plugin trace log <TRACE_LOG_ID>. Include exception details, message block, configuration, and timing fields.`
   `(Required: <TRACE_LOG_ID>)`
@@ -178,6 +183,11 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list failed bulk delete system jobs from the last 7 days.`
   `In <ENV>, list system jobs for correlation id <CORRELATION_ID>.`
   `In <ENV>, list in-progress workflow system jobs that were created in the last 2 hours.`
+  `(Required: none)`
+
+- `summarize_system_jobs`
+  `In <ENV>, summarize system jobs from the last 24 hours. Show success, failure, canceled counts, p95 runtime, and estimated queue depth by hour.`
+  `In <ENV>, summarize workflow system jobs from <START_TIME> to <END_TIME>. Group by name and show top failure messages.`
   `(Required: none)`
 
 - `get_system_job_details`
@@ -358,6 +368,16 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, list audit history for the contact with last name <LAST_NAME> from table contact.`
   `(Required: <TABLE> and a time window or one record lookup)`
 
+- `record_activity_trends`
+  `In <ENV>, show audit-based record activity trends for tables contact and account from 2026-04-01T00:00:00Z to 2026-04-30T23:59:59Z. Include created, modified, and deleted counts per day.`
+  `In <ENV>, check if table <TABLE> still has record write activity in the last 30 days. Report mostly depends on audit data and audit can be disabled.`
+  `(Required: one or more <TABLE> values)`
+
+- `field_change_frequency`
+  `In <ENV>, show which fields on table <TABLE> were edited most from 2026-04-01T00:00:00Z to 2026-04-30T23:59:59Z. Include distinct records, users, and audit coverage warnings.`
+  `In <ENV>, rank the top 20 changed fields on table contact in the last 30 days, excluding likely system users.`
+  `(Required: <TABLE>)`
+
 - `get_audit_details`
   `In <ENV>, show full audit details for audit record <AUDIT_ID>. Include the detail type and the full field diff when it exists.`
   `(Required: <AUDIT_ID>)`
@@ -470,6 +490,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `In <ENV>, show privileges for security role <ROLE>. If needed, use business unit <BUSINESS_UNIT>. Otherwise use the default global business unit, so prompts like "give me details for security role Managers" resolve the root business unit role by default.`
   `(Required: <ROLE>)`
 
+- `access_utilization_report`
+  `In <ENV>, build an access utilization report for security role <ROLE> or app module <APP_MODULE>. Show assigned users, audit-active users, and note that user activity depends on Dataverse audit data.`
+  `(Required: <ROLE> or <APP_MODULE>)`
+
 - `list_field_security_profiles`
   `In <ENV>, list field security profiles that grant access to column <COLUMN> on table <TABLE>. Include member names only when needed.`
   `(Required: none)`
@@ -501,6 +525,10 @@ Plugin tools return plugin classes only. Workflow activities (`CodeActivity`) st
   `(Required: <TABLE>.<COLUMN>)`
 
 ## Health
+
+- `storage_breakdown`
+  `In <ENV>, estimate storage drivers by table. Show database, file and database, and log signals. Include row counts and scan file columns for account, annotation, plugintracelog, and <TABLE>.`
+  `(Required: none)`
 
 - `environment_health_report`
   `Build an environment health report for <ENV> and focus on solution <SOLUTION>.`
@@ -566,6 +594,7 @@ This group needs at least two configured environments.
 
 This prompt list covers these tools:
 
+- `access_utilization_report`
 - `analyze_impact`
 - `analyze_create_triggers`
 - `analyze_update_triggers`
@@ -610,6 +639,7 @@ This prompt list covers these tools:
 - `get_sitemap_details`
 - `get_table_schema`
 - `get_audit_details`
+- `field_change_frequency`
 - `list_audit_history`
 - `get_view_details`
 - `get_view_fetchxml`
@@ -631,7 +661,9 @@ This prompt list covers these tools:
 - `list_table_ribbons`
 - `list_plugin_steps`
 - `list_plugin_trace_logs`
+- `summarize_plugin_trace_logs`
 - `list_system_jobs`
+- `summarize_system_jobs`
 - `list_plugins`
 - `list_plugin_assembly_images`
 - `list_plugin_assembly_steps`
