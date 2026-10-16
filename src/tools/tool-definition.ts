@@ -1,11 +1,14 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { z } from "zod";
+import { z } from "zod";
+import { withCacheRefresh } from "../client/cache-context.js";
 import type { DynamicsClient } from "../client/dynamics-client.js";
 import type { AppConfig } from "../config/types.js";
 import type { ToolResponse } from "./response.js";
 
 export type ToolSchemaShape = Record<string, z.ZodTypeAny>;
-export type ToolParams<TSchema extends ToolSchemaShape> = z.infer<z.ZodObject<TSchema>>;
+export type ToolParams<TSchema extends ToolSchemaShape> = z.infer<z.ZodObject<TSchema>> & {
+  refresh?: boolean;
+};
 type ToolHandler<TSchema extends ToolSchemaShape> = {
   bivarianceHack: (
     params: ToolParams<TSchema>,
@@ -28,7 +31,20 @@ export interface ToolBindingDefinition<TSchema extends ToolSchemaShape = ToolSch
 export function defineTool<TSchema extends ToolSchemaShape>(
   definition: ToolBindingDefinition<TSchema>,
 ): ToolBindingDefinition<TSchema> {
-  return definition;
+  return {
+    ...definition,
+    schema: {
+      ...definition.schema,
+      refresh: z
+        .boolean()
+        .optional()
+        .describe(
+          "Set to true to fetch fresh data for every read in this call and update the cache. Defaults to false.",
+        ),
+    },
+    handler: (params, context) =>
+      withCacheRefresh(params.refresh === true, () => definition.handler(params, context)),
+  };
 }
 
 export function registerTool<TSchema extends ToolSchemaShape>(

@@ -9,6 +9,15 @@ Note:
 - This file is about manual chat prompts that call tools.
 - The server also publishes MCP prompts and resources for first-run guidance.
 
+## Fresh Data For Any Tool
+
+Every tool accepts `refresh: true` to fetch fresh data and update the cache. It covers all reads in the call, including both environments in comparisons and ribbon translations. Without this option, tools use normal caching. Other queries can still have older cache entries.
+
+- `In <ENV>, get details for form <FORM> with refresh: true. I changed it since the last check.`
+- `In <ENV>, get FetchXML for view <VIEW> with refresh: true.`
+- `Compare forms in <SOURCE_ENV> and <TARGET_ENV> with refresh: true.`
+- `Repeat the previous tool call with the same arguments and refresh: true.`
+
 ## Built-in MCP Prompt Examples
 
 Use these when your MCP client supports prompt picks.

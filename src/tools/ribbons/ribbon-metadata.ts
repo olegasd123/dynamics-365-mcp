@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
+import { isCacheRefreshRequested } from "../../client/cache-context.js";
 import type { EnvironmentConfig } from "../../config/types.js";
 import type { DynamicsClient } from "../../client/dynamics-client.js";
 import {
@@ -739,7 +740,7 @@ async function loadRibbonTranslationsForSolution(
 ): Promise<Record<string, string>> {
   const cacheKey = `${env.name}|${solutionUniqueName}`;
   const cached = ribbonTranslationCache.get(cacheKey);
-  if (cached) {
+  if (cached && !isCacheRefreshRequested()) {
     return cached;
   }
 
@@ -756,7 +757,9 @@ async function loadRibbonTranslationsForSolution(
     const xml = readZipEntry(zipData, "CrmTranslations.xml");
     return parseRibbonTranslationsWorkbook(xml);
   })().catch((error) => {
-    ribbonTranslationCache.delete(cacheKey);
+    if (ribbonTranslationCache.get(cacheKey) === pending) {
+      ribbonTranslationCache.delete(cacheKey);
+    }
     throw error;
   });
 

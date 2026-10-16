@@ -1,3 +1,5 @@
+import { isCacheRefreshRequested } from "./cache-context.js";
+
 interface CacheEntry {
   expiresAt: number;
   value: unknown;
@@ -51,27 +53,37 @@ export class ResponseCache {
 
     this.deleteExpiredEntries();
 
+    const refresh = isCacheRefreshRequested();
     const cached = this.entries.get(key);
-    if (cached && cached.expiresAt > this.now()) {
+    if (!refresh && cached && cached.expiresAt > this.now()) {
       this.touch(key, cached);
       return this.cloneValueFn(cached.value as T);
     }
 
     const pending = this.pendingRequests.get(key);
-    if (pending) {
+    if (!refresh && pending) {
       return this.cloneValueFn((await pending) as T);
+    }
+
+    if (refresh) {
+      this.entries.delete(key);
     }
 
     const request = loader()
       .then((result) => {
-        this.setEntry(key, {
-          expiresAt: this.now() + options.ttlMs,
-          value: this.cloneValueFn(result),
-        });
+        // A refresh may have replaced this request while it was in flight.
+        if (this.pendingRequests.get(key) === request) {
+          this.setEntry(key, {
+            expiresAt: this.now() + options.ttlMs,
+            value: this.cloneValueFn(result),
+          });
+        }
         return result;
       })
       .finally(() => {
-        this.pendingRequests.delete(key);
+        if (this.pendingRequests.get(key) === request) {
+          this.pendingRequests.delete(key);
+        }
       });
 
     this.pendingRequests.set(key, request);
