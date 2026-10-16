@@ -56,6 +56,8 @@ describe("tool contracts", () => {
 
       for (const tool of result.tools) {
         expect(tool.inputSchema.type).toBe("object");
+        expect(tool.inputSchema.properties).toMatchObject({ refresh: { type: "boolean" } });
+        expect(tool.inputSchema.required || []).not.toContain("refresh");
       }
 
       expect(toolsByName.list_tables.inputSchema.properties).toMatchObject({
@@ -480,6 +482,7 @@ describe("tool contracts", () => {
 
       expect(tool).toBeDefined();
       expect(tool?.inputSchema.properties).toMatchObject({
+        refresh: { type: "boolean" },
         environment: expect.any(Object),
         table: expect.any(Object),
         fetchXml: expect.any(Object),

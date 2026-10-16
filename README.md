@@ -684,7 +684,9 @@ Use `analyze_impact` when you want one report for likely change impact.
 
 ### Performance Notes
 
-- Repeated metadata reads now use a short in-memory cache inside the Dynamics client.
+- All tools accept an optional `refresh` boolean. Set `refresh: true` to fetch fresh data for every read in that call and update the cache. This includes helper reads, all environments in comparison tools, and ribbon translations. Omit it or use `false` to keep normal caching.
+- The cache lasts 30 minutes for table schema, forms, and views; 5 minutes for selected metadata such as solutions and plugins; and 15 seconds for other reads. Ribbon translations are kept until refreshed or the server restarts.
+- Refresh updates only the cache entries read by that call. Other queries can still have older cached data. If a refresh fails, the tool reports the error or its usual partial-result warning; it does not use the old entry for that read.
 - Solution-scoped table, form, view, and cloud flow reads now use targeted id lookups where possible.
 - Large id-based metadata fetches are split into smaller chunks.
 - Expensive compare and usage tools now add warnings when detail scans are limited for safety.

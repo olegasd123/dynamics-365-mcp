@@ -1,7 +1,89 @@
 import { describe, expect, it, vi } from "vitest";
 import { ResponseCache } from "../response-cache.js";
+import { withCacheRefresh } from "../cache-context.js";
 
 describe("ResponseCache", () => {
+  it("replaces cached data on refresh and keeps other concurrent calls cached", async () => {
+    const cache = new ResponseCache();
+    const options = { ttlMs: 60_000 };
+    await cache.load("dev|forms", async () => "old", options);
+    await cache.load("prod|forms", async () => "prod-old", options);
+
+    let resume!: () => void;
+    const paused = new Promise<void>((resolve) => {
+      resume = resolve;
+    });
+    const refreshed = withCacheRefresh(true, async () => {
+      await paused;
+      return cache.load("dev|forms", async () => "new", options);
+    });
+
+    expect(await cache.load("dev|forms", async () => "unexpected", options)).toBe("old");
+    resume();
+    await expect(refreshed).resolves.toBe("new");
+    expect(await cache.load("dev|forms", async () => "unexpected", options)).toBe("new");
+    expect(await cache.load("prod|forms", async () => "unexpected", options)).toBe("prod-old");
+  });
+
+  it.each([true, false])(
+    "does not let an older pending read replace a refresh (old completes first: %s)",
+    async (oldCompletesFirst) => {
+      const cache = new ResponseCache();
+      const options = { ttlMs: 60_000 };
+      let resolveOld!: (value: string) => void;
+      let resolveNew!: (value: string) => void;
+      const old = cache.load(
+        "forms",
+        () =>
+          new Promise<string>((resolve) => {
+            resolveOld = resolve;
+          }),
+        options,
+      );
+      const fresh = withCacheRefresh(true, () =>
+        cache.load(
+          "forms",
+          () =>
+            new Promise<string>((resolve) => {
+              resolveNew = resolve;
+            }),
+          options,
+        ),
+      );
+
+      if (oldCompletesFirst) {
+        resolveOld("old");
+        await old;
+        expect(cache.getHealthSnapshot().pendingRequestCount).toBe(1);
+      }
+      resolveNew("new");
+      await expect(fresh).resolves.toBe("new");
+      if (!oldCompletesFirst) {
+        resolveOld("old");
+        await old;
+      }
+      expect(await cache.load("forms", async () => "unexpected", options)).toBe("new");
+    },
+  );
+
+  it("retries after a failed refresh instead of returning the old entry", async () => {
+    const cache = new ResponseCache();
+    const options = { ttlMs: 60_000 };
+    await cache.load("forms", async () => "old", options);
+    await expect(
+      withCacheRefresh(true, () =>
+        cache.load(
+          "forms",
+          async () => {
+            throw new Error("unavailable");
+          },
+          options,
+        ),
+      ),
+    ).rejects.toThrow("unavailable");
+    expect(await cache.load("forms", async () => "new", options)).toBe("new");
+  });
+
   it("returns cloned cached values", async () => {
     const cache = new ResponseCache();
     const loader = vi.fn().mockResolvedValue([{ id: "1" }]);

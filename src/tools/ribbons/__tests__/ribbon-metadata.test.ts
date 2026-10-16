@@ -1,5 +1,7 @@
 import { deflateRawSync } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { withCacheRefresh } from "../../../client/cache-context.js";
+import type { DynamicsClient } from "../../../client/dynamics-client.js";
 import type { EnvironmentConfig } from "../../../config/types.js";
 import { buildRetrieveEntityRibbonPath } from "../../../queries/ribbon-queries.js";
 import { createRecordingClient, createTestConfig } from "../../__tests__/tool-test-helpers.js";
@@ -458,7 +460,7 @@ describe("ribbon metadata", () => {
     expect(button.toolTipDescription).toBe("");
   });
 
-  it("loads localized ribbon text from solution translation exports", async () => {
+  it("loads, caches, and refreshes localized ribbon text from solution translation exports", async () => {
     const { client } = createRecordingClient({
       dev: {
         EntityDefinitions: [
@@ -489,7 +491,7 @@ describe("ribbon metadata", () => {
           {
             solutionid: "sol-1",
             friendlyname: "SYNERGIE_TalentPlug",
-            uniquename: "SYNERGIE_TalentPlug",
+            uniquename: "ribbon_refresh_test",
             ismanaged: false,
           },
         ],
@@ -510,6 +512,25 @@ describe("ribbon metadata", () => {
     expect(localized.label).toBe("Publier ou modifier");
     expect(localized.toolTipTitle).toBe("Publier ou modifier");
     expect(localized.toolTipDescription).toBe("Publier ou modifier");
+
+    const exportTranslation = vi.spyOn(client as DynamicsClient, "invokeAction").mockResolvedValue({
+      ExportTranslationFile: createStoredZip(
+        "CrmTranslations.xml",
+        translationWorkbookXml.replaceAll("Publier ou modifier", "Updated label"),
+        true,
+      ).toString("base64"),
+    });
+    const cached = await localizeRibbonButtonDetails(env, client, metadata.table, button);
+    expect(cached.label).toBe("Publier ou modifier");
+    expect(exportTranslation).not.toHaveBeenCalled();
+
+    const refreshed = await withCacheRefresh(true, () =>
+      localizeRibbonButtonDetails(env, client, metadata.table, button),
+    );
+    expect(refreshed.label).toBe("Updated label");
+    const reused = await localizeRibbonButtonDetails(env, client, metadata.table, button);
+    expect(reused.label).toBe("Updated label");
+    expect(exportTranslation).toHaveBeenCalledTimes(1);
   });
 
   it("shows the friendly label in button details output", async () => {
