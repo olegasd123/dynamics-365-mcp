@@ -105,7 +105,9 @@ Path resolved from `D365_MCP_CONFIG` env var, or `~/.dynamics-365-mcp/config.jso
 }
 ```
 
-For better protection, keep the client secret out of the JSON file. Store it in the OS keychain:
+#### Client Secret in the OS Keychain
+
+For `authType: "clientSecret"`, store the client secret **Value** from the Microsoft Entra app registration in the keychain. The **Secret ID** identifies the secret in Entra. In your environment config, replace the `clientSecret` field with `clientSecretSource` and `clientSecretName` as shown below.
 
 ```json
 {
@@ -116,29 +118,32 @@ For better protection, keep the client secret out of the JSON file. Store it in 
 }
 ```
 
-Default keychain service is `dynamics-365-mcp-client-certificates`. You can override it with `privateKeyKeychainService`.
-
-Store the PEM key:
-
-macOS Keychain:
+On **macOS**, run this command to add or update the secret. Paste the secret **Value** at the password prompt.
 
 ```bash
-security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat /secure/prod-client.key)"
+security add-generic-password -U -s dynamics-365-mcp-client-secrets -a dev-client-secret -w
 ```
 
-Linux Secret Service:
+- `-U` updates the entry if it exists or creates it if it is missing. Use the same service and account when you update the secret.
+- `-s` sets the Keychain service. Use the default shown above, or the value of `clientSecretKeychainService` if you set it.
+- `-a` sets the Keychain account. Use the exact value of `clientSecretName` from your config (`dev-client-secret` in this example).
+- `-w` at the end prompts for the secret, so its value stays out of your shell history.
+
+On **Linux**, enter the same secret value when Secret Service prompts you.
 
 ```bash
-secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < /secure/prod-client.key
+secret-tool store --label="Dynamics 365 MCP dev client secret" service dynamics-365-mcp-client-secrets account dev-client-secret
 ```
 
-Windows Credential Manager target:
+On **Windows**, save the secret in Credential Manager.
 
 ```powershell
 cmdkey /generic:dynamics-365-mcp-client-secrets/dev-client-secret /user:dev-client-secret /pass:"your-client-secret"
 ```
 
-Or read the client secret from an environment variable:
+#### Client Secret in an Environment Variable
+
+To read the secret from an environment variable, use these settings.
 
 ```json
 {
@@ -262,7 +267,7 @@ Optional:
 
 #### Client Certificate With OS Keychain Private Key
 
-Use this when you want the private key in the OS secret store instead of a plain file. The MCP reads the PEM private key from the keychain when it needs to sign a client assertion.
+For `authType: "clientCertificate"`, `certificatePath` points to the public certificate (`.crt`). The keychain holds the matching PEM private key (`.key`), which the MCP uses to sign in.
 
 ```json
 {
@@ -280,6 +285,22 @@ Use this when you want the private key in the OS secret store instead of a plain
   ],
   "defaultEnvironment": "prod"
 }
+```
+
+On **macOS**, replace `/secure/prod-client.key` with the path to your PEM private key file before running this command.
+
+```bash
+security add-generic-password -U -s dynamics-365-mcp-client-certificates -a prod-client-key -w "$(cat "/secure/prod-client.key")"
+```
+
+- `-s` selects the default certificate keychain service. If you set `privateKeyKeychainService`, use that value here.
+- `-a prod-client-key` selects the entry named by `privateKeyName` in your config.
+- `cat` reads the private key file. `$(...)` passes its text to `-w`, and the outer quotes keep all lines together. Keychain stores the PEM text.
+
+On **Linux**, `<` reads the same private key file into Secret Service.
+
+```bash
+secret-tool store --label="Dynamics 365 MCP prod client key" service dynamics-365-mcp-client-certificates account prod-client-key < "/secure/prod-client.key"
 ```
 
 #### Client Certificate With Windows Certificate Store
